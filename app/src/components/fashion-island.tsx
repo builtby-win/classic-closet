@@ -399,13 +399,6 @@ export default function FashionIsland() {
         </header>
         <div id="controls">
           <button id="cog" onClick={() => setSettingsOpen(v => !v)} aria-label="Settings" aria-expanded={settingsOpen} aria-controls="settings"><Icon name="settings" /></button>
-          <label className="class-control">
-            <span>Class</span>
-              <select aria-label="Choose class and weapon" value={classJob} onChange={e => chooseClass(e.target.value)}>
-                {['Beginner', 'Warrior', 'Magician', 'Bowman', 'Thief'].map(job => <option key={job} value={job}>{job}</option>)}
-              </select>
-              <span className="class-weapon" title={getItem(CATALOG, look.items.Weapon)?.name ?? 'Choose a weapon'} aria-live="polite">{getItem(CATALOG, look.items.Weapon)?.name ?? 'No weapon'}</span>
-          </label>
           <button id="shuffle" onClick={() => setLook(randomLook(look.sex, Math.random, excludedSlots, nxOnly, classJob))} aria-label="Randomize outfit"><Icon name="shuffle" /></button>
         </div>
         <div id="canvas">
@@ -445,6 +438,19 @@ export default function FashionIsland() {
               <button className={look.sex === 'm' ? 'on' : ''} onClick={() => setSex('m')}>♂ Male</button>
               <button className={look.sex === 'f' ? 'on' : ''} onClick={() => setSex('f')}>♀ Female</button>
             </div>
+          </div>
+          <div className="setrow">
+            <span>class</span>
+            <select aria-label="Choose class and weapon" value={classJob} onChange={(e) => chooseClass(e.target.value)}>
+              {['Beginner', 'Warrior', 'Magician', 'Bowman', 'Thief'].map((job) => (
+                <option key={job} value={job}>
+                  {job}
+                </option>
+              ))}
+            </select>
+            <span className="class-weapon" title={getItem(CATALOG, look.items.Weapon)?.name ?? 'Choose a weapon'}>
+              {getItem(CATALOG, look.items.Weapon)?.name ?? 'No weapon'}
+            </span>
           </div>
           <div className="setrow">
             <span>pose</span>
@@ -511,7 +517,7 @@ export default function FashionIsland() {
                 ))}
               </div>
             </div>
-            <Section id="Hair" news rates label={`🎲 Mystery Hair · ${mysteryHairs.length} · 5,500 NX random · ends Oct 28`} sub="Random style per coupon · 16.67% each · coupon lasts 14 days" onSeeAll={() => openCat('Hair')}>
+            <Section id="Hair" label="🎲 Mystery Hair" onSeeAll={() => openCat('Hair')}>
               {wornFirst(mysteryHairs.filter((st) => getStyle(CATALOG, st)), (st) => Math.floor(look.hair / 10) === st).slice(0, ROW_CAP).map((st) => {
                 const styleMeta = getStyle(CATALOG, st)!;
                 return (
@@ -533,7 +539,7 @@ export default function FashionIsland() {
             </Section>
 
             {/* 2. SIGNATURE HAIR (pick your style) */}
-            <Section id="HairSignature" news label={`✨ Signature Hair · ${signatureHairs.length} · 7,500 NX pick · ends Oct 28`} sub="Choose your style · coupon lasts 14 days" onSeeAll={() => openCat('HairSignature')}>
+            <Section id="HairSignature" label="✨ Signature Hair" onSeeAll={() => openCat('HairSignature')}>
               {wornFirst(signatureHairs.filter((st) => getStyle(CATALOG, st)), (st) => Math.floor(look.hair / 10) === st).slice(0, ROW_CAP).map((st) => {
                 const styleMeta = getStyle(CATALOG, st)!;
                 return (
@@ -554,13 +560,13 @@ export default function FashionIsland() {
               })}
             </Section>
 
-            <Section id="HairClassic" label={`Starter hair · ${starterHairStyles.length}`} onSeeAll={() => openCat('HairClassic')}>
+            <Section id="HairClassic" label="Starter Hair" onSeeAll={() => openCat('HairClassic')}>
               {wornFirst(starterHairStyles, (st) => Math.floor(look.hair / 10) === st).map((st) => {
                 const meta = getStyle(CATALOG, st)!;
                 return <Tile key={st} on={Math.floor(look.hair / 10) === st} img={iconURL(st * 10 + look.hairCol)} label={meta.name} attainable={true} onClick={() => wearItemById(st * 10 + look.hairCol, 'Hair')} />;
               })}
             </Section>
-            {pastHairStyles.length > 0 && <Section id="HairPast" label={`Past rotation hair · ${pastHairStyles.length}`} onSeeAll={() => openCat('HairPast')}>
+            {pastHairStyles.length > 0 && <Section id="HairPast" label="Past Rotation Hair" onSeeAll={() => openCat('HairPast')}>
               {wornFirst(pastHairStyles, (st) => Math.floor(look.hair / 10) === st).slice(0, ROW_CAP).map((st) => {
                 const meta = getStyle(CATALOG, st)!;
                 return <Tile key={st} on={Math.floor(look.hair / 10) === st} img={iconURL(st * 10 + look.hairCol)} label={meta.name} attainable={meta.attainable} bannerId={meta.bannerId} onClick={() => wearItemById(st * 10 + look.hairCol, 'Hair')} />;
@@ -587,7 +593,7 @@ export default function FashionIsland() {
             </div>
 
             {/* 4. MYSTERY FACES (random 16.67%) */}
-            <Section id="Face" news rates label={`🎲 Mystery Faces · ${mysteryFaces.length} · 3,500 NX random · ends Oct 28`} sub="Random style per coupon · 16.67% each · coupon lasts 14 days" onSeeAll={() => openCat('Face')}>
+            <Section id="Face" label="🎲 Mystery Faces" onSeeAll={() => openCat('Face')}>
               {wornFirst(mysteryFaces.filter((fid) => getItem(CATALOG, fid)), (fid) => faceStyleId(look.face) === faceStyleId(fid)).slice(0, ROW_CAP).map((fid) => {
                 const faceMeta = getItem(CATALOG, fid)!;
                 const faceId = faceVariantId(look.sex, faceStyleId(fid), faceColorIndex(look.face));
@@ -608,7 +614,7 @@ export default function FashionIsland() {
             </Section>
 
             {/* 5. SIGNATURE FACES (pick your face) */}
-            <Section id="FaceSignature" news label={`✨ Signature Faces · ${signatureFaces.length} · 5,500 NX pick · ends Oct 28`} sub="Choose your face · coupon lasts 14 days" onSeeAll={() => openCat('FaceSignature')}>
+            <Section id="FaceSignature" label="✨ Signature Faces" onSeeAll={() => openCat('FaceSignature')}>
               {wornFirst(signatureFaces.filter((fid) => getItem(CATALOG, fid)), (fid) => faceStyleId(look.face) === faceStyleId(fid)).slice(0, ROW_CAP).map((fid) => {
                 const faceMeta = getItem(CATALOG, fid)!;
                 const faceId = faceVariantId(look.sex, faceStyleId(fid), faceColorIndex(look.face));
@@ -628,13 +634,13 @@ export default function FashionIsland() {
               })}
             </Section>
 
-            <Section id="FaceClassic" label={`Starter eyes · ${starterFaces.length}`} onSeeAll={() => openCat('FaceClassic')}>
+            <Section id="FaceClassic" label="Starter Eyes" onSeeAll={() => openCat('FaceClassic')}>
               {wornFirst(starterFaces, (fid) => faceStyleId(look.face) === faceStyleId(fid)).map((fid) => {
                 const meta = getItem(CATALOG, fid)!;
                 return <Tile key={fid} on={faceStyleId(look.face) === faceStyleId(fid)} img={iconURL(faceVariantId(look.sex, faceStyleId(fid), faceColorIndex(look.face)))} label={meta.name} attainable={true} onClick={() => wearItemById(fid, 'Face')} />;
               })}
             </Section>
-            {pastFaces.length > 0 && <Section id="FacePast" label={`Past rotation eyes · ${pastFaces.length}`} onSeeAll={() => openCat('FacePast')}>
+            {pastFaces.length > 0 && <Section id="FacePast" label="Past Rotation Eyes" onSeeAll={() => openCat('FacePast')}>
               {wornFirst(pastFaces, (fid) => faceStyleId(look.face) === faceStyleId(fid)).slice(0, ROW_CAP).map((fid) => {
                 const meta = getItem(CATALOG, fid)!;
                 return <Tile key={fid} on={faceStyleId(look.face) === faceStyleId(fid)} img={iconURL(faceVariantId(look.sex, faceStyleId(fid), faceColorIndex(look.face)))} label={meta.name} attainable={meta.attainable} bannerId={meta.bannerId} onClick={() => wearItemById(fid, 'Face')} />;
@@ -644,21 +650,11 @@ export default function FashionIsland() {
             {/* Equipment by slot; shirts and pants are alternatives to an overall. */}
             {equipSections.map(({ id: slot, label, ids: list }) => {
               if (!list.length) return null;
-              const coverEnd = getBanner(CATALOG, 'covers-10day-nov26')?.end;
-              const covers = list.filter((id) => getItem(CATALOG, id)?.group === 'cover-10day').length;
-              const sub = covers > 0 && covers === list.length
-                ? `10-day duration · 700–1,200 NX · sale ends ${coverEnd ? shortDate(coverEnd) : 'Nov 18'}`
-                : covers > 0
-                  ? `Includes ${covers} × 10-day cover${covers === 1 ? '' : 's'}`
-                  : undefined;
-              const coverLabel = sub && covers === list.length ? `${label} · 10-day · ${list.length}` : `${label} · ${list.length}`;
               return (
                 <Section
                   key={slot}
                   id={slot}
-                  label={coverLabel}
-                  sub={sub}
-                  news={covers > 0}
+                  label={label}
                   onSeeAll={() => openCat(slot)}
                 >
                   {wornFirst(list.filter((id) => getItem(CATALOG, id)), (id) => Object.values(look.items).includes(id)).slice(0, ROW_CAP).map((id) => {

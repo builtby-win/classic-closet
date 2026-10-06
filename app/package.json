@@ -11,7 +11,7 @@
     "test": "tsx --test tests/*.test.ts",
     "catalog": "tsx scripts/build-catalog.ts",
     "update-banners": "tsx scripts/update-banners.ts",
-    "deploy": "pnpm build && CLOUDFLARE_ACCOUNT_ID=58df26bb8dbf15af4045df9c8f1740f1 wrangler pages deploy dist --project-name maple-closet --branch production"
+    "deploy": "pnpm build && CLOUDFLARE_ACCOUNT_ID=58df26bb8dbf15af4045df9c8f1740f1 npx wrangler pages deploy dist --project-name maple-closet --branch production"
   },
   "dependencies": {
     "astro": "^7.3.1",

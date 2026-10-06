@@ -84,10 +84,7 @@
 .worn-alert { color: var(--dim); font-size: 11px; line-height: 1.5; }
 #controls { position: absolute; top: 52px; left: 16px; right: 16px; display: flex; align-items: center; justify-content: space-between; gap: 10px; pointer-events: none; z-index: 2; }
 #controls button { pointer-events: auto; }
-.class-control { pointer-events: auto; display: flex; align-items: center; gap: 6px; min-width: 0; padding: 5px 8px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-2); color: var(--dim); font-size: 11px; }
-.class-control select { min-width: 82px; border: 0; outline: 0; padding: 2px 16px 2px 0; background: transparent; color: var(--txt); font-size: 12px; font-weight: 600; }
-.class-weapon { max-width: 76px; overflow: hidden; color: var(--dim); text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
-.class-control option { background: var(--surface); color: var(--txt); }
+
 .mf svg { width: 18px; height: 18px; flex: none; }
 .mf button:focus-visible, .site-credit:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 
@@ -153,6 +150,7 @@
 .seg button { flex: 1; min-height: 32px; }
 .seg button.on { background: var(--surface); color: var(--txt); box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
 .setrow select { appearance: none; }
+.setrow .class-weapon { color: var(--dim); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px; }
 #skins { display: flex; gap: 8px; align-items: center; }
 #skins button {
   width: 28px;
@@ -243,7 +241,7 @@
 .sec h2 .newslink { font-weight: 500; margin-left: 6px; }
 .cat-sub { padding: 0 16px 8px; }
 #catpage .cat-sub { flex: none; }
-.seeall { background: none; border: none; color: var(--accent); font-size: 13px; font-weight: 500; cursor: pointer; padding: 2px 0; }
+.seeall { background: none; border: none; color: var(--accent); font-size: 13px; font-weight: 500; cursor: pointer; padding: 2px 0; white-space: nowrap; flex: none; }
 .row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
 .row::-webkit-scrollbar { display: none; }
 
@@ -429,10 +427,7 @@
   #catgrid { grid-template-columns: repeat(6, 1fr); }
 }
 
-@media (max-width: 360px) {
-  .class-weapon { display: none; }
-  .class-control select { min-width: 72px; }
-}
+
 
 /* Feedback overlays the stage without reserving a row. */
 .equip-toast-slot { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); width: min(280px, calc(100% - 96px)); z-index: 3; pointer-events: none; }
