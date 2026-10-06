@@ -1,0 +1,565 @@
+import catalogData from '../data/catalog.json';
+// Shared domain model for the fashion customizer.
+// Rendering is 100% remote (maplestory.io); this lib builds URLs + filters the baked catalog.
+
+export const API = 'https://maplestory.io/api/MCW/CBT2';
+export const REGION = 'MCW';
+export const VERSION = 'CBT2';
+
+export interface BannerMeta {
+  id: string;
+  label: string;
+  start: string | null;
+  end: string | null;
+  note?: string;
+  post?: string;
+  rates?: string;
+}
+
+
+export interface HairStyleMeta {
+  name: string;
+  sex: 'm' | 'f';
+  bannerId: string;
+  attainable: boolean;
+  rate?: string;
+  src?: 'GMS';
+  history?: string[];
+  coupon?: 'mystery' | 'signature';
+}
+
+export interface ItemMeta {
+  name: string;
+  sub: string;
+  requiredJobs?: string[];
+  requiredLevel?: number;
+  sex: 'm' | 'f' | 'u';
+  bannerId: string;
+  attainable: boolean;
+  group?: string;
+  rate?: string;
+  src?: 'GMS';
+  history?: string[];
+  coupon?: 'mystery' | 'signature';
+}
+
+export interface SearchEntry {
+  id: number;
+  name: string;
+  sub: string;
+  sex: 'm' | 'f' | 'u';
+  isStyle?: boolean;
+}
+
+export interface FastCatalog {
+  banners: Record<string, BannerMeta>;
+  styles: Record<number, HairStyleMeta>;
+  items: Record<number, ItemMeta>;
+  indexes: {
+    hairs: {
+      m: { active: number[]; past: number[] };
+      f: { active: number[]; past: number[] };
+    };
+    faces: {
+      m: { active: number[]; past: number[] };
+      f: { active: number[]; past: number[] };
+    };
+    groups: Record<string, {
+      m: number[];
+      f: number[];
+      u: number[];
+    }>;
+    search: SearchEntry[];
+  };
+}
+
+export type Sex = 'm' | 'f';
+
+export type SectionId =
+  | 'Hair'
+  | 'HairClassic'
+  | 'HairPast'
+  | 'HairSignature'
+  | 'Face'
+  | 'FaceClassic'
+  | 'FacePast'
+  | 'FaceSignature'
+  | 'founder-crate'
+  | 'aurora-crate'
+  | 'cover-10day'
+  | 'Shield' | 'Hat' | 'Top' | 'Bottom' | 'Overall' | 'Shoes' | 'Glove' | 'Weapon' | 'Cape' | 'Accessories';
+
+// Static lookup: weapon subcategory names
+const WEAPON_SUBS: Record<string, true> = {
+  Cash: true,
+  'One-Handed Blunt Weapon': true,
+  Claw: true,
+  Dagger: true,
+  'One-Handed Sword': true,
+  'One-Handed Axe': true,
+  Wand: true,
+  'Two-Handed Sword': true,
+  Bow: true,
+  'Two-Handed Axe': true,
+  'Two-Handed Blunt': true,
+  'Pole Arm': true,
+  Crossbow: true,
+  Spear: true,
+  Staff: true,
+  Katara: true,
+  Knuckle: true,
+  Gun: true,
+  'Dual Bowguns': true,
+  'Hand Cannon': true,
+  'Shining Rod': true,
+  'Psy-limiter': true,
+  Chain: true,
+  Gauntlet: true,
+  Cane: true,
+  'Ritual Fan': true,
+};
+
+/** Idle/walk stance whose renderer frames draw each weapon family correctly.
+ *  Verified against maplestory.io item frameBooks: 1H weapons have stand1/walk1
+ *  only; 2H melee, spears, polearms and crossbows have stand2 (no stand1);
+ *  bows only draw held correctly in alert (stand1 clips, stand2 hides).
+ */
+const WEAPON_STANCE: Record<string, { stand: string; walk: string }> = {
+  'One-Handed Sword': { stand: 'stand1', walk: 'walk1' },
+  'One-Handed Axe': { stand: 'stand1', walk: 'walk1' },
+  'One-Handed Blunt Weapon': { stand: 'stand1', walk: 'walk1' },
+  Dagger: { stand: 'stand1', walk: 'walk1' },
+  Claw: { stand: 'stand1', walk: 'walk1' },
+  Wand: { stand: 'stand1', walk: 'walk1' },
+  Staff: { stand: 'stand1', walk: 'walk1' },
+  'Two-Handed Sword': { stand: 'stand2', walk: 'walk1' },
+  'Two-Handed Axe': { stand: 'stand2', walk: 'walk2' },
+  'Two-Handed Blunt': { stand: 'stand2', walk: 'walk2' },
+  Spear: { stand: 'stand2', walk: 'walk2' },
+  'Pole Arm': { stand: 'stand2', walk: 'walk2' },
+  Crossbow: { stand: 'stand2', walk: 'walk2' },
+  Bow: { stand: 'alert', walk: 'walk1' },
+};
+
+/** Subs that occupy both hands: no shield can be worn with them. */
+export const TWO_HAND_SUBS: Record<string, true> = {
+  'Two-Handed Sword': true,
+  'Two-Handed Axe': true,
+  'Two-Handed Blunt': true,
+  Spear: true,
+  'Pole Arm': true,
+  Crossbow: true,
+  Bow: true,
+};
+
+/**
+ * Idle stance that draws this weapon correctly, or null to keep current anim.
+ * Only stand/walk poses are steered (they are per-weapon stances); action poses
+ * carry their own weapon frames. Unknown subs (e.g. Cash) keep stance.
+ */
+export function stanceForWeapon(sub: string | undefined, currentAnim: string): { anim: string; frame: number } | null {
+  if (!sub) return null;
+  const want = WEAPON_STANCE[sub];
+  if (!want) return null;
+  if ((currentAnim === 'stand1' || currentAnim === 'stand2') && currentAnim !== want.stand) {
+    return { anim: want.stand, frame: 0 };
+  }
+  if ((currentAnim === 'walk1' || currentAnim === 'walk2') && currentAnim !== want.walk) {
+    return { anim: want.walk, frame: 0 };
+  }
+  return null;
+}
+
+/** Short group tag for badges */
+export const GROUP_SHORT: Record<string, string> = {
+  'founder-crate': 'Founder',
+  'aurora-crate': 'Aurora',
+  'style-coupon': 'Style',
+  'cover-10day': '10-Day',
+  'classic-equips': 'Job Equips',
+  'past-rotation': 'Past',
+};
+
+/** Which equip slot an item occupies (for wearing). Group sections bypass this. */
+export function equipSlot(sub: string): string {
+  if (WEAPON_SUBS[sub]) return 'Weapon';
+  if (sub === 'Face Accessory') return 'FaceAcc';
+  if (sub === 'Eye Decoration') return 'EyeDec';
+  if (sub === 'Earrings' || sub === 'Ring') return 'Earring';
+  return sub;
+}
+
+/** Hair style id = floor(id/10); color variant = id%10. Style base name strips the color prefix. */
+export const HAIR_COLORS = ['Black', 'Red', 'Orange', 'Blonde', 'Green', 'Blue', 'Purple', 'Brown'] as const;
+export const EYE_COLORS = ['Black', 'Blue', 'Red', 'Green', 'Brown', 'Cyan', 'Purple', 'Dark red', 'White'] as const;
+
+export function faceStyleId(faceId: number): number {
+  return faceId % 100;
+}
+
+export function faceColorIndex(faceId: number): number {
+  return Math.floor(faceId / 100) % 10;
+}
+
+export function faceVariantId(sex: Sex, styleId: number, color: number): number {
+  return (sex === 'f' ? 21000 : 20000) + color * 100 + styleId;
+}
+
+export function hairBaseName(name: string): string {
+  for (const c of HAIR_COLORS) {
+    if (name.startsWith(c + ' ')) return name.slice(c.length + 1);
+  }
+  return name;
+}
+
+export interface Look {
+  sex: Sex;
+  skin: number;
+  hair: number;
+  hairCol: number;
+  face: number;
+  anim: string;
+  frame: number;
+  items: Partial<Record<string, number>>;
+}
+
+export const DEFAULT_LOOK: Look = {
+  sex: 'm',
+  skin: 2000,
+  hair: 30130, // Antagonist (Black)
+  hairCol: 0,
+  face: 20805, // Alert Face
+  anim: 'stand1',
+  frame: 0,
+  items: { Hat: 1002000, Top: 1040002, Bottom: 1060002, Shoes: 1072000, Glove: 1082000, Weapon: 1302000 },
+};
+
+/** Character render URL */
+export const GMS_API = 'https://maplestory.io/api/GMS/270';
+
+const CATALOG = catalogData as FastCatalog;
+
+export const RANDOM_EQUIP_SLOTS = ['Hat', 'Top', 'Bottom', 'Shoes', 'Glove', 'Cape', 'Weapon'] as const;
+export type RandomEquipSlot = typeof RANDOM_EQUIP_SLOTS[number];
+
+export function randomClassicWeapon(sex: Sex, job: string, random: () => number = Math.random): number | undefined {
+  const group = CATALOG.indexes.groups['classic-equips'];
+  const weapons = [...group.u, ...group[sex]].filter(id => {
+    const item = CATALOG.items[id];
+    if (!item?.attainable || equipSlot(item.sub) !== 'Weapon') return false;
+    const jobs = item.requiredJobs ?? [];
+    return jobs.includes('Beginner') || jobs.includes(job);
+  });
+  return weapons.length ? weapons[Math.floor(random() * weapons.length)] : undefined;
+}
+
+/** Randomize a complete outfit using current, sex-compatible catalog items. */
+export function randomLook(sex: Sex, random: () => number = Math.random, excludedSlots: readonly RandomEquipSlot[] = [], nxOnly = false, job = 'Beginner'): Look {
+  const pick = <T,>(values: T[]): T => values[Math.floor(random() * values.length)];
+  const group = CATALOG.indexes.groups['classic-equips'];
+  const candidates = (nxOnly
+    ? [
+        ...Object.entries(CATALOG.indexes.groups).filter(([key]) => key !== 'classic-equips').flatMap(([, g]) => [...g.u, ...g[sex]]),
+        ...group.u.concat(group[sex]).filter(id => equipSlot(CATALOG.items[id]?.sub ?? '') === 'Weapon'),
+      ]
+    : [...group.u, ...group[sex]]).filter(id => CATALOG.items[id]?.attainable);
+  const items: Look['items'] = {};
+  for (const slot of RANDOM_EQUIP_SLOTS) {
+    if (excludedSlots.includes(slot)) continue;
+    const ids = candidates.filter(id => {
+      const item = CATALOG.items[id];
+      if (equipSlot(item.sub) !== slot) return false;
+      if (slot !== 'Weapon' || item.group !== 'classic-equips' || job === 'All') return true;
+      const jobs = item.requiredJobs ?? [];
+      return jobs.includes('Beginner') || jobs.includes(job);
+    });
+    if (!ids.length) {
+      if (nxOnly) continue;
+      throw new Error(`No compatible items for ${sex} ${slot}`);
+    }
+    items[slot] = pick(ids);
+  }
+  const hairCol = Math.floor(random() * HAIR_COLORS.length);
+  const hair = pick(CATALOG.indexes.hairs[sex].active) * 10 + hairCol;
+  const faceStyle = faceStyleId(pick(CATALOG.indexes.faces[sex].active));
+  const eyeColor = Math.floor(random() * EYE_COLORS.length);
+  const stance = stanceForWeapon(
+    items.Weapon != null ? CATALOG.items[items.Weapon]?.sub : undefined,
+    DEFAULT_LOOK.anim,
+  );
+  return {
+    ...DEFAULT_LOOK, sex, items, hairCol,
+    hair,
+    face: faceVariantId(sex, faceStyle, eyeColor),
+    ...(stance ? { anim: stance.anim, frame: stance.frame } : null),
+  };
+}
+
+/** Resolve each asset independently; same-number equips are not interchangeable. */
+function assetSource(itemId: number): { region: string; version: string } {
+  const meta = getItem(CATALOG, itemId);
+  return meta?.src === 'GMS'
+    ? { region: 'GMS', version: '270' }
+    : { region: REGION, version: VERSION };
+}
+
+export function renderURL(look: Look): string {
+  // The Avatar endpoint requires both body and head, unlike the legacy Character endpoint.
+  const ids = [look.skin, look.skin + 10000, look.face, look.hair, ...Object.values(look.items)];
+  const entries = ids.filter((id): id is number => id != null).map(itemId => ({
+    itemId,
+    ...assetSource(itemId),
+  }));
+  const items = encodeURIComponent(entries.map(entry => JSON.stringify(entry)).join(','));
+  return `https://maplestory.io/api/character/${items}/${encodeURIComponent(look.anim)}/${look.frame}`;
+}
+
+/** Item icons use the same source as the character renderer. */
+export function iconURL(itemId: number): string {
+  const { region, version } = assetSource(itemId);
+  return `https://maplestory.io/api/${region}/${version}/item/${itemId}/icon`;
+}
+
+/** Apply an equip pick with Overall ↔ Top/Bottom and 2H-weapon ↔ Shield exclusion.
+ *  Needs the picked item's sub (not just the slot): a two-handed weapon drops the
+ *  shield, and a shield is refused while a two-handed weapon is worn.
+ */
+export function applyPick(items: Look['items'], slot: string, id: number | null, sub?: string): Look['items'] {
+  const next = { ...items };
+  if (slot === 'Overall' && id) {
+    delete next.Top;
+    delete next.Bottom;
+  }
+  if ((slot === 'Top' || slot === 'Bottom') && id) {
+    delete next.Overall;
+  }
+  if (slot === 'Weapon' && id && sub && TWO_HAND_SUBS[sub]) {
+    delete next.Shield;
+  }
+  if (slot === 'Shield' && id) {
+    const weaponSub = CATALOG.items[next.Weapon ?? -1]?.sub;
+    if (weaponSub && TWO_HAND_SUBS[weaponSub]) return next;
+  }
+  if (id) next[slot] = id;
+  else delete next[slot];
+  return next;
+}
+
+function toBase64(str: string): string {
+  if (typeof btoa !== 'undefined') return btoa(str);
+  if (typeof Buffer !== 'undefined') return Buffer.from(str).toString('base64');
+  return '';
+}
+
+function fromBase64(b64: string): string {
+  let normalized = b64.replace(/-/g, '+').replace(/_/g, '/');
+  while (normalized.length % 4 !== 0) normalized += '=';
+  if (typeof atob !== 'undefined') return atob(normalized);
+  if (typeof Buffer !== 'undefined') return Buffer.from(normalized, 'base64').toString('utf8');
+  return '';
+}
+
+/** Encode the look into readable query params. */
+export function encodeLook(look: Look): string {
+  const params = new URLSearchParams();
+  params.set('sex', look.sex);
+  params.set('skin', String(look.skin));
+  params.set('hair', String(look.hair));
+  params.set('hairCol', String(look.hairCol));
+  params.set('face', String(look.face));
+  params.set('anim', look.anim);
+  params.set('frame', String(look.frame));
+  for (const [slot, id] of Object.entries(look.items)) {
+    params.set(slot, String(id));
+  }
+  return params.toString();
+}
+
+/**
+ * Decode a look from query parameter, search string, URL hash, or raw base64.
+ */
+export function decodeLook(input?: string): Partial<Look> | null {
+  if (!input) return null;
+  const trimmed = input.trim();
+
+  // If input contains query string
+  if (trimmed.includes('?') || trimmed.includes('&') || trimmed.includes('=')) {
+    const search = trimmed.startsWith('?') ? trimmed.slice(1) : trimmed.includes('?') ? trimmed.split('?')[1] : trimmed;
+    const params = new URLSearchParams(search);
+    const lookParam = params.get('look');
+    if (lookParam) {
+      const decoded = decodeLook(lookParam);
+      if (decoded) return decoded;
+    }
+    // Check individual params fallback
+    if (params.has('hair') || params.has('face') || params.has('sex')) {
+      const partial: Partial<Look> = {};
+      if (params.has('sex')) partial.sex = params.get('sex') === 'f' ? 'f' : 'm';
+      if (params.has('skin')) partial.skin = Number(params.get('skin')) || 2000;
+      if (params.has('hair')) partial.hair = Number(params.get('hair')) || 30130;
+      if (params.has('hairCol')) partial.hairCol = Number(params.get('hairCol')) || 0;
+      if (params.has('face')) partial.face = Number(params.get('face')) || 20805;
+      if (params.has('anim')) partial.anim = params.get('anim') || 'stand1';
+      if (params.has('frame')) partial.frame = Number(params.get('frame')) || 0;
+      // Equip slots (Hat, Top, Bottom, Overall, Shoes, Weapon, …) round-trip as
+      // their own params — anything else here is an equip id.
+      const KNOWN: Record<string, true> = { sex: true, skin: true, hair: true, hairCol: true, face: true, anim: true, frame: true, look: true };
+      const items: Partial<Record<string, number>> = {};
+      for (const [k, v] of params) {
+        if (KNOWN[k]) continue;
+        const id = Number(v);
+        if (Number.isInteger(id) && id > 0) items[k] = id;
+      }
+      if (Object.keys(items).length) partial.items = items;
+      return partial;
+    }
+  }
+
+  // If input is URL hash (#...)
+  const cleaned = trimmed.replace(/^[#?]/, '').replace(/^look=/, '');
+  try {
+    const json = fromBase64(cleaned);
+    const parsed: unknown = JSON.parse(json);
+    if (parsed && typeof parsed === 'object') return parsed as Partial<Look>;
+  } catch {
+    // ignore parse error
+  }
+  return null;
+}
+
+export const STORAGE_LOOK_KEY = 'mf-look';
+export const STORAGE_SEX_KEY = 'mf-sex';
+
+export function saveLookToStorage(look: Look): void {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(STORAGE_LOOK_KEY, JSON.stringify(look));
+      localStorage.setItem(STORAGE_SEX_KEY, look.sex);
+    }
+  } catch {
+    // ignore
+  }
+}
+
+export function loadLookFromStorage(): Partial<Look> | null {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const raw = localStorage.getItem(STORAGE_LOOK_KEY);
+      if (raw) {
+        const parsed: unknown = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') return parsed as Partial<Look>;
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+/** Item resolved through color virtualization (hair styles expand to per-color ids). */
+export interface ResolvedItem extends ItemMeta {
+  id: number;
+  style?: number;
+}
+
+/** Unified O(1) item lookup with color virtualization */
+export function getItem(
+  catalog: FastCatalog,
+  id: number | null | undefined,
+): ResolvedItem | undefined {
+  if (id == null) return undefined;
+  // Hair items in MapleStory (30000..49999) virtualize colors from base style
+  if (id >= 30000 && id < 50000) {
+    const style = Math.floor(id / 10);
+    const styleMeta = catalog.styles[style];
+    if (styleMeta) {
+      return {
+        id,
+        style,
+        name: styleMeta.name,
+        sub: 'Hair',
+        sex: styleMeta.sex,
+        bannerId: styleMeta.bannerId,
+        attainable: styleMeta.attainable,
+        group: styleMeta.bannerId ? 'style-coupon' : undefined,
+        rate: styleMeta.rate,
+        src: styleMeta.src,
+        history: styleMeta.history,
+        coupon: styleMeta.coupon,
+      };
+    }
+  }
+  // Face color is the hundreds digit; preserve the style suffix across colors.
+  if (id >= 20000 && id < 22000) {
+    const faceStyle = faceStyleId(id);
+    const faceBase = id >= 21000 ? 21000 : 20000;
+    for (let color = 0; color <= 8; color++) {
+      const variant = catalog.items[faceBase + color * 100 + faceStyle];
+      if (variant?.sub === 'Face') return { id, ...variant };
+    }
+  }
+  const item = catalog.items[id];
+  if (item) {
+    return { id, ...item };
+  }
+  return undefined;
+}
+
+/** O(1) style lookup */
+export function getStyle(catalog: FastCatalog, styleId: number | null | undefined): HairStyleMeta | undefined {
+  if (styleId == null) return undefined;
+  return catalog.styles[styleId];
+}
+
+/** O(1) banner lookup */
+export function getBanner(catalog: FastCatalog, bannerId?: string): BannerMeta | undefined {
+  if (!bannerId) return undefined;
+  return catalog.banners[bannerId];
+}
+
+/** Formats attainability note in O(1) time */
+export function formatAttainableInfo(
+  catalog: FastCatalog,
+  itemId: number | null | undefined,
+): {
+  isAttainable: boolean;
+  statusText: string;
+  dateRangeText?: string;
+  bannerLabel?: string;
+} {
+  const item = getItem(catalog, itemId);
+  if (!item) {
+    return { isAttainable: true, statusText: 'Active' };
+  }
+  if (item.group === 'classic-equips') {
+    return { isAttainable: true, statusText: 'Non-NX equip' };
+  }
+  const banner = getBanner(catalog, item.bannerId);
+  if (item.attainable) {
+    const end = banner?.end;
+    return {
+      isAttainable: true,
+      statusText: end ? `Ends ${end.slice(5)}` : 'Active',
+      dateRangeText: banner?.start && banner?.end ? `${banner.start} – ${banner.end}` : undefined,
+      bannerLabel: banner?.label,
+    };
+  }
+  const range =
+    banner?.start && banner?.end
+      ? `${banner.start} – ${banner.end}`
+      : banner?.end
+        ? `Ended ${banner.end}`
+        : 'Past Rotation';
+  return {
+    isAttainable: false,
+    statusText: 'Not Attainable',
+    dateRangeText: `Last available: ${range}`,
+    bannerLabel: banner?.label,
+  };
+}
+
+/** Common equips are wearable by every class; class filters only affect job equips. */
+export function matchesJob(item: ItemMeta | undefined, job: string): boolean {
+  return job === 'All' || item?.group !== 'classic-equips' ||
+    !item.requiredJobs?.length || item.requiredJobs.includes('Beginner') || item.requiredJobs.includes(job);
+}

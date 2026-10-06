@@ -1,0 +1,6 @@
+{
+  "$schema": "./nexon-overlay.schema.json",
+  "_comment": "Hand-tracked Nexon releases (founder shop, patch notes) not yet in MCW/1 data. Applied by pnpm catalog AFTER the maplestory.io fetch, so these entries win.",
+  "items": [],
+  "hide": []
+}

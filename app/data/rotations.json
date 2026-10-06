@@ -1,0 +1,149 @@
+{
+  "sources": [
+    {
+      "id": "founder-crate-oct26",
+      "label": "Founder's Mystery Fashion Crate",
+      "start": "2026-10-06",
+      "end": "2026-10-28",
+      "post": "https://www.nexon.com/maplestory/news/sale/45819/founder-s-access-cash-shop",
+      "rates": "https://g.nexonstatic.com/maplestory/cms/v1/general-posts/45538"
+    },
+    {
+      "id": "aurora-s1",
+      "label": "Aurora Stamp Shop Season 1",
+      "start": "2026-10-06",
+      "end": "2027-01-13",
+      "rates": "https://g.nexonstatic.com/maplestory/cms/v1/general-posts/45659"
+    },
+    {
+      "id": "style-oct26",
+      "label": "Mystery/Signature Style Coupons",
+      "start": "2026-10-06",
+      "end": "2026-10-28",
+      "rates": "https://g.nexonstatic.com/maplestory/cms/v1/general-posts/45537"
+    },
+    {
+      "id": "covers-10day-nov26",
+      "label": "10-Day Equip Covers",
+      "start": "2026-10-06",
+      "end": "2026-11-18",
+      "post": "https://www.nexon.com/maplestory/news/sale/45819/founder-s-access-cash-shop"
+    }
+  ],
+  "current": [
+    {
+      "id": "style-oct26",
+      "type": "style-coupon",
+      "label": "Mystery & Signature Style Coupons",
+      "start": "2026-10-06",
+      "end": "2026-10-28",
+      "note": "Mystery Hair 5,500 NX · Mystery Face 3,500 NX · Signature Hair 7,500 NX · Signature Face 5,500 NX · 14-day styles",
+      "post": "https://www.nexon.com/maplestory/news/sale/45819/founder-s-access-cash-shop",
+      "rates": "https://g.nexonstatic.com/maplestory/cms/v1/general-posts/45537",
+      "hairs": [
+        { "name": "Metrosexual Hair", "sex": "m", "rate": "16.67%", "style": 3005 },
+        { "name": "Antagonist", "sex": "m", "rate": "16.67%", "style": 3013 },
+        { "name": "Dreamcatcher", "sex": "m", "rate": "16.67%", "style": 3080 },
+        { "name": "Bed Head Hair", "sex": "m", "rate": "16.67%", "style": 3239 },
+        { "name": "Prince Cut Hair", "sex": "m", "rate": "16.67%", "style": 3300 },
+        { "name": "Short Regent Cut", "sex": "m", "rate": "16.67%", "style": 3335 },
+        { "name": "Lovely Ladyhawk", "sex": "f", "rate": "16.67%", "style": 3168 },
+        { "name": "Angelica Hair", "sex": "f", "rate": "16.67%", "style": 3115 },
+        { "name": "Caspia Hair", "sex": "f", "rate": "16.67%", "style": 3122 },
+        { "name": "Rose", "sex": "f", "rate": "16.67%", "style": 3123 },
+        { "name": "Ponytail-to-the-Side", "sex": "f", "rate": "16.67%", "style": 3475 },
+        { "name": "Vivacious Wavy Hair", "sex": "f", "rate": "16.67%", "style": 3421 }
+      ],
+      "faces": [
+        { "name": "Rebel's Fire", "sex": "m", "rate": "16.67%", "id": 20804 },
+        { "name": "Worrisome Glare", "sex": "m", "rate": "16.67%", "id": 20808 },
+        { "name": "Alert Face", "sex": "m", "rate": "16.67%", "id": 20805 },
+        { "name": "Overjoyed Smile", "sex": "m", "rate": "16.67%", "id": 20821 },
+        { "name": "Innocent Gaze", "sex": "m", "rate": "16.67%", "id": 20033 },
+        { "name": "Distant Gaze", "sex": "m", "rate": "16.67%", "id": 20035 },
+        { "name": "Beauty Stare", "sex": "f", "rate": "16.67%", "id": 21816 },
+        { "name": "Strong Stare", "sex": "f", "rate": "16.67%", "id": 21803 },
+        { "name": "Prim Face", "sex": "f", "rate": "16.67%", "id": 21053 },
+        { "name": "Posh Look", "sex": "f", "rate": "16.67%", "id": 21057 },
+        { "name": "Bulbous-Eyed Face", "sex": "f", "rate": "16.67%", "id": 21072 },
+        { "name": "Round Eyed Face", "sex": "f", "rate": "16.67%", "id": 21077 }
+      ],
+      "signatureHairs": [
+        { "name": "Bowl Cut", "sex": "m", "style": 3019 },
+        { "name": "Line Scratch Hair", "sex": "m", "style": 3017 },
+        { "name": "Chestnut", "sex": "m", "style": 3024 },
+        { "name": "Mohecan Shaggy 'Do", "sex": "m", "style": 3028 },
+        { "name": "Medium Cornrows", "sex": "m", "style": 3015 },
+        { "name": "Mane", "sex": "m", "style": 3018 },
+        { "name": "Bridget", "sex": "f", "style": 3109 },
+        { "name": "Jolie", "sex": "f", "style": 3113 },
+        { "name": "Holla' Back 'Do", "sex": "f", "style": 3120 },
+        { "name": "Veronica", "sex": "f", "style": 3101 },
+        { "name": "Rastafari Hair", "sex": "f", "style": 3117 },
+        { "name": "Penelope Hair", "sex": "f", "style": 3133 }
+      ],
+      "signatureFaces": [
+        { "name": "Smart Aleck", "sex": "m", "id": 20009 },
+        { "name": "Cool Guy Gaze", "sex": "m", "id": 20011 },
+        { "name": "Insomniac Daze", "sex": "m", "id": 20013 },
+        { "name": "Look of Wonder", "sex": "m", "id": 20014 },
+        { "name": "Wisdom Glance", "sex": "m", "id": 20010 },
+        { "name": "Babyface Pout", "sex": "m", "id": 20006 },
+        { "name": "Curious Look", "sex": "f", "id": 21014 },
+        { "name": "Hera's Radiance", "sex": "f", "id": 21019 },
+        { "name": "Gentle Glow", "sex": "f", "id": 21020 },
+        { "name": "Hopeless Gaze", "sex": "f", "id": 21008 },
+        { "name": "Wide-eyed Girl", "sex": "f", "id": 21013 },
+        { "name": "Babyface Pout", "sex": "f", "id": 21005 }
+      ]
+    },
+    {
+      "id": "founder-crate-oct26",
+      "type": "crate",
+      "label": "Founder's Mystery Fashion Crate",
+      "start": "2026-10-06",
+      "end": "2026-10-28",
+      "note": "Mystery Fashion Crate · 3,500 NX",
+      "post": "https://www.nexon.com/maplestory/news/sale/45819/founder-s-access-cash-shop",
+      "rates": "https://g.nexonstatic.com/maplestory/cms/v1/general-posts/45538"
+    },
+    {
+      "id": "aurora-s1",
+      "type": "shop",
+      "label": "Aurora Stamp Shop Season 1",
+      "start": "2026-10-06",
+      "end": "2027-01-13",
+      "rates": "https://g.nexonstatic.com/maplestory/cms/v1/general-posts/45659"
+    },
+    {
+      "id": "covers-10day-nov26",
+      "type": "covers",
+      "label": "10-Day Equip Covers",
+      "start": "2026-10-06",
+      "end": "2026-11-18",
+      "note": "700–1,200 NX · 10-day duration",
+      "post": "https://www.nexon.com/maplestory/news/sale/45819/founder-s-access-cash-shop"
+    }
+  ],
+  "past": [
+    {
+      "id": "beta-style-sep26",
+      "type": "style-coupon",
+      "label": "Beta Test Style Rotation",
+      "start": "2026-08-15",
+      "end": "2026-09-15",
+      "note": "CBT Style Coupon (Expired)",
+      "hairs": [
+        { "name": "Toben Hair", "sex": "m", "style": 3000 },
+        { "name": "Unkempt Hair", "sex": "m", "style": 3002 },
+        { "name": "Shaved Hair", "sex": "m", "style": 3003 },
+        { "name": "Cutie Hair", "sex": "f", "style": 3100 },
+        { "name": "Edgy", "sex": "f", "style": 3104 }
+      ],
+      "faces": [
+        { "name": "Defiant Face", "sex": "m", "id": 20000 },
+        { "name": "Defiant Face", "sex": "f", "id": 21000 }
+      ]
+    }
+  ]
+}

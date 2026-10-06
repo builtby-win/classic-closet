@@ -1,0 +1,30 @@
+{
+  "name": "maple-closet",
+  "type": "module",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "typecheck": "astro check && tsc --noEmit",
+    "test": "tsx --test tests/*.test.ts",
+    "catalog": "tsx scripts/build-catalog.ts",
+    "update-banners": "tsx scripts/update-banners.ts",
+    "deploy": "pnpm build && CLOUDFLARE_ACCOUNT_ID=58df26bb8dbf15af4045df9c8f1740f1 wrangler pages deploy dist --project-name maple-closet --branch production"
+  },
+  "dependencies": {
+    "astro": "^7.3.1",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.9",
+    "@astrojs/react": "^6.0.5",
+    "@types/node": "^26.6.4",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "tsx": "^4.19.0",
+    "typescript": "^5.8.0"
+  }
+}
