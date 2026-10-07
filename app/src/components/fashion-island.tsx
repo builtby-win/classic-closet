@@ -277,7 +277,7 @@ export default function FashionIsland() {
     const needle = q.trim().toLowerCase();
     if (!needle) return null;
     return CATALOG.indexes.search
-      .filter((o) => (o.sex === 'u' || o.sex === look.sex) && o.name.toLowerCase().includes(needle))
+      .filter((o) => (o.sex === 'u' || o.sex === look.sex) && (o.name.toLowerCase().includes(needle) || String(o.id).includes(needle)))
       .filter((o) => {
         const item = o.isStyle ? getItem(CATALOG, o.id * 10) : getItem(CATALOG, o.id);
         return !groupFilter || item?.group === groupFilter;
@@ -290,42 +290,42 @@ export default function FashionIsland() {
     const needle = catQ.trim().toLowerCase();
     if (catSec === 'Hair') {
       let r = mysteryHairs;
-      if (needle) r = r.filter((st) => CATALOG.styles[st]?.name.toLowerCase().includes(needle));
+      if (needle) r = r.filter((st) => CATALOG.styles[st]?.name.toLowerCase().includes(needle) || String(st).includes(needle));
       return r.map((st) => ({ type: 'hair' as const, id: st }));
     }
     if (catSec === 'HairSignature') {
       let r = signatureHairs;
-      if (needle) r = r.filter((st) => CATALOG.styles[st]?.name.toLowerCase().includes(needle));
+      if (needle) r = r.filter((st) => CATALOG.styles[st]?.name.toLowerCase().includes(needle) || String(st).includes(needle));
       return r.map((st) => ({ type: 'hair' as const, id: st }));
     }
     if (catSec === 'HairClassic') {
       let r = starterHairStyles;
-      if (needle) r = r.filter((st) => CATALOG.styles[st]?.name.toLowerCase().includes(needle));
+      if (needle) r = r.filter((st) => CATALOG.styles[st]?.name.toLowerCase().includes(needle) || String(st).includes(needle));
       return r.map((st) => ({ type: 'hair' as const, id: st }));
     }
     if (catSec === 'HairPast') {
       let r = pastHairStyles;
-      if (needle) r = r.filter((st) => CATALOG.styles[st]?.name.toLowerCase().includes(needle));
+      if (needle) r = r.filter((st) => CATALOG.styles[st]?.name.toLowerCase().includes(needle) || String(st).includes(needle));
       return r.map((st) => ({ type: 'hair' as const, id: st }));
     }
     if (catSec === 'Face') {
       let r = mysteryFaces;
-      if (needle) r = r.filter((fid) => CATALOG.items[fid]?.name.toLowerCase().includes(needle));
+      if (needle) r = r.filter((fid) => CATALOG.items[fid]?.name.toLowerCase().includes(needle) || String(fid).includes(needle));
       return r.map((fid) => ({ type: 'item' as const, id: fid }));
     }
     if (catSec === 'FaceSignature') {
       let r = signatureFaces;
-      if (needle) r = r.filter((fid) => CATALOG.items[fid]?.name.toLowerCase().includes(needle));
+      if (needle) r = r.filter((fid) => CATALOG.items[fid]?.name.toLowerCase().includes(needle) || String(fid).includes(needle));
       return r.map((fid) => ({ type: 'item' as const, id: fid }));
     }
     if (catSec === 'FaceClassic') {
       let r = starterFaces;
-      if (needle) r = r.filter((fid) => CATALOG.items[fid]?.name.toLowerCase().includes(needle));
+      if (needle) r = r.filter((fid) => CATALOG.items[fid]?.name.toLowerCase().includes(needle) || String(fid).includes(needle));
       return r.map((fid) => ({ type: 'item' as const, id: fid }));
     }
     if (catSec === 'FacePast') {
       let r = pastFaces;
-      if (needle) r = r.filter((fid) => CATALOG.items[fid]?.name.toLowerCase().includes(needle));
+      if (needle) r = r.filter((fid) => CATALOG.items[fid]?.name.toLowerCase().includes(needle) || String(fid).includes(needle));
       return r.map((fid) => ({ type: 'item' as const, id: fid }));
     }
     let r = equipSections.find((section) => section.id === catSec)?.ids ?? getGroupEquips(catSec);
@@ -333,7 +333,7 @@ export default function FashionIsland() {
       const selectedJob = catSec === 'Weapon' ? classJob : jobFilter;
       r = r.filter((id) => matchesJob(CATALOG.items[id], selectedJob));
     }
-    if (needle) r = r.filter((id) => CATALOG.items[id]?.name.toLowerCase().includes(needle));
+    if (needle) r = r.filter((id) => CATALOG.items[id]?.name.toLowerCase().includes(needle) || String(id).includes(needle));
     return r.map((id) => ({ type: 'item' as const, id }));
   }, [catSec, catQ, mysteryHairs, signatureHairs, pastHairStyles, starterHairStyles, mysteryFaces, signatureFaces, pastFaces, starterFaces, getGroupEquips, equipSections, jobFilter, classJob]);
 

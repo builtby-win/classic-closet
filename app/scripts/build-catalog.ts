@@ -44,6 +44,8 @@ interface OsmsItem {
   sub_category: string;
   gender?: 'male' | 'female';
   stats?: { reqLevel?: number };
+  weapon_type?: string;
+  req_job_label?: string;
 }
 
 interface OsmsBeautyEntry {
@@ -184,17 +186,45 @@ const [osmsItemsFile, osmsBeauty, count] = await Promise.all([
   fetch(`${API}/item/count`).then((r) => r.json() as Promise<number>),
 ]);
 const mcwDump: RawItem[] = await fetch(`${API}/item/list?count=${count}`).then((r) => r.json());
+const mcwById = new Map(mcwDump.map(item => [item.id, item]));
 const osmsGear: RawItem[] = osmsItemsFile.items
   .filter((item) => item.category === 'Equipment')
-  .map((item) => ({
-    id: item.id,
-    name: item.name,
-    requiredGender: item.gender === 'male' ? 0 : item.gender === 'female' ? 1 : undefined,
-    isCash: false,
-    requiredLevel: item.stats?.reqLevel,
-    typeInfo: { overallCategory: 'Equip', subCategory: item.sub_category },
-    src: 'OSMS',
-  }));
+  .map((item) => {
+    const mcw = mcwById.get(item.id);
+    let subCategory = mcw?.typeInfo?.subCategory ?? item.sub_category;
+    if (subCategory === 'Weapon' && item.weapon_type) {
+      const weaponMap: Record<string, string> = {
+        '1H Sword': 'One-Handed Sword',
+        '1H Axe': 'One-Handed Axe',
+        '1H Blunt Weapon': 'One-Handed Blunt Weapon',
+        'Dagger': 'Dagger',
+        'Wand': 'Wand',
+        'Staff': 'Staff',
+        '2H Sword': 'Two-Handed Sword',
+        '2H Axe': 'Two-Handed Axe',
+        '2H Blunt Weapon': 'Two-Handed Blunt',
+        'Spear': 'Spear',
+        'Polearm': 'Pole Arm',
+        'Bow': 'Bow',
+        'Crossbow': 'Crossbow',
+        'Claw': 'Claw',
+      };
+      subCategory = weaponMap[item.weapon_type] ?? subCategory;
+    }
+    const requiredJobs = mcw?.requiredJobs ?? (
+      item.req_job_label === 'All' ? ['Beginner'] : item.req_job_label ? [item.req_job_label] : undefined
+    );
+    return {
+      id: item.id,
+      name: item.name,
+      requiredGender: item.gender === 'male' ? 0 : item.gender === 'female' ? 1 : mcw?.requiredGender,
+      isCash: false,
+      requiredJobs,
+      requiredLevel: item.stats?.reqLevel ?? mcw?.requiredLevel,
+      typeInfo: { overallCategory: 'Equip', subCategory },
+      src: 'OSMS',
+    };
+  });
 const osmsBeautyItems: RawItem[] = [
   ...osmsBeauty.hair.map((item) => ({
     id: item.id,
@@ -228,7 +258,6 @@ interface GmsItem {
 const GMS_API = 'https://maplestory.io/api/GMS/270';
 let gmsByName = new Map<string, GmsItem>();
 let gmsById = new Map<number, GmsItem>();
-const mcwById = new Map(mcwDump.map(item => [item.id, item]));
 const osmsById = new Map(osmsDump.map(item => [item.id, item]));
 try {
   const gmsCount = await fetch(`${GMS_API}/item/count`).then(r => r.json()) as number;

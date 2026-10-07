@@ -237,7 +237,7 @@ export const DEFAULT_LOOK: Look = {
 /** Character render URL */
 export const GMS_API = 'https://maplestory.io/api/GMS/270';
 
-const CATALOG = catalogData as FastCatalog;
+export const CATALOG = catalogData as FastCatalog;
 
 export const RANDOM_EQUIP_SLOTS = ['Hat', 'Top', 'Bottom', 'Shoes', 'Glove', 'Cape', 'Weapon'] as const;
 export type RandomEquipSlot = typeof RANDOM_EQUIP_SLOTS[number];
@@ -316,6 +316,11 @@ export function renderURL(look: Look): string {
 
 /** Item icons use the same source as the character renderer. */
 export function iconURL(itemId: number): string {
+  const meta = getItem(CATALOG, itemId);
+  if (meta?.src === 'OSMS' && meta.sub === 'Face') {
+    const faceBase = itemId >= 21000 ? 21000 : 20000;
+    return `/sprites/faces/${faceBase + faceStyleId(itemId)}.png`;
+  }
   const { region, version } = assetSource(itemId);
   return `https://maplestory.io/api/${region}/${version}/item/${itemId}/icon`;
 }

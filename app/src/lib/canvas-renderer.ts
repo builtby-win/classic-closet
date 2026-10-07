@@ -1,5 +1,5 @@
 import { getZIndex } from './zmap';
-import type { Look } from './fashion';
+import { CATALOG, faceStyleId, getItem, type Look } from './fashion';
 
 export interface SpriteEffect {
   image: string; // data URI (PNG) or URL
@@ -172,11 +172,11 @@ export async function renderCharacterToCanvas(
   }
 
   // 2. Collect all item IDs: face, hair, and worn equipment
-  const activeIds: Array<{ id: number; isFace?: boolean }> = [];
+  const activeIds: Array<{ id: number; isFace?: boolean; isHair?: boolean; isHat?: boolean }> = [];
   if (look.face) activeIds.push({ id: look.face, isFace: true });
-  if (look.hair) activeIds.push({ id: look.hair });
-  for (const itemId of Object.values(look.items)) {
-    if (itemId != null) activeIds.push({ id: itemId });
+  if (look.hair) activeIds.push({ id: look.hair, isHair: true });
+  for (const [slot, itemId] of Object.entries(look.items)) {
+    if (itemId != null) activeIds.push({ id: itemId, isHat: slot === 'Hat' });
   }
 
   // 3. Resolve all sprite data (from cache or background fetch)
@@ -195,16 +195,24 @@ export async function renderCharacterToCanvas(
 
   const spriteDataList = await Promise.all(
     activeIds.map(async ({ id }) => {
-      let data: ItemSpriteData | null | undefined = spriteDataCache.get(id);
+      const meta = getItem(CATALOG, id);
+      const spriteId = meta?.src === 'OSMS' && meta.sub === 'Face'
+        ? (id >= 21000 ? 21000 : 20000) + faceStyleId(id)
+        : id;
+      let data: ItemSpriteData | null | undefined = spriteDataCache.get(spriteId);
       if (!data) {
-        data = await fetchItemSpriteData(id);
+        data = await fetchItemSpriteData(spriteId, meta?.src === 'GMS' ? 'GMS' : undefined);
       }
       return data;
     })
   );
 
+  const capHatEquipped = activeIds.some(({ isHat }, i) => isHat && Object.values(spriteDataList[i]?.frames ?? {})
+    .flat()
+    .some((effect) => ['cap', 'capAccessory', 'capBelowAccessory'].includes(effect.position)));
+
   for (let i = 0; i < activeIds.length; i++) {
-    const { isFace } = activeIds[i]!;
+    const { isFace, isHair } = activeIds[i]!;
     const itemData = spriteDataList[i];
     if (!itemData) {
       allLoaded = false;
@@ -224,6 +232,10 @@ export async function renderCharacterToCanvas(
     if (!effects) continue;
 
     for (const eff of effects) {
+      // Keep the main hair sprite beneath the hat. The separate hairOverHead
+      // sprite is an exposed overlay, so suppress it for cap-style hats.
+      if (isHair && capHatEquipped && eff.position === 'hairOverHead') continue;
+
       let img = getCachedImage(eff.image);
       if (!img) {
         try {
@@ -256,6 +268,8 @@ export async function renderCharacterToCanvas(
         img,
         x: Math.round(drawX),
         y: Math.round(drawY),
+        // Preserve MapleStory's per-sprite z positions: hair is under caps, and
+        // only the hair pieces tagged hairOverHead render above them.
         zIndex: getZIndex(eff.position),
       });
     }

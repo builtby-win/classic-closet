@@ -14,9 +14,30 @@ const catalog = JSON.parse(readFileSync(catalogPath, 'utf8'));
 
 const BASE_DIR = join(ROOT, 'public', 'sprites', 'base');
 const ITEMS_DIR = join(ROOT, 'public', 'sprites', 'items');
+const FACES_DIR = join(ROOT, 'public', 'sprites', 'faces');
 
 mkdirSync(BASE_DIR, { recursive: true });
 mkdirSync(ITEMS_DIR, { recursive: true });
+mkdirSync(FACES_DIR, { recursive: true });
+
+function bakeFaceIcons() {
+  let count = 0;
+  for (const [id, meta] of Object.entries<any>(catalog.items)) {
+    if (meta.sub !== 'Face') continue;
+    const spritePath = join(ITEMS_DIR, `${id}.json`);
+    if (!existsSync(spritePath)) continue;
+    try {
+      const sprite = JSON.parse(readFileSync(spritePath, 'utf8'));
+      const image = sprite.frames?.['default:0']?.[0]?.image;
+      const base64 = typeof image === 'string' ? image.replace(/^data:image\/png;base64,/, '') : '';
+      if (!base64) continue;
+      const iconId = (Number(id) >= 21000 ? 21000 : 20000) + (Number(id) % 100);
+      writeFileSync(join(FACES_DIR, `${iconId}.png`), Buffer.from(base64, 'base64'));
+      count++;
+    } catch { /* skip invalid cached sprite */ }
+  }
+  console.log(`Baked ${count} face icons`);
+}
 
 const SKINS = [2000, 2001, 2002, 2003, 2004, 2005, 2006];
 const POSES = ['stand1', 'stand2', 'alert'];
@@ -136,6 +157,8 @@ async function main() {
       console.log(`Progress: ${count} baked (${success} ok, ${skipped} skipped)...`);
     }
   });
+
+  bakeFaceIcons();
 
   console.log('--- Baking Hair Styles ---');
   const hairStyles = Object.keys(catalog.styles).map(Number);
