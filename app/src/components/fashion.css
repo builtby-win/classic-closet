@@ -87,6 +87,23 @@
 }
 #preview .preview-resolved.loaded { opacity: 1; }
 #preview.remote-ready .preview-local { visibility: hidden; }
+.preview-loading {
+  position: absolute;
+  z-index: 3;
+  top: 3px;
+  right: 3px;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255,255,255,0.25);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: preview-spin 700ms linear infinite;
+  filter: drop-shadow(0 1px 3px rgba(0,0,0,0.8));
+}
+@keyframes preview-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .preview-loading { animation-duration: 1800ms; }
+}
 #spin {
   position: absolute;
   inset: 0;

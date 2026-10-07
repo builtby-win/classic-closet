@@ -11,25 +11,31 @@ export default function CharacterCanvas({ look, onRendered }: CharacterCanvasPro
   const url = renderURL(look);
   const [remoteImage, setRemoteImage] = useState<{ url: string; src: string } | null>(null);
   const [loadedUrl, setLoadedUrl] = useState<string | null>(null);
+  const [loadingUrl, setLoadingUrl] = useState<string | null>(null);
   const onRenderedRef = useRef(onRendered);
   onRenderedRef.current = onRendered;
 
   useEffect(() => {
     setRemoteImage(null);
     setLoadedUrl(null);
+    setLoadingUrl(url);
 
     const controller = new AbortController();
     let objectUrl: string | null = null;
     const timer = window.setTimeout(async () => {
       try {
         const response = await fetch(url, { signal: controller.signal });
-        if (!response.ok) return;
+        if (!response.ok) {
+          setLoadingUrl((current) => current === url ? null : current);
+          return;
+        }
         const blob = await response.blob();
         if (controller.signal.aborted) return;
         objectUrl = URL.createObjectURL(blob);
         setRemoteImage({ url, src: objectUrl });
       } catch {
         // Keep showing the client-rendered character when the remote render fails.
+        setLoadingUrl((current) => current === url ? null : current);
       }
     }, 180);
 
@@ -43,17 +49,21 @@ export default function CharacterCanvas({ look, onRendered }: CharacterCanvasPro
   return (
     <div id="preview" className={loadedUrl === url ? 'remote-ready' : ''} role="img" aria-label="Character preview">
       <LocalCharacterCanvas look={look} onRendered={onRendered} />
+      {loadingUrl === url && <span className="preview-loading" role="status" aria-label="Loading official character render" />}
       {remoteImage?.url === url && <img
           className={'preview-resolved' + (loadedUrl === url ? ' loaded' : '')}
           src={remoteImage.src}
           alt=""
           aria-hidden="true"
-          onLoad={() => { setLoadedUrl(url); onRenderedRef.current?.(); }}
-          onError={() => setRemoteImage((current) => {
-            if (current?.url !== url) return current;
-            URL.revokeObjectURL(current.src);
-            return null;
-          })}
+          onLoad={() => { setLoadedUrl(url); setLoadingUrl(null); onRenderedRef.current?.(); }}
+          onError={() => {
+            setLoadingUrl(null);
+            setRemoteImage((current) => {
+              if (current?.url !== url) return current;
+              URL.revokeObjectURL(current.src);
+              return null;
+            });
+          }}
         />}
     </div>
   );
