@@ -7,5 +7,11 @@
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS"
-  }
+  },
+  "routes": [
+    {
+      "pattern": "maple-closet.builtby.win",
+      "custom_domain": true
+    }
+  ]
 }
