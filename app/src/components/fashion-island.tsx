@@ -40,6 +40,12 @@ import CharacterCanvas from './character-canvas';
 import './fashion.css';
 
 const CATALOG = catalogData as FastCatalog;
+const MYSTERY_RATE_GROUPS = [
+  { title: 'Male hair', rows: CATALOG.indexes.hairs.m.active.filter((id) => CATALOG.styles[id]?.coupon === 'mystery').map((id) => ({ name: CATALOG.styles[id].name, rate: CATALOG.styles[id].rate ?? '16.67%' })) },
+  { title: 'Female hair', rows: CATALOG.indexes.hairs.f.active.filter((id) => CATALOG.styles[id]?.coupon === 'mystery').map((id) => ({ name: CATALOG.styles[id].name, rate: CATALOG.styles[id].rate ?? '16.67%' })) },
+  { title: 'Male faces', rows: CATALOG.indexes.faces.m.active.filter((id) => CATALOG.items[id]?.coupon === 'mystery').map((id) => ({ name: CATALOG.items[id].name, rate: CATALOG.items[id].rate ?? '16.67%' })) },
+  { title: 'Female faces', rows: CATALOG.indexes.faces.f.active.filter((id) => CATALOG.items[id]?.coupon === 'mystery').map((id) => ({ name: CATALOG.items[id].name, rate: CATALOG.items[id].rate ?? '16.67%' })) },
+];
 const STARTER_HAIRS: Record<Sex, number[]> = { m: [3000, 3002, 3003], f: [3100, 3104] };
 const STARTER_FACES: Record<Sex, number[]> = { m: [20000, 20001, 20002], f: [21000, 21001, 21002] };
 const HAIR_DOTS = ['#23232a', '#a83a32', '#d97b2e', '#e3c46a', '#4a8f4d', '#4a6fa5', '#7a4a8f', '#6e4a2f'];
@@ -115,6 +121,7 @@ export default function FashionIsland() {
   const [jobFilter, setJobFilter] = useState('All');
   const [classJob, setClassJob] = useState('Beginner');
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [ratesOpen, setRatesOpen] = useState(false);
   const [catSec, setCatSec] = useState<SectionId | null>(null);
   const [catQ, setCatQ] = useState('');
   const [rendering, setRendering] = useState(false);
@@ -498,7 +505,7 @@ export default function FashionIsland() {
                 ))}
               </div>
             </div>
-            <Section id="Hair" label="🎲 Mystery Hair" onSeeAll={() => openCat('Hair')}>
+            <Section id="Hair" label="🎲 Mystery Hair" onSeeAll={() => openCat('Hair')} onRates={() => setRatesOpen(true)}>
               {wornFirst(mysteryHairs.filter((st) => getStyle(CATALOG, st)), (st) => Math.floor(look.hair / 10) === st).slice(0, ROW_CAP).map((st) => {
                 const styleMeta = getStyle(CATALOG, st)!;
                 return (
@@ -574,7 +581,7 @@ export default function FashionIsland() {
             </div>
 
             {/* 4. MYSTERY FACES (random 16.67%) */}
-            <Section id="Face" label="🎲 Mystery Faces" onSeeAll={() => openCat('Face')}>
+            <Section id="Face" label="🎲 Mystery Faces" onSeeAll={() => openCat('Face')} onRates={() => setRatesOpen(true)}>
               {wornFirst(mysteryFaces.filter((fid) => getItem(CATALOG, fid)), (fid) => faceStyleId(look.face) === faceStyleId(fid)).slice(0, ROW_CAP).map((fid) => {
                 const faceMeta = getItem(CATALOG, fid)!;
                 const faceId = faceVariantId(look.sex, faceStyleId(fid), faceColorIndex(look.face));
@@ -708,7 +715,7 @@ export default function FashionIsland() {
               </div>
             </div>
             {['Hair', 'Face'].includes(catSec) && (
-              <p className="cat-sub">Random style per coupon · 16.67% each · coupon lasts 14 days · <a href={STYLE_RATES} target="_blank" rel="noreferrer">Nexon rates</a> · <a href={NEWS_POST} target="_blank" rel="noreferrer">cash shop post</a></p>
+              <p className="cat-sub">Random style per coupon · 16.67% each · coupon lasts 14 days · <button className="inline-link" onClick={() => setRatesOpen(true)}>view full rates</button> · <a href={NEWS_POST} target="_blank" rel="noreferrer">Nexon cash shop announcement</a></p>
             )}
             {['HairSignature', 'FaceSignature'].includes(catSec) && (
               <p className="cat-sub">Choose your style · coupon lasts 14 days · ends Oct 28 · <a href={NEWS_POST} target="_blank" rel="noreferrer">cash shop post</a></p>
@@ -785,6 +792,28 @@ export default function FashionIsland() {
           </div>
         )}
       </div>
+      {ratesOpen && (
+        <div className="rates-overlay" onClick={() => setRatesOpen(false)}>
+          <section className="rates-dialog" role="dialog" aria-modal="true" aria-labelledby="rates-title" onClick={(event) => event.stopPropagation()}>
+            <header className="rates-header">
+              <div><h2 id="rates-title">Mystery coupon rates</h2><p>Each coupon gives one style for your character’s gender. Rates are rounded.</p></div>
+              <button className="rates-close" autoFocus aria-label="Close rates" onClick={() => setRatesOpen(false)}>×</button>
+            </header>
+            <div className="rates-grid">
+              {MYSTERY_RATE_GROUPS.map((group) => (
+                <section className="rates-group" key={group.title}>
+                  <h3>{group.title}</h3>
+                  {group.rows.map((row) => <div className="rates-row" key={row.name}><span>{row.name}</span><strong>{row.rate}</strong></div>)}
+                </section>
+              ))}
+            </div>
+            <footer className="rates-footer">
+              <a href={STYLE_RATES} target="_blank" rel="noreferrer">Nexon’s official rate data (JSON) ↗</a>
+              <a href={NEWS_POST} target="_blank" rel="noreferrer">Nexon cash shop announcement ↗</a>
+            </footer>
+          </section>
+        </div>
+      )}
     </div>
   );
 }
@@ -851,11 +880,11 @@ const SearchTile = memo(function SearchTile(props: { entry: SearchEntry; look: L
 const NEWS_POST = 'https://www.nexon.com/maplestory/news/sale/45819/founder-s-access-cash-shop';
 const STYLE_RATES = 'https://g.nexonstatic.com/maplestory/cms/v1/general-posts/45537';
 
-const Section = memo(function Section(props: { id: string; label: string; sub?: string; onSeeAll?: () => void; news?: boolean; rates?: boolean; children: React.ReactNode }) {
+const Section = memo(function Section(props: { id: string; label: string; sub?: string; onSeeAll?: () => void; news?: boolean; onRates?: () => void; children: React.ReactNode }) {
   return (
     <div className="sec">
       <h2>
-        <span>{props.label}{props.news && <a className="newslink" href={NEWS_POST} target="_blank" rel="noreferrer" title="Nexon cash shop post"> ↗</a>}{props.rates && <a className="newslink" href={STYLE_RATES} target="_blank" rel="noreferrer" title="Nexon drop rates"> rates</a>}</span>
+        <span>{props.label}{props.news && <a className="newslink" href={NEWS_POST} target="_blank" rel="noreferrer" title="Nexon cash shop post"> ↗</a>}{props.onRates && <button className="newslink rates-trigger" onClick={props.onRates} title="View mystery coupon rates"> rates</button>}</span>
         {props.onSeeAll && <button className="seeall" onClick={props.onSeeAll}>see all →</button>}
       </h2>
       {props.sub && <p className="sec-sub">{props.sub}</p>}
