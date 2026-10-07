@@ -311,7 +311,7 @@ export function renderURL(look: Look): string {
     ...assetSource(itemId),
   }));
   const items = encodeURIComponent(entries.map(entry => JSON.stringify(entry)).join(','));
-  return `https://maplestory.io/api/character/${items}/${encodeURIComponent(look.anim)}/${look.frame}`;
+  return `https://maplestory.io/api/character/${items}/${encodeURIComponent(look.anim)}/${look.frame}?showears=false&showLefEars=false&showHighLefEars=false&resize=1&flipX=false&renderMode=0&padX=30&padY=50`;
 }
 
 /** Item icons use the same source as the character renderer. */

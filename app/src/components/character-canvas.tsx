@@ -41,7 +41,7 @@ export default function CharacterCanvas({ look, onRendered }: CharacterCanvasPro
   }, [url]);
 
   return (
-    <div id="preview" role="img" aria-label="Character preview">
+    <div id="preview" className={loadedUrl === url ? 'remote-ready' : ''} role="img" aria-label="Character preview">
       <LocalCharacterCanvas look={look} onRendered={onRendered} />
       {remoteImage?.url === url && <img
           className={'preview-resolved' + (loadedUrl === url ? ' loaded' : '')}
