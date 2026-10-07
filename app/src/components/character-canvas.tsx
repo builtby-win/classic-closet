@@ -9,21 +9,20 @@ interface CharacterCanvasProps {
 
 export default function CharacterCanvas({ look, onRendered }: CharacterCanvasProps) {
   const url = renderURL(look);
-  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  const [resolvedUrl, setResolvedUrl] = useState<string | null>(null);
 
-  if (failedUrl !== url) {
-    return (
+  return (
+    <div id="preview" role="img" aria-label="Character preview">
+      <LocalCharacterCanvas look={look} onRendered={onRendered} />
       <img
-        id="preview"
+        className={'preview-resolved' + (resolvedUrl === url ? ' loaded' : '')}
         src={url}
-        alt="character preview"
-        onLoad={() => onRendered?.()}
-        onError={() => setFailedUrl(url)}
+        alt=""
+        aria-hidden="true"
+        onLoad={() => { setResolvedUrl(url); onRendered?.(); }}
       />
-    );
-  }
-
-  return <LocalCharacterCanvas look={look} onRendered={onRendered} />;
+    </div>
+  );
 }
 
 function LocalCharacterCanvas({ look, onRendered }: CharacterCanvasProps) {
@@ -62,10 +61,10 @@ function LocalCharacterCanvas({ look, onRendered }: CharacterCanvasProps) {
   return (
     <canvas
       ref={canvasRef}
-      id="preview"
+      className="preview-local"
       width={128}
       height={128}
-      aria-label="character preview"
+      aria-hidden="true"
     />
   );
 }
