@@ -55,7 +55,21 @@ export default function CharacterCanvas({ look, onRendered }: CharacterCanvasPro
           src={remoteImage.src}
           alt=""
           aria-hidden="true"
-          onLoad={() => { setLoadedUrl(url); setLoadingUrl(null); onRenderedRef.current?.(); }}
+          onLoad={(event) => {
+            const image = event.currentTarget;
+            const bounds = image.parentElement?.getBoundingClientRect();
+            if (bounds) {
+              const dpr = window.devicePixelRatio || 1;
+              const left = bounds.left + (bounds.width - image.naturalWidth) / 2;
+              const baseline = bounds.top + bounds.height * (98 / 128);
+              image.style.left = `${Math.round(left * dpr) / dpr - bounds.left}px`;
+              image.style.top = `${Math.round((baseline - image.naturalHeight) * dpr) / dpr - bounds.top}px`;
+              image.style.transform = 'none';
+            }
+            setLoadedUrl(url);
+            setLoadingUrl(null);
+            onRenderedRef.current?.();
+          }}
           onError={() => {
             setLoadingUrl(null);
             setRemoteImage((current) => {

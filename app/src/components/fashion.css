@@ -98,7 +98,7 @@
   border-top-color: rgba(255,255,255,0.48);
   border-radius: 50%;
   opacity: 0;
-  animation: preview-spin 900ms linear 500ms infinite, preview-appear 0s linear 500ms forwards;
+  animation: preview-spin 900ms linear 180ms infinite, preview-appear 0s linear 180ms forwards;
 }
 @keyframes preview-spin { to { transform: rotate(360deg); } }
 @keyframes preview-appear { to { opacity: 0.45; } }
