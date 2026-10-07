@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
-import type { Look } from '../lib/fashion';
+import { useEffect, useRef, useState } from 'react';
+import { renderURL, type Look } from '../lib/fashion';
 import { renderCharacterToCanvas } from '../lib/canvas-renderer';
 
 interface CharacterCanvasProps {
@@ -8,6 +8,25 @@ interface CharacterCanvasProps {
 }
 
 export default function CharacterCanvas({ look, onRendered }: CharacterCanvasProps) {
+  const url = renderURL(look);
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+
+  if (failedUrl !== url) {
+    return (
+      <img
+        id="preview"
+        src={url}
+        alt="character preview"
+        onLoad={() => onRendered?.()}
+        onError={() => setFailedUrl(url)}
+      />
+    );
+  }
+
+  return <LocalCharacterCanvas look={look} onRendered={onRendered} />;
+}
+
+function LocalCharacterCanvas({ look, onRendered }: CharacterCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const lookRef = useRef(look);
   lookRef.current = look;

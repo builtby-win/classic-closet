@@ -172,11 +172,11 @@ export async function renderCharacterToCanvas(
   }
 
   // 2. Collect all item IDs: face, hair, and worn equipment
-  const activeIds: Array<{ id: number; isFace?: boolean; isHair?: boolean; isHat?: boolean }> = [];
+  const activeIds: Array<{ id: number; isFace?: boolean }> = [];
   if (look.face) activeIds.push({ id: look.face, isFace: true });
-  if (look.hair) activeIds.push({ id: look.hair, isHair: true });
+  if (look.hair) activeIds.push({ id: look.hair });
   for (const [slot, itemId] of Object.entries(look.items)) {
-    if (itemId != null) activeIds.push({ id: itemId, isHat: slot === 'Hat' });
+    if (itemId != null) activeIds.push({ id: itemId });
   }
 
   // 3. Resolve all sprite data (from cache or background fetch)
@@ -207,12 +207,8 @@ export async function renderCharacterToCanvas(
     })
   );
 
-  const capHatEquipped = activeIds.some(({ isHat }, i) => isHat && Object.values(spriteDataList[i]?.frames ?? {})
-    .flat()
-    .some((effect) => ['cap', 'capAccessory', 'capBelowAccessory'].includes(effect.position)));
-
   for (let i = 0; i < activeIds.length; i++) {
-    const { isFace, isHair } = activeIds[i]!;
+    const { isFace } = activeIds[i]!;
     const itemData = spriteDataList[i];
     if (!itemData) {
       allLoaded = false;
@@ -232,10 +228,6 @@ export async function renderCharacterToCanvas(
     if (!effects) continue;
 
     for (const eff of effects) {
-      // Keep the main hair sprite beneath the hat. The separate hairOverHead
-      // sprite is an exposed overlay, so suppress it for cap-style hats.
-      if (isHair && capHatEquipped && eff.position === 'hairOverHead') continue;
-
       let img = getCachedImage(eff.image);
       if (!img) {
         try {
@@ -268,8 +260,8 @@ export async function renderCharacterToCanvas(
         img,
         x: Math.round(drawX),
         y: Math.round(drawY),
-        // Preserve MapleStory's per-sprite z positions: hair is under caps, and
-        // only the hair pieces tagged hairOverHead render above them.
+        // Preserve MapleStory's per-sprite z positions, including hair strands
+        // tagged hairOverHead that intentionally render above headwear.
         zIndex: getZIndex(eff.position),
       });
     }
