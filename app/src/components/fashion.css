@@ -90,19 +90,20 @@
 .preview-loading {
   position: absolute;
   z-index: 3;
-  top: 3px;
-  right: 3px;
-  width: 14px;
-  height: 14px;
-  border: 2px solid rgba(255,255,255,0.25);
-  border-top-color: var(--accent);
+  top: 2px;
+  right: 2px;
+  width: 10px;
+  height: 10px;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-top-color: rgba(255,255,255,0.48);
   border-radius: 50%;
-  animation: preview-spin 700ms linear infinite;
-  filter: drop-shadow(0 1px 3px rgba(0,0,0,0.8));
+  opacity: 0;
+  animation: preview-spin 900ms linear 500ms infinite, preview-appear 0s linear 500ms forwards;
 }
 @keyframes preview-spin { to { transform: rotate(360deg); } }
+@keyframes preview-appear { to { opacity: 0.45; } }
 @media (prefers-reduced-motion: reduce) {
-  .preview-loading { animation-duration: 1800ms; }
+  .preview-loading { animation-duration: 1800ms, 0s; }
 }
 #spin {
   position: absolute;
