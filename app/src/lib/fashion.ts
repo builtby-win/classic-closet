@@ -570,3 +570,31 @@ export function matchesJob(item: ItemMeta | undefined, job: string): boolean {
   return job === 'All' || item?.group !== 'classic-equips' ||
     !item.requiredJobs?.length || item.requiredJobs.includes('Beginner') || item.requiredJobs.includes(job);
 }
+/** Subsequence fuzzy score for search-as-you-type. Higher = better. Null = no match. */
+export function fuzzyScore(rawNeedle: string, rawHaystack: string): number | null {
+  const needle = rawNeedle.trim().toLowerCase();
+  const hay = rawHaystack.toLowerCase();
+  if (!needle) return 0;
+  if (hay === needle) return 300 + hay.length;
+  const idx = hay.indexOf(needle);
+  if (idx >= 0) return 200 - idx;
+  // Subsequence: every needle char appears in order. Score rewards compact spans.
+  let hi = 0;
+  let gaps = 0;
+  for (let ni = 0; ni < needle.length; ni++) {
+    const found = hay.indexOf(needle[ni], hi);
+    if (found < 0) return null;
+    if (ni > 0) gaps += found - hi;
+    hi = found + 1;
+  }
+  return 100 - gaps - hay.length * 0.01;
+}
+
+/** Name-or-id fuzzy match used by drawer + global search. */
+export function matchesFuzzy(name: string | undefined, id: number, rawQuery: string): boolean {
+  const needle = rawQuery.trim().toLowerCase();
+  if (!needle) return true;
+  if (String(id).includes(needle)) return true;
+  if (!name) return false;
+  return fuzzyScore(needle, name) != null;
+}
