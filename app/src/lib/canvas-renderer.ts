@@ -152,7 +152,9 @@ export async function renderCharacterToCanvas(
 
   const navel = { x: bodyX + 18, y: bodyY + 46 };
   const brow = { x: bodyX + 17, y: bodyY + 14 };
-  const hand = { x: bodyX + 24, y: bodyY + 41 };
+  // Stand1's equipped-weapon anchor is the character's right hand, outside the
+  // torso. Keeping it on the body center makes swords and staffs clip inside it.
+  const hand = { x: bodyX + 35, y: bodyY + 41 };
 
   // 1. Load base body image
   const anim = look.anim || 'stand1';
