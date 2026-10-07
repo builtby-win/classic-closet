@@ -9,18 +9,52 @@ interface CharacterCanvasProps {
 
 export default function CharacterCanvas({ look, onRendered }: CharacterCanvasProps) {
   const url = renderURL(look);
-  const [resolvedUrl, setResolvedUrl] = useState<string | null>(null);
+  const [remoteImage, setRemoteImage] = useState<{ url: string; src: string } | null>(null);
+  const [loadedUrl, setLoadedUrl] = useState<string | null>(null);
+  const onRenderedRef = useRef(onRendered);
+  onRenderedRef.current = onRendered;
+
+  useEffect(() => {
+    setRemoteImage(null);
+    setLoadedUrl(null);
+
+    const controller = new AbortController();
+    let objectUrl: string | null = null;
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await fetch(url, { signal: controller.signal });
+        if (!response.ok) return;
+        const blob = await response.blob();
+        if (controller.signal.aborted) return;
+        objectUrl = URL.createObjectURL(blob);
+        setRemoteImage({ url, src: objectUrl });
+      } catch {
+        // Keep showing the client-rendered character when the remote render fails.
+      }
+    }, 180);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [url]);
 
   return (
     <div id="preview" role="img" aria-label="Character preview">
       <LocalCharacterCanvas look={look} onRendered={onRendered} />
-      <img
-        className={'preview-resolved' + (resolvedUrl === url ? ' loaded' : '')}
-        src={url}
-        alt=""
-        aria-hidden="true"
-        onLoad={() => { setResolvedUrl(url); onRendered?.(); }}
-      />
+      {remoteImage?.url === url && <img
+          className={'preview-resolved' + (loadedUrl === url ? ' loaded' : '')}
+          src={remoteImage.src}
+          alt=""
+          aria-hidden="true"
+          onLoad={() => { setLoadedUrl(url); onRenderedRef.current?.(); }}
+          onError={() => setRemoteImage((current) => {
+            if (current?.url !== url) return current;
+            URL.revokeObjectURL(current.src);
+            return null;
+          })}
+        />}
     </div>
   );
 }
