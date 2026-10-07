@@ -219,7 +219,13 @@ export default function FashionIsland() {
     if (sub === 'Hair') patch({ hair: id, hairCol: id % 10 });
     else if (sub === 'Face') patch({ face: selectedId });
     else {
-      const stance = unequipping && slot === 'Weapon' ? null : stanceForWeapon(sub === 'Shield' ? getItem(CATALOG, nextItems.Weapon)?.sub : sub, look.anim);
+      // Browsing/equipping a weapon should not unexpectedly change the pose.
+      // Keep the current stance for two-handed weapons (including bows and
+      // crossbows); users can pick a stance explicitly from the character view.
+      const weaponSub = sub === 'Shield' ? getItem(CATALOG, nextItems.Weapon)?.sub : sub;
+      const stance = unequipping || (slot === 'Weapon' && weaponSub && TWO_HAND_SUBS[weaponSub])
+        ? null
+        : stanceForWeapon(weaponSub, look.anim);
       patch(stance ? { items: nextItems, anim: stance.anim, frame: stance.frame } : { items: nextItems });
     }
   }, [look, patch]);
