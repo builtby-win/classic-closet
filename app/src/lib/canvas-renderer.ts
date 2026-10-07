@@ -268,8 +268,11 @@ export async function renderCharacterToCanvas(
         img,
         x: Math.round(drawX),
         y: Math.round(drawY),
-        // Preserve MapleStory's per-sprite z positions.
-        zIndex: getZIndex(eff.position),
+        // The local base sprite is a single flattened body image; it has no
+        // separate arm layer to cover a held weapon. Put stand-pose weapons
+        // behind the body so they emerge from the hand instead of crossing
+        // visibly over the torso. Resolved MapleStory renders keep official z.
+        zIndex: eff.position === 'weapon' ? getZIndex('weaponBelowBody') : getZIndex(eff.position),
       });
     }
   }

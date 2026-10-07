@@ -122,7 +122,7 @@ const WEAPON_SUBS: Record<string, true> = {
 /** Idle/walk stance whose renderer frames draw each weapon family correctly.
  *  Verified against maplestory.io item frameBooks: 1H weapons have stand1/walk1
  *  only; 2H melee, spears, polearms and crossbows have stand2 (no stand1);
- *  bows only draw held correctly in alert (stand1 clips, stand2 hides).
+ *  bows use the regular stand1 idle stance.
  */
 const WEAPON_STANCE: Record<string, { stand: string; walk: string }> = {
   'One-Handed Sword': { stand: 'stand1', walk: 'walk1' },
@@ -138,7 +138,7 @@ const WEAPON_STANCE: Record<string, { stand: string; walk: string }> = {
   Spear: { stand: 'stand2', walk: 'walk2' },
   'Pole Arm': { stand: 'stand2', walk: 'walk2' },
   Crossbow: { stand: 'stand2', walk: 'walk2' },
-  Bow: { stand: 'alert', walk: 'walk1' },
+  Bow: { stand: 'stand1', walk: 'walk1' },
 };
 
 /** Subs that occupy both hands: no shield can be worn with them. */
