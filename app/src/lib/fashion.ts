@@ -139,9 +139,14 @@ const WEAPON_STANCE: Record<string, { stand: string; walk: string }> = {
   'Pole Arm': { stand: 'stand2', walk: 'walk2' },
   Crossbow: { stand: 'stand2', walk: 'walk2' },
   Bow: { stand: 'stand1', walk: 'walk1' },
+  // NX cash weapons only ship stand1 frames (all four baked items include
+  // them), so equipping one from a 2H stance steers back to stand1.
+  Cash: { stand: 'stand1', walk: 'walk1' },
 };
 
-/** Subs that occupy both hands: no shield can be worn with them. */
+/** Subs that occupy both hands: wearing one drops the shield, and tapping a
+ *  shield while one is worn swaps to a one-handed weapon instead of refusing.
+ *  Claw claims WpSi in the renderer data (garnier vslot) so it counts too. */
 export const TWO_HAND_SUBS: Record<string, true> = {
   'Two-Handed Sword': true,
   'Two-Handed Axe': true,
@@ -150,12 +155,13 @@ export const TWO_HAND_SUBS: Record<string, true> = {
   'Pole Arm': true,
   Crossbow: true,
   Bow: true,
+  Claw: true,
 };
 
 /**
  * Idle stance that draws this weapon correctly, or null to keep current anim.
  * Only stand/walk poses are steered (they are per-weapon stances); action poses
- * carry their own weapon frames. Unknown subs (e.g. Cash) keep stance.
+ * carry their own weapon frames. Unknown subs keep stance.
  */
 export function stanceForWeapon(sub: string | undefined, currentAnim: string): { anim: string; frame: number } | null {
   if (!sub) return null;
@@ -329,7 +335,8 @@ export function iconURL(itemId: number): string {
 
 /** Apply an equip pick with Overall ↔ Top/Bottom and 2H-weapon ↔ Shield exclusion.
  *  Needs the picked item's sub (not just the slot): a two-handed weapon drops the
- *  shield, and a shield is refused while a two-handed weapon is worn.
+ *  shield, and tapping a shield while a two-handed weapon is worn swaps to a
+ *  one-handed weapon (classic behavior: shields need a free hand).
  */
 export function applyPick(items: Look['items'], slot: string, id: number | null, sub?: string): Look['items'] {
   const next = { ...items };
@@ -345,7 +352,18 @@ export function applyPick(items: Look['items'], slot: string, id: number | null,
   }
   if (slot === 'Shield' && id) {
     const weaponSub = CATALOG.items[next.Weapon ?? -1]?.sub;
-    if (weaponSub && TWO_HAND_SUBS[weaponSub]) return next;
+    if (weaponSub && TWO_HAND_SUBS[weaponSub]) {
+      // Swap to a one-handed weapon so the shield has a free hand: prefer the
+      // starter Sword, else the first 1H classic-equip in the catalog.
+      const fallback = CATALOG.items[1302000]?.sub && !TWO_HAND_SUBS[CATALOG.items[1302000].sub]
+        ? 1302000
+        : Number(Object.keys(CATALOG.items).find((key) => {
+          const item = CATALOG.items[Number(key)];
+          return item?.group === 'classic-equips' && WEAPON_SUBS[item.sub] && !TWO_HAND_SUBS[item.sub];
+        }));
+      if (fallback) next.Weapon = fallback;
+      else delete next.Weapon;
+    }
   }
   if (id) next[slot] = id;
   else delete next[slot];

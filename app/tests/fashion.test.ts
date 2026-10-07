@@ -91,18 +91,19 @@ test('unequipping removes only the selected slot and preserves clothing exclusio
   assert.deepEqual(applyPick(overall, 'Overall', null), { Hat: 1007116, Shoes: 1072001 });
 });
 
-test('two-handed weapons drop the shield; shields refuse while one is worn', () => {
+test('two-handed weapons drop the shield; shields swap to a one-handed weapon', () => {
   const both = applyPick({ Weapon: 1302000, Shield: 1092000 }, 'Weapon', 1402000, 'Two-Handed Sword');
   assert.equal(both.Weapon, 1402000);
   assert.equal(both.Shield, undefined);
   const kept = applyPick({ Weapon: 1302000 }, 'Weapon', 1332000, 'Dagger');
   assert.equal(kept.Weapon, 1332000);
-  const refused = applyPick({ Weapon: 1402000, Shield: undefined }, 'Shield', 1092000, 'Shield');
-  assert.equal(refused.Shield, undefined);
-  assert.equal(refused.Weapon, 1402000);
-  const bowBlocks = applyPick({ Weapon: 1452000 }, 'Shield', 1092000, 'Shield');
-  assert.equal(bowBlocks.Shield, undefined);
+  const swapped = applyPick({ Weapon: 1402000, Shield: undefined }, 'Shield', 1092000, 'Shield');
+  assert.equal(swapped.Shield, 1092000);
+  assert.ok(!TWO_HAND_SUBS[(catalog.items as Record<string, { sub: string }>)[String(swapped.Weapon)].sub]);
+  const bowSwaps = applyPick({ Weapon: 1452000 }, 'Shield', 1092000, 'Shield');
+  assert.equal(bowSwaps.Shield, 1092000);
   assert.ok(TWO_HAND_SUBS['Bow']);
+  assert.ok(TWO_HAND_SUBS['Claw']);
 });
 
 test('each weapon family steers to a stance with renderer frames', () => {
@@ -110,7 +111,11 @@ test('each weapon family steers to a stance with renderer frames', () => {
   assert.deepEqual(stanceForWeapon('One-Handed Sword', 'stand2'), { anim: 'stand1', frame: 0 });
   assert.deepEqual(stanceForWeapon('Two-Handed Sword', 'stand1'), { anim: 'stand2', frame: 0 });
   assert.deepEqual(stanceForWeapon('Crossbow', 'stand1'), { anim: 'stand2', frame: 0 });
+  assert.deepEqual(stanceForWeapon('Claw', 'stand2'), { anim: 'stand1', frame: 0 });
+  assert.deepEqual(stanceForWeapon('Wand', 'stand2'), { anim: 'stand1', frame: 0 });
+  assert.deepEqual(stanceForWeapon('Staff', 'stand2'), { anim: 'stand1', frame: 0 });
   assert.deepEqual(stanceForWeapon('Cash', 'stand1'), null);
+  assert.deepEqual(stanceForWeapon('Cash', 'stand2'), { anim: 'stand1', frame: 0 });
   assert.deepEqual(stanceForWeapon('Two-Handed Sword', 'alert'), null);
 });
 

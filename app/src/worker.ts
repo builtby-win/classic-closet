@@ -14,15 +14,17 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     const response = await env.ASSETS.fetch(request);
-
-    const contentType = response.headers.get('content-type') || '';
+    const newHeaders = new Headers(response.headers);
+    const contentType = newHeaders.get('content-type') || '';
     if (!contentType.includes('text/html')) {
       return response;
     }
+    // HTML shell contains script hashes; never cache at edge so asset updates take effect immediately.
+    newHeaders.set('cache-control', 'no-cache, no-store, must-revalidate');
 
     const searchStr = url.search;
     if (!searchStr || searchStr === '?') {
-      return response;
+      return new Response(response.body, { status: response.status, statusText: response.statusText, headers: newHeaders });
     }
 
     try {

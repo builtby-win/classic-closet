@@ -4,7 +4,7 @@
  *
  * Rules, in order:
  * 1. The `body`/`body` layer is the root at (0,0) and publishes its named
- *    anchors (brow/navel/neck/hand/...) for every other sprite.
+ *    anchors (navel/neck/...) for the arm and head attachment chains.
  * 2. Any layer sharing at least one anchor name with the published set
  *    attaches at `anchor_world - own_offset` (multi-pass so chains resolve).
  * 3. Layers with no anchors draw at their source origin; layers whose
@@ -29,7 +29,7 @@ export interface SourceLayer {
   width: number;
   height: number;
   origin: Point;
-  /** Named attachment points, relative to the sprite's top-left. */
+  /** Named attachment points, relative to the sprite's source origin. */
   map: Record<string, Point>;
   z: string;
   /** MapleStory equipment slots, when supplied by the source manifest. */
@@ -49,7 +49,11 @@ export interface Composition {
   unresolved: string[];
 }
 
-/** Official classic z-map order: earlier names are behind later names. */
+/** Official classic z-map order: earlier names are behind later names.
+ *  accessoryEye/accessoryEar/capBelowBody come from upstream frame data
+ *  (e.g. 1027004 sunglasses, 1032000 earrings, hats with lower trims):
+ *  Eye decorations draw over the face (remote render confirms the glasses
+ *  cover the eyes), ear decorations beside it, cap trims under the cap. */
 export const CLASSIC_ZMAP_ORDER = [
   'backTamingMobMid', 'backMobEquipUnderSaddle', 'backSaddle', 'backMobEquipMid',
   'backTamingMobFront', 'backMobEquipFront', 'weaponBelowBody', 'hairBelowBody',
@@ -60,13 +64,13 @@ export const CLASSIC_ZMAP_ORDER = [
   'mailChestOverHighest', 'gloveWristOverBody', 'mailChestTop', 'weaponOverBody',
   'armBelowHead', 'mailArmBelowHead', 'armBelowHeadOverMailChest', 'gloveBelowHead',
   'mailArmBelowHeadOverMailChest', 'gloveWristBelowHead', 'weaponOverArmBelowHead',
-  'shield', 'weapon', 'arm', 'glove', 'mailArm', 'gloveWrist', 'cape', 'head',
-  'hairShade', 'face', 'capBelowAccessory', 'capAccessoryBelowAccFace', 'hair', 'cap',
+  'shield', 'weapon', 'arm', 'hand', 'glove', 'mailArm', 'gloveWrist', 'cape', 'head',
+  'hairShade', 'face', 'accessoryEar', 'accessoryEye', 'capBelowAccessory', 'capBelowBody', 'capAccessoryBelowAccFace', 'hair', 'cap',
   'capAccessory', 'hairOverHead', 'capOverHair', 'weaponBelowArm',
   'armOverHairBelowWeapon', 'mailArmOverHairBelowWeapon', 'armOverHair',
   'gloveBelowMailArm', 'mailArmOverHair', 'gloveWristBelowMailArm', 'weaponOverArm',
-  'gloveBelowWeapon', 'gloveWristBelowWeapon', 'shieldOverHair', 'weaponOverHand',
-  'gloveOverHair', 'gloveWristOverHair', 'weaponOverGlove', 'capeOverHead',
+  'handBelowWeapon', 'gloveBelowWeapon', 'gloveWristBelowWeapon', 'shieldOverHair', 'weaponOverHand',
+  'handOverHair', 'gloveOverHair', 'gloveWristOverHair', 'weaponOverGlove', 'capeOverHead',
   'weaponWristOverGlove', 'characterStart',
 ] as const;
 
@@ -105,26 +109,38 @@ export function composeLayers(
   // Multi-pass: each pass attaches every layer sharing an anchor with the
   // published table and publishes its own anchors for the next pass.
   let pending = layers.filter((layer) => layer !== root);
-  for (let pass = 0; pass < 10 && pending.length; pass++) {
-    const remain: SourceLayer[] = [];
-    let progress = false;
-    for (const layer of pending) {
-      const shared = Object.keys(layer.map).find((name) => name in anchors);
-      if (shared === undefined) {
-        remain.push(layer);
-        continue;
+  const attach = (waiting: SourceLayer[]): SourceLayer[] => {
+    let remain = waiting;
+    for (let pass = 0; pass < 10 && remain.length; pass++) {
+      const next: SourceLayer[] = [];
+      let progress = false;
+      for (const layer of remain) {
+        const shared = Object.keys(layer.map).find((name) => name in anchors);
+        if (shared === undefined) {
+          next.push(layer);
+          continue;
+        }
+        const base = anchors[shared]!;
+        const own = layer.map[shared]!;
+        const at = { x: base.x - own.x, y: base.y - own.y };
+        positions[layer.key] = at;
+        for (const [name, point] of Object.entries(layer.map)) {
+          if (!(name in anchors)) anchors[name] = { x: at.x + point.x, y: at.y + point.y };
+        }
+        progress = true;
       }
-      const base = anchors[shared]!;
-      const own = layer.map[shared]!;
-      const at = { x: base.x - own.x, y: base.y - own.y };
-      positions[layer.key] = at;
-      for (const [name, point] of Object.entries(layer.map)) {
-        if (!(name in anchors)) anchors[name] = { x: at.x + point.x, y: at.y + point.y };
-      }
-      progress = true;
+      remain = next;
+      if (!progress) break;
     }
-    pending = remain;
-    if (!progress) break;
+    return remain;
+  };
+  pending = attach(pending);
+  // The source arm publishes `hand` but never `handMove`, while glove layers
+  // attach through `handMove` alone (e.g. 1082000). Mirror the reference
+  // engine: a neutral grip falls back to the source arm hand point.
+  if (anchors['hand'] && !('handMove' in anchors) && pending.some((layer) => 'handMove' in layer.map)) {
+    anchors['handMove'] = { ...anchors['hand']! };
+    pending = attach(pending);
   }
 
   const placed: PlacedLayer[] = [];
@@ -181,10 +197,19 @@ export function drawComposition(
   ctx.imageSmoothingEnabled = false;
   ctx.clearRect(0, 0, width, height);
   if (!composition.layers.length) return;
-  // Keep the base body centered so adding a long weapon doesn't shift the
-  // character itself across the preview.
-  const xOffset = Math.floor((width - 43) / 2);
-  const yOffset = Math.floor((height - 68) / 2);
+  // Center the complete base character, excluding equipment bounds so a
+  // long weapon cannot move the character across the preview.
+  const root = composition.layers.find((layer) => layer.part === 'body' && layer.name === 'body');
+  let left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;
+  for (const layer of composition.layers) {
+    if (root && layer.itemKey !== root.itemKey) continue;
+    left = Math.min(left, layer.x);
+    top = Math.min(top, layer.y);
+    right = Math.max(right, layer.x + layer.width);
+    bottom = Math.max(bottom, layer.y + layer.height);
+  }
+  const xOffset = Math.round((width - left - right) / 2);
+  const yOffset = Math.round((height - top - bottom) / 2);
   for (const layer of composition.layers) {
     ctx.drawImage(layer.image, Math.round(layer.x + xOffset), Math.round(layer.y + yOffset));
   }

@@ -1,6 +1,24 @@
 import { CLASSIC_ZMAP_ORDER, composeLayers, drawComposition, type Point, type SourceLayer } from './layered-renderer';
 import type { Look } from './fashion';
 
+interface BaseEffect {
+  part: string;
+  name: string;
+  image: string;
+  origin?: Point;
+  mapOffset?: Record<string, Point>;
+  position?: string;
+}
+
+interface BaseFrame {
+  body: BaseEffect[];
+  head: BaseEffect[];
+}
+
+interface BaseManifest {
+  frames: Record<string, BaseFrame>;
+}
+
 interface EffectRecord {
   image: string;
   origin?: Point;
@@ -17,6 +35,7 @@ interface ItemRecord {
 
 const records = new Map<number, Promise<ItemRecord | null>>();
 const images = new Map<string, Promise<HTMLImageElement>>();
+let baseManifest: Promise<BaseManifest | null> | null = null;
 
 function localItem(id: number): Promise<ItemRecord | null> {
   const cached = records.get(id);
@@ -26,6 +45,15 @@ function localItem(id: number): Promise<ItemRecord | null> {
     .catch(() => null);
   records.set(id, request);
   return request;
+}
+
+function localBase(): Promise<BaseManifest | null> {
+  if (!baseManifest) {
+    baseManifest = fetch('/sprites/base.json')
+      .then((response) => response.ok ? response.json() as Promise<BaseManifest> : null)
+      .catch(() => null);
+  }
+  return baseManifest;
 }
 
 function localImage(src: string): Promise<HTMLImageElement> {
@@ -52,17 +80,28 @@ function frameEffects(record: ItemRecord, look: Look, isFace: boolean): EffectRe
     ?? [];
 }
 
+function baseFrame(manifest: BaseManifest, look: Look): BaseFrame | null {
+  const wanted = `${look.skin}:${look.anim || 'stand1'}:${look.frame || 0}`;
+  return manifest.frames[wanted]
+    ?? manifest.frames[`${look.skin}:${look.anim || 'stand1'}:0`]
+    ?? manifest.frames[`${look.skin}:stand1:0`]
+    ?? null;
+}
+
 function effectMap(effect: EffectRecord): Record<string, Point> {
-  const offsets = effect.mapOffset ?? {};
-  if (Object.keys(offsets).length) return { ...offsets };
-  // A sprite without an attachment point uses its source origin, which is
-  // represented by the base layer's zero-valued root anchor.
-  return { base: { x: 0, y: 0 } };
+  // A sprite without attachment points draws at its source origin (the
+  // compositor places empty-map layers at -origin); no fake anchor needed.
+  return effect.mapOffset ?? {};
 }
 
 /**
  * Independent local-only preview pipeline. It reads baked source sprites,
  * resolves named anchors, and draws in z-map order; there is no API fallback.
+ *
+ * The base body is unflattened source layers (Body/body root, Body/arm,
+ * Head/head, Head/humanEar) from the local base manifest: weapons attach to
+ * the source arm hand anchor and faces/hair to the source head brow anchor
+ * through the normal multi-pass chain. No fake hand/brow/navel constants.
  */
 export async function renderLayeredCharacter(
   ctx: CanvasRenderingContext2D,
@@ -70,18 +109,32 @@ export async function renderLayeredCharacter(
   width = 128,
   height = 128,
 ): Promise<{ missing: number[]; unresolved: string[] }> {
-  const pose = look.anim === 'stand2' || look.anim === 'alert' ? look.anim : 'stand1';
-  const bodyImage = await localImage(`/sprites/base/${look.skin}_${pose}_0.png`);
-  const bodyLayer: SourceLayer = {
-    key: 'base:body', itemKey: 'base', part: 'body', name: 'body',
-    image: bodyImage, width: bodyImage.naturalWidth, height: bodyImage.naturalHeight,
-    origin: { x: 0, y: 0 },
-    map: {
-      base: { x: 0, y: 0 }, navel: { x: 18, y: 46 },
-      brow: { x: 17, y: 14 }, neck: { x: 20, y: 22 }, hand: { x: 35, y: 41 },
-    },
-    z: 'body',
-  };
+  const missing: number[] = [];
+  const spriteLayers: SourceLayer[] = [];
+  const base = await localBase();
+  const frame = base ? baseFrame(base, look) : null;
+  if (!frame) {
+    missing.push(look.skin);
+  } else {
+    for (const layers of [frame.body, frame.head]) {
+      for (let index = 0; index < layers.length; index++) {
+        const effect = layers[index]!;
+        try {
+          const image = await localImage(effect.image);
+          spriteLayers.push({
+            key: `base:${effect.part}:${effect.name}`,
+            itemKey: 'base', part: effect.part, name: effect.name, image,
+            width: image.naturalWidth, height: image.naturalHeight,
+            origin: effect.origin ?? { x: 0, y: 0 },
+            map: effect.mapOffset ?? {},
+            z: effect.position ?? 'body',
+          });
+        } catch {
+          missing.push(look.skin);
+        }
+      }
+    }
+  }
 
   const selections: Array<{ id: number; part: string; face?: boolean; hair?: boolean }> = [];
   if (look.face) selections.push({ id: look.face, part: 'Face', face: true });
@@ -94,8 +147,9 @@ export async function renderLayeredCharacter(
     selection,
     record: await localItem(selection.id),
   })));
-  const missing = loaded.filter(({ record }) => !record).map(({ selection }) => selection.id);
-  const spriteLayers: SourceLayer[] = [bodyLayer];
+  for (const { record, selection } of loaded) {
+    if (!record) missing.push(selection.id);
+  }
   const hatHasCap = loaded.some(({ selection, record }) => selection.part === 'Hat'
     && Object.values(record?.frames ?? {}).flat().some((effect) =>
       ['cap', 'capAccessory', 'capBelowAccessory'].includes(effect.position ?? '')));

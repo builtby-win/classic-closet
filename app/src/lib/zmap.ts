@@ -48,6 +48,8 @@ export const ZMAP_ORDER: string[] = [
   'head',
   'hairShade',
   'face',
+  'accessoryEar',
+  'accessoryEye',
   'capBelowAccessory',
   'capAccessoryBelowAccFace',
   'hair',

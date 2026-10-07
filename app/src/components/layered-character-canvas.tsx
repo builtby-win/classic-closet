@@ -19,9 +19,16 @@ export default function LayeredCharacterCanvas({ look, onRendered }: LayeredChar
     if (!canvas || !ctx) return;
     let cancelled = false;
     canvas.dataset.renderState = 'loading';
+    const buffer = document.createElement('canvas');
+    buffer.width = canvas.width;
+    buffer.height = canvas.height;
+    const bufferContext = buffer.getContext('2d');
+    if (!bufferContext) return;
 
-    void renderLayeredCharacter(ctx, look, canvas.width, canvas.height).then((result) => {
+    void renderLayeredCharacter(bufferContext, look, canvas.width, canvas.height).then((result) => {
       if (cancelled) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(buffer, 0, 0);
       canvas.dataset.renderState = result.missing.length || result.unresolved.length ? 'partial' : 'ready';
       canvas.dataset.missingAssets = result.missing.join(',');
       canvas.dataset.unresolvedLayers = result.unresolved.join(',');
