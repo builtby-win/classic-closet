@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { renderURL, type Look } from '../lib/fashion';
+import { CATALOG, getItem, renderURL, type Look } from '../lib/fashion';
 import { renderCharacterToCanvas } from '../lib/canvas-renderer';
 
 interface CharacterCanvasProps {
@@ -8,6 +8,8 @@ interface CharacterCanvasProps {
 }
 
 export default function CharacterCanvas({ look, onRendered }: CharacterCanvasProps) {
+  const faceMeta = look.face ? getItem(CATALOG, look.face) : undefined;
+  const hasOsmsFace = faceMeta?.sub === 'Face' && faceMeta.src === 'OSMS';
   const url = renderURL(look);
   const [remoteImage, setRemoteImage] = useState<{ url: string; src: string } | null>(null);
   const [loadedUrl, setLoadedUrl] = useState<string | null>(null);
@@ -18,7 +20,11 @@ export default function CharacterCanvas({ look, onRendered }: CharacterCanvasPro
   useEffect(() => {
     setRemoteImage(null);
     setLoadedUrl(null);
-    setLoadingUrl(url);
+    setLoadingUrl(hasOsmsFace ? null : url);
+
+    // MCW's composite endpoint doesn't contain OSMS faces. Keep the local
+    // composition for these looks; the renderer loads the color variant from GMS.
+    if (hasOsmsFace) return;
 
     const controller = new AbortController();
     let objectUrl: string | null = null;
@@ -44,7 +50,7 @@ export default function CharacterCanvas({ look, onRendered }: CharacterCanvasPro
       controller.abort();
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [url]);
+  }, [url, hasOsmsFace]);
 
   return (
     <div id="preview" className={loadedUrl === url ? 'remote-ready' : ''} role="img" aria-label="Character preview">

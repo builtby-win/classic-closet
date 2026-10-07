@@ -201,7 +201,8 @@ export async function renderCharacterToCanvas(
       const spriteId = id;
       let data: ItemSpriteData | null | undefined = spriteDataCache.get(spriteId);
       if (!data) {
-        data = await fetchItemSpriteData(spriteId, meta?.src === 'GMS' ? 'GMS' : undefined);
+        const useGmsSource = meta?.src === 'GMS' || (meta?.sub === 'Face' && meta.src === 'OSMS');
+        data = await fetchItemSpriteData(spriteId, useGmsSource ? 'GMS' : undefined);
       }
       return data;
     })
