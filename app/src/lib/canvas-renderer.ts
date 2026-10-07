@@ -1,5 +1,5 @@
 import { getZIndex } from './zmap';
-import { CATALOG, getItem, type Look } from './fashion';
+import { assetSource, type Look } from './fashion';
 
 export interface SpriteEffect {
   image: string; // data URI (PNG) or URL
@@ -195,14 +195,12 @@ export async function renderCharacterToCanvas(
 
   const spriteDataList = await Promise.all(
     activeIds.map(async ({ id }) => {
-      const meta = getItem(CATALOG, id);
       // Face IDs include the selected eye color. Keep the full ID so color
       // variants use their own sprite data instead of always drawing black eyes.
       const spriteId = id;
       let data: ItemSpriteData | null | undefined = spriteDataCache.get(spriteId);
       if (!data) {
-        const useGmsSource = meta?.src === 'GMS' || (meta?.sub === 'Face' && meta.src === 'OSMS');
-        data = await fetchItemSpriteData(spriteId, useGmsSource ? 'GMS' : undefined);
+        data = await fetchItemSpriteData(spriteId, assetSource(spriteId).region === 'GMS' ? 'GMS' : undefined);
       }
       return data;
     })

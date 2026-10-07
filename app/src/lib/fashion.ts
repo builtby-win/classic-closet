@@ -296,9 +296,11 @@ export function randomLook(sex: Sex, random: () => number = Math.random, exclude
 }
 
 /** Resolve each asset independently; same-number equips are not interchangeable. */
-function assetSource(itemId: number): { region: string; version: string } {
+export function assetSource(itemId: number): { region: string; version: string } {
   const meta = getItem(CATALOG, itemId);
-  return meta?.src === 'GMS'
+  const isGmsCosmetic = meta?.src === 'GMS'
+    || (meta?.src === 'OSMS' && (meta.sub === 'Hair' || meta.sub === 'Face'));
+  return isGmsCosmetic
     ? { region: 'GMS', version: '270' }
     : { region: REGION, version: VERSION };
 }
