@@ -3,7 +3,6 @@ import {
   API,
   DEFAULT_LOOK,
   EYE_COLORS,
-  GROUP_SHORT,
   HAIR_COLORS,
   STORAGE_SEX_KEY,
   applyPick,
@@ -21,7 +20,6 @@ import {
   loadLookFromStorage,
   matchesJob,
   randomClassicWeapon,
-  renderURL,
   randomLook,
   stanceForWeapon,
   TWO_HAND_SUBS,
@@ -36,7 +34,7 @@ import {
   type Sex,
 } from '../lib/fashion';
 import catalogData from '../data/catalog.json';
-import CharacterCanvas from './character-canvas';
+import LayeredCharacterCanvas from './layered-character-canvas';
 import './fashion.css';
 
 const CATALOG = catalogData as FastCatalog;
@@ -101,15 +99,6 @@ function loadInitialLook(): Look {
   return { ...DEFAULT_LOOK, sex: savedSex || DEFAULT_LOOK.sex };
 }
 
-function updateSocialMeta(look: Look) {
-  if (typeof document === 'undefined') return;
-  const previewImg = renderURL(look);
-  const metaOg = document.querySelector('meta[property="og:image"]');
-  if (metaOg) metaOg.setAttribute('content', previewImg);
-  const metaTw = document.querySelector('meta[name="twitter:image"]');
-  if (metaTw) metaTw.setAttribute('content', previewImg);
-}
-
 export default function FashionIsland() {
   const [look, setLook] = useState<Look>(() => loadInitialLook());
   const [skins, setSkins] = useState<number[]>([2000]);
@@ -117,7 +106,6 @@ export default function FashionIsland() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [excludedSlots, setExcludedSlots] = useState<RandomEquipSlot[]>([]);
   const [nxOnly, setNxOnly] = useState(true);
-  const [groupFilter, setGroupFilter] = useState<string | null>(null);
   const [jobFilter, setJobFilter] = useState('All');
   const [classJob, setClassJob] = useState('Beginner');
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -152,7 +140,6 @@ export default function FashionIsland() {
     currentUrl.hash = '';
     history.replaceState(null, '', currentUrl.pathname + currentUrl.search);
     saveLookToStorage(look);
-    updateSocialMeta(look);
   }, [look]);
 
   const patch = useCallback((p: Partial<Look>) => {
@@ -254,7 +241,7 @@ export default function FashionIsland() {
 
   const equipSections = useMemo(() => {
     const ids = [...new Set(['founder-crate', 'aurora-crate', 'cover-10day', 'classic-equips'].flatMap(getGroupEquips))]
-      .filter((id) => !groupFilter || CATALOG.items[id]?.group === groupFilter);
+      .filter((id) => !!CATALOG.items[id]);
     return EQUIP_SECTIONS.map((section) => ({
       ...section,
       ids: ids.filter((id) => {
@@ -266,20 +253,8 @@ export default function FashionIsland() {
           : slot === section.id;
       }),
     }));
-  }, [getGroupEquips, groupFilter]);
+  }, [getGroupEquips]);
 
-  const groupCounts = useMemo(() => {
-    const counts: Record<string, number> = {
-      'style-coupon': activeHairStyles.length + activeFaces.length,
-      'founder-crate': CATALOG.indexes.groups['founder-crate'].u.length + CATALOG.indexes.groups['founder-crate'][look.sex].length,
-      'aurora-crate': CATALOG.indexes.groups['aurora-crate'].u.length + CATALOG.indexes.groups['aurora-crate'][look.sex].length,
-      'cover-10day': CATALOG.indexes.groups['cover-10day'].u.length + CATALOG.indexes.groups['cover-10day'][look.sex].length,
-    };
-    if (pastHairStyles.length || pastFaces.length) {
-      counts['past-rotation'] = pastHairStyles.length + pastFaces.length;
-    }
-    return counts;
-  }, [look.sex, activeHairStyles.length, activeFaces.length, pastHairStyles.length, pastFaces.length]);
 
   const searchResults = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -288,10 +263,10 @@ export default function FashionIsland() {
       .filter((o) => (o.sex === 'u' || o.sex === look.sex) && (o.name.toLowerCase().includes(needle) || String(o.id).includes(needle)))
       .filter((o) => {
         const item = o.isStyle ? getItem(CATALOG, o.id * 10) : getItem(CATALOG, o.id);
-        return !groupFilter || item?.group === groupFilter;
+        return true;
       })
       .slice(0, 120);
-  }, [q, look.sex, groupFilter]);
+  }, [q, look.sex]);
 
   const catRows = useMemo(() => {
     if (!catSec) return [];
@@ -379,6 +354,63 @@ export default function FashionIsland() {
     ...wornEquipList.filter((e) => e.meta && !e.meta.attainable).map((e) => ({ type: e.slot, id: e.id!, meta: e.meta! })),
   ].filter(Boolean) as Array<{ type: string; id: number; meta: ResolvedItem }>;
 
+  // Side rail order: head to feet, matching how the character is dressed.
+  const railSlots = useMemo(() => {
+    const slots: Array<{ id: SectionId; label: string; icon: string }> = [
+      { id: 'Hair', label: 'Hair', icon: '💇' },
+      { id: 'Face', label: 'Eyes', icon: '👁️' },
+    ];
+    const order: SectionId[] = ['Hat', 'Top', 'Bottom', 'Overall', 'Shoes', 'Glove', 'Weapon', 'Shield', 'Cape', 'Accessories'];
+    for (const id of order) {
+      const section = equipSections.find((sec) => sec.id === id);
+      if (section && section.ids.length > 0) slots.push({ id, label: section.label, icon: '' });
+    }
+    return slots;
+  }, [equipSections]);
+
+
+  const wornForSlot = useCallback((slot: SectionId): { id: number; name: string; img: string } | null => {
+    if (slot === 'Hair') {
+      const meta = getStyle(CATALOG, Math.floor(look.hair / 10));
+      if (!meta) return null;
+      return { id: look.hair, name: `${meta.name} · ${HAIR_COLORS[look.hairCol]}`, img: iconURL(look.hair) };
+    }
+    if (slot === 'Face') {
+      const meta = getItem(CATALOG, look.face);
+      if (!meta) return null;
+      return { id: look.face, name: `${meta.name} · ${EYE_COLORS[faceColorIndex(look.face)]}`, img: iconURL(look.face) };
+    }
+    const id = look.items[slot];
+    const meta = getItem(CATALOG, id);
+    if (id == null || !meta) return null;
+    return { id, name: meta.name, img: iconURL(id) };
+  }, [look]);
+
+  const drawerTitle = useMemo(() => {
+    if (!catSec) return '';
+    return EQUIP_SECTIONS.find((section) => section.id === catSec)?.label ?? (catSec === 'Hair'
+      ? '🎲 Mystery Hair · 5,500 NX'
+      : catSec === 'HairSignature'
+        ? '✨ Signature Hair · 7,500 NX'
+        : catSec === 'HairClassic'
+          ? 'Starter Hair'
+          : catSec === 'HairPast'
+            ? 'Past Rotation Hair'
+            : catSec === 'Face'
+              ? '🎲 Mystery Faces · 3,500 NX'
+              : catSec === 'FaceSignature'
+                ? '✨ Signature Faces · 5,500 NX'
+                : catSec === 'FaceClassic'
+                  ? 'Starter Eyes'
+                  : catSec === 'FacePast'
+                    ? 'Past Rotation Eyes'
+                    : catSec === 'founder-crate'
+                      ? "Founder's Crate"
+                      : catSec === 'aurora-crate'
+                        ? 'Aurora Crate'
+                        : '10-Day Covers · 700–1,200 NX');
+  }, [catSec]);
+
   return (
     <div className="mf">
       <div id="stage">
@@ -391,7 +423,7 @@ export default function FashionIsland() {
           <button id="shuffle" onClick={() => setLook(randomLook(look.sex, Math.random, excludedSlots, nxOnly, classJob))} aria-label="Randomize outfit"><Icon name="shuffle" /></button>
         </div>
         <div id="canvas">
-          <CharacterCanvas look={look} onRendered={() => setRendering(false)} />
+          <LayeredCharacterCanvas look={look} onRendered={() => setRendering(false)} />
           {rendering && <div id="spin" />}
         </div>
         <div className="equip-toast-slot" role="status" aria-live="polite" aria-atomic="true">
@@ -471,249 +503,37 @@ export default function FashionIsland() {
         </div>
       )}
 
-      <div id="sheet">
-        <div id="grab" />
-        {searchOpen && <div id="bar" role="search">
-          <input id="item-search" autoFocus aria-label="Search all items" value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => { if (e.key === 'Escape') { setSearchOpen(false); setQ(''); } }} placeholder="Search all items…" enterKeyHint="search" />
-          <button className="icon-button" aria-label="Close search" onClick={() => { setSearchOpen(false); setQ(''); }}><Icon name="close" /></button>
-        </div>}
-        <div id="groups">
+      <div id="rail">
+        <div id="slot-list" role="list" aria-label="Equipped items, head to feet">
           <button id="search-toggle" className={searchOpen ? 'on' : ''} aria-label="Search items" aria-expanded={searchOpen} aria-controls="item-search" onClick={() => { setSearchOpen(v => !v); setQ(''); }}><Icon name="search" /></button>
-          <button className={groupFilter === null ? 'on' : ''} onClick={() => setGroupFilter(null)}>All</button>
-          {Object.entries(groupCounts).map(([g, n]) => (
-            <button key={g} className={groupFilter === g ? 'on' : ''} onClick={() => setGroupFilter(groupFilter === g ? null : g)}>
-              {GROUP_SHORT[g] ?? g} · {n}
-            </button>
-          ))}
+          {railSlots.map((slot) => {
+            const worn = wornForSlot(slot.id);
+            return (
+              <button
+                key={slot.id}
+                role="listitem"
+                className={'slot-row' + (catSec === slot.id ? ' on' : '')}
+                onClick={() => openCat(slot.id)}
+                aria-label={`${slot.label}${worn ? `: ${worn.name}` : ''}`}
+              >
+                {slot.icon
+                  ? <span className="slot-icon" aria-hidden="true">{slot.icon}</span>
+                  : worn
+                    ? <img className="slot-icon" src={worn.img} alt="" loading="lazy" decoding="async" />
+                    : <span className="slot-icon slot-empty" aria-hidden="true">○</span>}
+                <span className="slot-label">{slot.label}</span>
+                <span className="slot-worn">{worn ? worn.name : 'None'}</span>
+                <span className="slot-chev" aria-hidden="true">›</span>
+              </button>
+            );
+          })}
         </div>
 
-        {!catSec && !searchResults && (
-          <div id="scroll">
-            <div className="color-strip">
-              <span className="color-strip-label">Hair color · {HAIR_COLORS[look.hairCol]}</span>
-              <div className="color-band" role="group" aria-label="Hair color">
-                {HAIR_COLORS.map((c, i) => (
-                  <button
-                    key={c}
-                    type="button"
-                    title={c}
-                    aria-label={c}
-                    aria-pressed={look.hairCol === i}
-                    className={'color-swatch' + (look.hairCol === i ? ' on' : '')}
-                    style={{ background: HAIR_DOTS[i] }}
-                    onClick={() => patch({ hair: Math.floor(look.hair / 10) * 10 + i, hairCol: i })}
-                  />
-                ))}
-              </div>
-            </div>
-            <Section id="Hair" label="🎲 Mystery Hair" onSeeAll={() => openCat('Hair')} onRates={() => setRatesOpen(true)}>
-              {wornFirst(mysteryHairs.filter((st) => getStyle(CATALOG, st)), (st) => Math.floor(look.hair / 10) === st).slice(0, ROW_CAP).map((st) => {
-                const styleMeta = getStyle(CATALOG, st)!;
-                return (
-                  <Tile
-                    key={st}
-                    on={Math.floor(look.hair / 10) === st}
-                    img={iconURL(st * 10 + look.hairCol)}
-                    label={styleMeta.name}
-                    rate={styleMeta.rate || '16.67%'}
-                    attainable={true}
-                    bannerId={styleMeta.bannerId}
-                    coupon={styleMeta.coupon}
-                    onClick={() => {
-                      wearItemById(st * 10 + look.hairCol, 'Hair');
-                    }}
-                  />
-                );
-              })}
-            </Section>
-
-            {/* 2. SIGNATURE HAIR (pick your style) */}
-            <Section id="HairSignature" label="✨ Signature Hair" onSeeAll={() => openCat('HairSignature')}>
-              {wornFirst(signatureHairs.filter((st) => getStyle(CATALOG, st)), (st) => Math.floor(look.hair / 10) === st).slice(0, ROW_CAP).map((st) => {
-                const styleMeta = getStyle(CATALOG, st)!;
-                return (
-                  <Tile
-                    key={st}
-                    on={Math.floor(look.hair / 10) === st}
-                    img={iconURL(st * 10 + look.hairCol)}
-                    label={styleMeta.name}
-                    rate="Signature"
-                    attainable={true}
-                    bannerId={styleMeta.bannerId}
-                    coupon={styleMeta.coupon}
-                    onClick={() => {
-                      wearItemById(st * 10 + look.hairCol, 'Hair');
-                    }}
-                  />
-                );
-              })}
-            </Section>
-
-            <Section id="HairClassic" label="Starter Hair" onSeeAll={() => openCat('HairClassic')}>
-              {wornFirst(starterHairStyles, (st) => Math.floor(look.hair / 10) === st).map((st) => {
-                const meta = getStyle(CATALOG, st)!;
-                return <Tile key={st} on={Math.floor(look.hair / 10) === st} img={iconURL(st * 10 + look.hairCol)} label={meta.name} attainable={true} onClick={() => wearItemById(st * 10 + look.hairCol, 'Hair')} />;
-              })}
-            </Section>
-            {pastHairStyles.length > 0 && <Section id="HairPast" label="Past Rotation Hair" onSeeAll={() => openCat('HairPast')}>
-              {wornFirst(pastHairStyles, (st) => Math.floor(look.hair / 10) === st).slice(0, ROW_CAP).map((st) => {
-                const meta = getStyle(CATALOG, st)!;
-                return <Tile key={st} on={Math.floor(look.hair / 10) === st} img={iconURL(st * 10 + look.hairCol)} label={meta.name} attainable={meta.attainable} bannerId={meta.bannerId} onClick={() => wearItemById(st * 10 + look.hairCol, 'Hair')} />;
-              })}
-            </Section>}
-
-
-            <div className="color-strip">
-              <span className="color-strip-label">Eye color · {EYE_COLORS[faceColorIndex(look.face)]}</span>
-              <div className="color-band" role="group" aria-label="Eye color">
-                {EYE_COLORS.map((color, i) => (
-                  <button
-                    key={color}
-                    type="button"
-                    title={color}
-                    aria-label={color}
-                    aria-pressed={faceColorIndex(look.face) === i}
-                    className={'color-swatch' + (faceColorIndex(look.face) === i ? ' on' : '')}
-                    style={{ background: EYE_DOTS[i] }}
-                    onClick={() => patch({ face: faceVariantId(look.sex, faceStyleId(look.face), i) })}
-                  />
-                ))}
-              </div>
-            </div>
-
-            {/* 4. MYSTERY FACES (random 16.67%) */}
-            <Section id="Face" label="🎲 Mystery Faces" onSeeAll={() => openCat('Face')} onRates={() => setRatesOpen(true)}>
-              {wornFirst(mysteryFaces.filter((fid) => getItem(CATALOG, fid)), (fid) => faceStyleId(look.face) === faceStyleId(fid)).slice(0, ROW_CAP).map((fid) => {
-                const faceMeta = getItem(CATALOG, fid)!;
-                const faceId = faceVariantId(look.sex, faceStyleId(fid), faceColorIndex(look.face));
-                return (
-                  <Tile
-                    key={fid}
-                    on={faceStyleId(look.face) === faceStyleId(fid)}
-                    img={iconURL(faceId)}
-                    label={faceMeta.name}
-                    rate={faceMeta.rate}
-                    attainable={true}
-                    bannerId={faceMeta.bannerId}
-                    coupon={faceMeta.coupon}
-                    onClick={() => wearItemById(fid, 'Face')}
-                  />
-                );
-              })}
-            </Section>
-
-            {/* 5. SIGNATURE FACES (pick your face) */}
-            <Section id="FaceSignature" label="✨ Signature Faces" onSeeAll={() => openCat('FaceSignature')}>
-              {wornFirst(signatureFaces.filter((fid) => getItem(CATALOG, fid)), (fid) => faceStyleId(look.face) === faceStyleId(fid)).slice(0, ROW_CAP).map((fid) => {
-                const faceMeta = getItem(CATALOG, fid)!;
-                const faceId = faceVariantId(look.sex, faceStyleId(fid), faceColorIndex(look.face));
-                return (
-                  <Tile
-                    key={fid}
-                    on={faceStyleId(look.face) === faceStyleId(fid)}
-                    img={iconURL(faceId)}
-                    label={faceMeta.name}
-                    rate="Signature"
-                    attainable={true}
-                    bannerId={faceMeta.bannerId}
-                    coupon={faceMeta.coupon}
-                    onClick={() => wearItemById(fid, 'Face')}
-                  />
-                );
-              })}
-            </Section>
-
-            <Section id="FaceClassic" label="Starter Eyes" onSeeAll={() => openCat('FaceClassic')}>
-              {wornFirst(starterFaces, (fid) => faceStyleId(look.face) === faceStyleId(fid)).map((fid) => {
-                const meta = getItem(CATALOG, fid)!;
-                return <Tile key={fid} on={faceStyleId(look.face) === faceStyleId(fid)} img={iconURL(faceVariantId(look.sex, faceStyleId(fid), faceColorIndex(look.face)))} label={meta.name} attainable={true} onClick={() => wearItemById(fid, 'Face')} />;
-              })}
-            </Section>
-            {pastFaces.length > 0 && <Section id="FacePast" label="Past Rotation Eyes" onSeeAll={() => openCat('FacePast')}>
-              {wornFirst(pastFaces, (fid) => faceStyleId(look.face) === faceStyleId(fid)).slice(0, ROW_CAP).map((fid) => {
-                const meta = getItem(CATALOG, fid)!;
-                return <Tile key={fid} on={faceStyleId(look.face) === faceStyleId(fid)} img={iconURL(faceVariantId(look.sex, faceStyleId(fid), faceColorIndex(look.face)))} label={meta.name} attainable={meta.attainable} bannerId={meta.bannerId} onClick={() => wearItemById(fid, 'Face')} />;
-              })}
-            </Section>}
-
-            {/* Equipment by slot; shirts and pants are alternatives to an overall. */}
-            {equipSections.map(({ id: slot, label, ids: list }) => {
-              if (!list.length) return null;
-              return (
-                <Section
-                  key={slot}
-                  id={slot}
-                  label={label}
-                  onSeeAll={() => openCat(slot)}
-                >
-                  {wornFirst(list.filter((id) => getItem(CATALOG, id)), (id) => Object.values(look.items).includes(id)).slice(0, ROW_CAP).map((id) => {
-                    const item = getItem(CATALOG, id)!;
-                    const worn = Object.values(look.items).includes(id);
-                    return (
-                      <Tile
-                        key={id}
-                        on={worn}
-                        img={iconURL(id)}
-                        label={item.name}
-                        rate={item.rate}
-                        bannerId={item.bannerId}
-                        equipInfo={equipInfo(item)}
-                        coupon={item.coupon}
-                        attainable={item.attainable}
-                        onClick={() => wearItemById(id, item.sub)}
-                      />
-                    );
-                  })}
-                </Section>
-              );
-            })}
-
-          </div>
-        )}
-
-        {!catSec && searchResults && (
-          <div id="scroll">
-            <div className="sec">
-              <h2><span>Search · {searchResults.length}</span></h2>
-              <div className="row" style={{ flexWrap: 'wrap', overflow: 'visible' }}>
-                {searchResults.map((entry) => (
-                  <SearchTile key={entry.id + ':' + entry.sub} entry={entry} look={look} onWear={() => {
-                    if (entry.isStyle) wearItemById(entry.id * 10 + look.hairCol, 'Hair');
-                    else wearItemById(entry.id, entry.sub);
-                  }} />
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
         {catSec && (
-          <div id="catpage" className="open">
-            <div id="cathead">
-              <button id="back" onClick={() => setCatSec(null)}>‹ back</button>
-              <div id="cattitle">
-                {EQUIP_SECTIONS.find((section) => section.id === catSec)?.label ?? (catSec === 'Hair'
-                  ? '🎲 Mystery Hair · 5,500 NX'
-                  : catSec === 'HairSignature'
-                    ? '✨ Signature Hair · 7,500 NX'
-                    : catSec === 'HairClassic'
-                      ? 'Starter Hair'
-                    : catSec === 'HairPast'
-                      ? 'Past Rotation Hair'
-                      : catSec === 'Face'
-                        ? '🎲 Mystery Faces · 3,500 NX'
-                        : catSec === 'FaceSignature'
-                          ? '✨ Signature Faces · 5,500 NX'
-                          : catSec === 'FaceClassic'
-                            ? 'Starter Eyes'
-                          : catSec === 'FacePast'
-                            ? 'Past Rotation Eyes'
-                            : catSec === 'founder-crate'
-                              ? "Founder's Crate"
-                              : catSec === 'aurora-crate'
-                                ? 'Aurora Crate'
-                                : '10-Day Covers · 700–1,200 NX')}
-              </div>
+          <div id="drawer" className="open">
+            <div id="drawer-head">
+              <button id="drawer-back" onClick={() => setCatSec(null)}>‹ back</button>
+              <div id="drawer-title">{drawerTitle}</div>
             </div>
             {['Hair', 'Face'].includes(catSec) && (
               <p className="cat-sub">Random style per coupon · 16.67% each · coupon lasts 14 days · <button className="inline-link" onClick={() => setRatesOpen(true)}>view full rates</button> · <a href={NEWS_POST} target="_blank" rel="noreferrer">Nexon cash shop announcement</a></p>
@@ -724,11 +544,11 @@ export default function FashionIsland() {
             {catSec === 'cover-10day' && (
               <p className="cat-sub">10-day duration · sale ends Nov 18 · <a href={NEWS_POST} target="_blank" rel="noreferrer">cash shop post</a></p>
             )}
-            <div id="catbar">
+            <div id="drawer-search">
               <input value={catQ} onChange={(e) => setCatQ(e.target.value)} placeholder="filter…" enterKeyHint="search" />
             </div>
             {EQUIP_SECTIONS.some((section) => section.id === catSec) && (
-              <div className="cat-filter">
+              <div id="drawer-filter">
                 <label htmlFor="job-filter">{catSec === 'Weapon' ? 'Class' : 'Filter by job'}</label>
                 <select id="job-filter" value={catSec === 'Weapon' ? classJob : jobFilter} onChange={e => catSec === 'Weapon' ? chooseClass(e.target.value) : setJobFilter(e.target.value)}>
                   {(catSec === 'Weapon' ? ['Beginner', 'Warrior', 'Magician', 'Bowman', 'Thief'] : ['All', 'Warrior', 'Magician', 'Bowman', 'Thief']).map(job => <option key={job} value={job}>{job === 'All' ? 'All classes' : job}</option>)}
@@ -736,16 +556,22 @@ export default function FashionIsland() {
               </div>
             )}
             {(['Hair', 'HairSignature', 'HairClassic', 'HairPast'] as SectionId[]).includes(catSec) && (
-              <ColorStrip label={`Hair color · ${HAIR_COLORS[look.hairCol]}`} ariaLabel="Hair color">
-                {HAIR_COLORS.map((color, i) => <ColorSwatch key={color} color={color} dot={HAIR_DOTS[i]} selected={look.hairCol === i} onClick={() => patch({ hair: Math.floor(look.hair / 10) * 10 + i, hairCol: i })} />)}
-              </ColorStrip>
+              <div id="drawer-color">
+                <span id="drawer-color-label">Hair color · {HAIR_COLORS[look.hairCol]}</span>
+                <div id="drawer-color-band" role="group" aria-label="Hair color">
+                  {HAIR_COLORS.map((color, i) => <ColorSwatch key={color} color={color} dot={HAIR_DOTS[i]} selected={look.hairCol === i} onClick={() => patch({ hair: Math.floor(look.hair / 10) * 10 + i, hairCol: i })} />)}
+                </div>
+              </div>
             )}
             {(['Face', 'FaceSignature', 'FaceClassic', 'FacePast'] as SectionId[]).includes(catSec) && (
-              <ColorStrip label={`Eye color · ${EYE_COLORS[faceColorIndex(look.face)]}`} ariaLabel="Eye color">
-                {EYE_COLORS.map((color, i) => <ColorSwatch key={color} color={color} dot={EYE_DOTS[i]} selected={faceColorIndex(look.face) === i} onClick={() => patch({ face: faceVariantId(look.sex, faceStyleId(look.face), i) })} />)}
-              </ColorStrip>
+              <div id="drawer-color">
+                <span id="drawer-color-label">Eye color · {EYE_COLORS[faceColorIndex(look.face)]}</span>
+                <div id="drawer-color-band" role="group" aria-label="Eye color">
+                  {EYE_COLORS.map((color, i) => <ColorSwatch key={color} color={color} dot={EYE_DOTS[i]} selected={faceColorIndex(look.face) === i} onClick={() => patch({ face: faceVariantId(look.sex, faceStyleId(look.face), i) })} />)}
+                </div>
+              </div>
             )}
-            <div id="catgrid">
+            <div id="drawer-grid">
               {catRows.map((row) => {
                 if (row.type === 'hair') {
                   const styleMeta = getStyle(CATALOG, row.id);
@@ -792,12 +618,38 @@ export default function FashionIsland() {
             </div>
           </div>
         )}
+
+        {!catSec && searchResults && (
+          <div id="scroll">
+            <div id="bar" role="search">
+              <input id="item-search" autoFocus aria-label="Search all items" value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => { if (e.key === 'Escape') { setSearchOpen(false); setQ(''); } }} placeholder="Search all items…" enterKeyHint="search" />
+              <button className="icon-button" aria-label="Close search" onClick={() => { setSearchOpen(false); setQ(''); }}><Icon name="close" /></button>
+            </div>
+            <div className="sec">
+              <h2><span>Search · {searchResults.length}</span></h2>
+              <div className="row" style={{ flexWrap: 'wrap', overflow: 'visible' }}>
+                {searchResults.map((entry) => (
+                  <SearchTile key={entry.id + ':' + entry.sub} entry={entry} look={look} onWear={() => {
+                    if (entry.isStyle) wearItemById(entry.id * 10 + look.hairCol, 'Hair');
+                    else wearItemById(entry.id, entry.sub);
+                  }} />
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {!catSec && !searchResults && (
+          <div id="scroll">
+            <p className="slot-hint">Pick a slot above to browse styles and equips. Your character updates live on the left.</p>
+          </div>
+        )}
       </div>
       {ratesOpen && (
         <div className="rates-overlay" onClick={() => setRatesOpen(false)}>
           <section className="rates-dialog" role="dialog" aria-modal="true" aria-labelledby="rates-title" onClick={(event) => event.stopPropagation()}>
             <header className="rates-header">
-              <div><h2 id="rates-title">Mystery coupon rates</h2><p>Each coupon gives one style for your character’s gender. Rates are rounded.</p></div>
+              <div><h2 id="rates-title">Mystery coupon rates</h2><p>Each coupon gives one style for your character's gender. Rates are rounded.</p></div>
               <button className="rates-close" autoFocus aria-label="Close rates" onClick={() => setRatesOpen(false)}>×</button>
             </header>
             <div className="rates-grid">
@@ -809,7 +661,7 @@ export default function FashionIsland() {
               ))}
             </div>
             <footer className="rates-footer">
-              <a href={STYLE_RATES} target="_blank" rel="noreferrer">Nexon’s official rate data (JSON) ↗</a>
+              <a href={STYLE_RATES} target="_blank" rel="noreferrer">Nexon's official rate data (JSON) ↗</a>
               <a href={NEWS_POST} target="_blank" rel="noreferrer">Nexon cash shop announcement ↗</a>
             </footer>
           </section>
@@ -819,12 +671,6 @@ export default function FashionIsland() {
   );
 }
 
-function ColorStrip(props: { label: string; ariaLabel: string; children: React.ReactNode }) {
-  return <div className="color-strip">
-    <span className="color-strip-label">{props.label}</span>
-    <div className="color-band" role="group" aria-label={props.ariaLabel}>{props.children}</div>
-  </div>;
-}
 
 function ColorSwatch(props: { color: string; dot: string; selected: boolean; onClick: () => void }) {
   return <button

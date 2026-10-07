@@ -67,15 +67,26 @@ async function bakeBaseBodies() {
   }
 }
 
-async function fetchItemData(id: number, src?: 'GMS'): Promise<any | null> {
-  const apiBase = src === 'GMS' ? 'https://maplestory.io/api/GMS/270' : 'https://maplestory.io/api/MCW/CBT2';
-  try {
-    const res = await fetchWithTimeout(`${apiBase}/item/${id}`, 8000);
-    if (!res.ok) return null;
-    return await res.json();
-  } catch {
-    return null;
+async function fetchItemData(id: number, src?: 'GMS' | 'OSMS'): Promise<any | null> {
+  // Modern OSMS hair and face cosmetics are served from the GMS data set, just
+  // like the other modern cosmetics selected by assetSource().
+  const preferred = src === 'GMS' || src === 'OSMS'
+    ? 'https://maplestory.io/api/GMS/270'
+    : 'https://maplestory.io/api/MCW/CBT2';
+  const fallback = preferred.includes('GMS/270')
+    ? 'https://maplestory.io/api/MCW/CBT2'
+    : 'https://maplestory.io/api/GMS/270';
+  for (const apiBase of [preferred, fallback]) {
+    try {
+      const res = await fetchWithTimeout(`${apiBase}/item/${id}`, 8000);
+      if (!res.ok) continue;
+      const raw = await res.json();
+      if (raw?.frameBooks && Object.keys(raw.frameBooks).length) return raw;
+    } catch {
+      // try the other region
+    }
   }
+  return null;
 }
 
 async function bakeItem(id: number, meta: any): Promise<boolean> {
@@ -86,6 +97,8 @@ async function bakeItem(id: number, meta: any): Promise<boolean> {
   if (!raw || !raw.frameBooks) return false;
 
   const frames: Record<string, any[]> = {};
+  const vslots: string[] = raw.metaInfo?.vslots ?? [];
+  const islots: string[] = raw.metaInfo?.islots ?? [];
   for (const [actionName, action] of Object.entries<any>(raw.frameBooks)) {
     if (!action?.frames) continue;
     action.frames.forEach((f: any, fIdx: number) => {
@@ -96,14 +109,16 @@ async function bakeItem(id: number, meta: any): Promise<boolean> {
       const effects: any[] = [];
       for (const eff of Object.values<any>(f.effects || {})) {
         if (!eff?.image) continue;
+        const mapOffset: Record<string, { x: number; y: number }> = {};
+        for (const [name, point] of Object.entries<any>(eff.mapOffset ?? {})) {
+          if (point && typeof point.x === 'number' && typeof point.y === 'number') {
+            mapOffset[name] = { x: point.x, y: point.y };
+          }
+        }
         effects.push({
           image: eff.image.startsWith('data:') ? eff.image : `data:image/png;base64,${eff.image}`,
           origin: { x: eff.origin?.x ?? 0, y: eff.origin?.y ?? 0 },
-          mapOffset: {
-            navel: eff.mapOffset?.navel ? { x: eff.mapOffset.navel.x ?? 0, y: eff.mapOffset.navel.y ?? 0 } : undefined,
-            brow: eff.mapOffset?.brow ? { x: eff.mapOffset.brow.x ?? 0, y: eff.mapOffset.brow.y ?? 0 } : undefined,
-            hand: eff.mapOffset?.hand ? { x: eff.mapOffset.hand.x ?? 0, y: eff.mapOffset.hand.y ?? 0 } : undefined,
-          },
+          mapOffset,
           position: eff.position || 'default',
         });
       }
@@ -113,7 +128,7 @@ async function bakeItem(id: number, meta: any): Promise<boolean> {
 
   if (!Object.keys(frames).length) return false;
 
-  writeFileSync(dest, JSON.stringify({ id, frames }));
+  writeFileSync(dest, JSON.stringify({ id, frames, vslot: vslots.join(''), islot: islots.join('') }));
   return true;
 }
 
