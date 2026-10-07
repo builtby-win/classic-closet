@@ -25,10 +25,10 @@ flowchart TD
 - **State** (`Look` in `src/lib/fashion.ts`): sex, skin, hair, hairCol, face, anim,
   frame, items. Persisted to URL query parameters (`?look=...`) on every change (`history.replaceState`) +
   saved in `localStorage` (`mf-look`, `mf-sex`). Shared links restore via `decodeLook`.
-- **Preview**: `renderURL(look)` → `GET /api/MCW/CBT2/Character/{skin}/{ids}/{anim}/{frame}`.
-  PNG, swapped only after offscreen `Image.onload` (no flicker).
-- **iMessage / Social Sharing**: Query param `?look=...` is intercepted by Cloudflare Pages
-  middleware (`functions/_middleware.ts`) which uses native `HTMLRewriter` to inject
+- **Preview**: Client-side HTML5 Canvas compositor (`src/lib/canvas-renderer.ts` + `CharacterCanvas`).
+  Slices and coordinates baked statically into `/sprites/items/` & `/sprites/base/` for 0ms instant updates.
+- **iMessage / Social Sharing**: Query param `?look=...` is intercepted by Cloudflare Worker
+  (`src/worker.ts`) which uses native `HTMLRewriter` to inject
   dynamic `<meta property="og:image">` pointing to the maplestory.io character render.
 - **Hair & Face Banner Rotation System**:
   - Hairs and faces in MapleStory Classic are limited-time banner rotations (not permanently available).
@@ -53,14 +53,17 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-    subgraph app["projects/maple-closet/app (Astro + React island + Cloudflare Pages)"]
+    subgraph app["projects/maple-closet/app (Astro + React island + Cloudflare Workers)"]
         page["src/pages/index.astro"] --> island["src/components/fashion-island.tsx"]
+        island --> canvas["src/components/character-canvas.tsx"]
+        canvas --> renderer["src/lib/canvas-renderer.ts (Z-map + anchors)"]
         island --> lib["src/lib/fashion.ts (URLs, slots, query params, storage)"]
         island --> data["src/data/catalog.json (baked)"]
         island --> css["src/components/fashion.css"]
         layout["src/layouts/base.astro"] --> meta["OpenGraph & Twitter meta tags"]
-        middleware["functions/_middleware.ts"] --> ogrewriter["HTMLRewriter dynamic OG previews"]
+        worker["src/worker.ts"] --> ogrewriter["HTMLRewriter dynamic OG previews"]
         rotations["data/rotations.json"] --> scripts["scripts/build-catalog.ts"]
         scripts --> data
+        bake["scripts/bake-sprites.ts"] --> sprites["public/sprites/ (baked slices)"]
     end
 ```

@@ -21,7 +21,10 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const API = 'https://maplestory.io/api/MCW/CBT2';
+const OSMS_REF = '6e4971f1d5f80f7668eb1671834ff23993a5ba24';
+const OSMS_DATA = `https://raw.githubusercontent.com/ohmi69/osms_datamine_dashboard/${OSMS_REF}/data/current`;
 const CMS = 'https://g.nexonstatic.com/maplestory/cms/v1/general-posts';
+type AssetSource = 'OSMS' | 'GMS';
 
 interface RawItem {
   id: number;
@@ -31,6 +34,22 @@ interface RawItem {
   requiredJobs?: string[];
   requiredLevel?: number;
   typeInfo: { overallCategory: string; subCategory: string };
+  src?: AssetSource;
+}
+
+interface OsmsItem {
+  id: number;
+  name: string;
+  category: string;
+  sub_category: string;
+  gender?: 'male' | 'female';
+  stats?: { reqLevel?: number };
+}
+
+interface OsmsBeautyEntry {
+  id: number;
+  name: string;
+  gender: 'male' | 'female';
 }
 
 interface BannerDef {
@@ -42,10 +61,10 @@ interface BannerDef {
   note?: string;
   post?: string;
   rates?: string;
-  hairs?: Array<{ name: string; sex: 'm' | 'f'; rate?: string; style?: number; src?: 'GMS'; history?: string[]; unverified?: boolean; unverifiedNote?: string }>;
-  faces?: Array<{ name: string; sex: 'm' | 'f'; rate?: string; id?: number; src?: 'GMS'; history?: string[]; unverified?: boolean; unverifiedNote?: string }>;
-  signatureHairs?: Array<{ name: string; sex: 'm' | 'f'; style?: number; src?: 'GMS'; history?: string[]; unverified?: boolean }>;
-  signatureFaces?: Array<{ name: string; sex: 'm' | 'f'; id?: number; src?: 'GMS'; history?: string[]; unverified?: boolean }>;
+  hairs?: Array<{ name: string; sex: 'm' | 'f'; rate?: string; style?: number; src?: AssetSource; history?: string[]; unverified?: boolean; unverifiedNote?: string }>;
+  faces?: Array<{ name: string; sex: 'm' | 'f'; rate?: string; id?: number; src?: AssetSource; history?: string[]; unverified?: boolean; unverifiedNote?: string }>;
+  signatureHairs?: Array<{ name: string; sex: 'm' | 'f'; style?: number; src?: AssetSource; history?: string[]; unverified?: boolean }>;
+  signatureFaces?: Array<{ name: string; sex: 'm' | 'f'; id?: number; src?: AssetSource; history?: string[]; unverified?: boolean }>;
 }
 interface RotationsFile {
   current: BannerDef[];
@@ -69,7 +88,7 @@ export interface HairStyleMeta {
   bannerId: string;
   attainable: boolean;
   rate?: string;
-  src?: 'GMS';
+  src?: AssetSource;
   history?: string[];
   coupon?: 'mystery' | 'signature';
   unverified?: boolean;
@@ -85,7 +104,7 @@ export interface ItemMeta {
   attainable: boolean;
   group?: string;
   rate?: string;
-  src?: 'GMS';
+  src?: AssetSource;
   history?: string[];
   coupon?: 'mystery' | 'signature';
   unverified?: boolean;
@@ -153,9 +172,50 @@ const founderRates = await rateTable(45538);
 const auroraRates = await rateTable(45659);
 console.log(`rates fetched: founder=${founderRates.size} aurora=${auroraRates.size}`);
 
-const count: number = await fetch(`${API}/item/count`).then((r) => r.json());
-const dump: RawItem[] = await fetch(`${API}/item/list?count=${count}`).then((r) => r.json());
-const byName = new Map(dump.map((i) => [i.name.toLowerCase(), i]));
+const [osmsItemsFile, osmsBeauty, count] = await Promise.all([
+  fetch(`${OSMS_DATA}/items.json`).then((r) => {
+    if (!r.ok) throw new Error(`OSMS items fetch failed: ${r.status}`);
+    return r.json() as Promise<{ items: OsmsItem[] }>;
+  }),
+  fetch(`${OSMS_DATA}/beauty.json`).then((r) => {
+    if (!r.ok) throw new Error(`OSMS beauty fetch failed: ${r.status}`);
+    return r.json() as Promise<{ hair: OsmsBeautyEntry[]; face: OsmsBeautyEntry[] }>;
+  }),
+  fetch(`${API}/item/count`).then((r) => r.json() as Promise<number>),
+]);
+const mcwDump: RawItem[] = await fetch(`${API}/item/list?count=${count}`).then((r) => r.json());
+const osmsGear: RawItem[] = osmsItemsFile.items
+  .filter((item) => item.category === 'Equipment')
+  .map((item) => ({
+    id: item.id,
+    name: item.name,
+    requiredGender: item.gender === 'male' ? 0 : item.gender === 'female' ? 1 : undefined,
+    isCash: false,
+    requiredLevel: item.stats?.reqLevel,
+    typeInfo: { overallCategory: 'Equip', subCategory: item.sub_category },
+    src: 'OSMS',
+  }));
+const osmsBeautyItems: RawItem[] = [
+  ...osmsBeauty.hair.map((item) => ({
+    id: item.id,
+    name: item.name,
+    requiredGender: item.gender === 'male' ? 0 : 1,
+    typeInfo: { overallCategory: 'Beauty', subCategory: 'Hair' },
+    src: 'OSMS' as const,
+  })),
+  ...osmsBeauty.face.map((item) => ({
+    id: item.id,
+    name: item.name,
+    requiredGender: item.gender === 'male' ? 0 : 1,
+    typeInfo: { overallCategory: 'Beauty', subCategory: 'Face' },
+    src: 'OSMS' as const,
+  })),
+];
+const osmsDump = [...osmsGear, ...osmsBeautyItems];
+// OSMS is the primary source. Keep MCW records for names/IDs absent from its dump.
+const dump = [...osmsDump, ...mcwDump.filter((item) => !osmsDump.some((osmsItem) => osmsItem.id === item.id))];
+const byName = new Map(mcwDump.map((i) => [i.name.toLowerCase(), i]));
+for (const item of osmsDump) byName.set(item.name.toLowerCase(), item);
 
 // GMS fallback: fetch GMS items for styles/faces not on MCW
 interface GmsItem {
@@ -168,7 +228,8 @@ interface GmsItem {
 const GMS_API = 'https://maplestory.io/api/GMS/270';
 let gmsByName = new Map<string, GmsItem>();
 let gmsById = new Map<number, GmsItem>();
-const mcwById = new Map(dump.map(item => [item.id, item]));
+const mcwById = new Map(mcwDump.map(item => [item.id, item]));
+const osmsById = new Map(osmsDump.map(item => [item.id, item]));
 try {
   const gmsCount = await fetch(`${GMS_API}/item/count`).then(r => r.json()) as number;
   const gmsDump = await fetch(`${GMS_API}/item/list?count=${gmsCount}`).then(r => r.json()) as GmsItem[];
@@ -179,16 +240,20 @@ try {
   console.log('GMS fallback failed:', e);
 }
 
-function findItem(name: string, subCategory: string): { item: RawItem | GmsItem; src: 'GMS' | undefined } | null {
+function findItem(name: string, subCategory: string): { item: RawItem | GmsItem; src: AssetSource | undefined } | null {
   const mcw = byName.get(name.toLowerCase());
-  if (mcw && mcw.typeInfo.subCategory === subCategory) return { item: mcw, src: undefined };
+  if (mcw && mcw.typeInfo.subCategory === subCategory) return { item: mcw, src: mcw.src };
   const gms = gmsByName.get(name.toLowerCase());
   if (gms && gms.typeInfo.subCategory === subCategory) return { item: gms, src: 'GMS' };
   return null;
 }
 
 // Explicit coupon IDs may exist only in retail data. Never apply this fallback to equips.
-function cosmeticSource(id: number, sub: 'Hair' | 'Face'): 'GMS' | undefined | null {
+function cosmeticSource(id: number, sub: 'Hair' | 'Face'): AssetSource | undefined | null {
+  const osmsId = sub === 'Face'
+    ? (id >= 21000 ? 21000 : 20000) + (id % 100)
+    : id;
+  if (osmsById.get(osmsId)?.typeInfo.subCategory === sub) return 'OSMS';
   if (mcwById.get(id)?.typeInfo.subCategory === sub) return undefined;
   if (gmsById.get(id)?.typeInfo.subCategory === sub) return 'GMS';
   return null;
@@ -412,6 +477,7 @@ for (const banner of rotations.current) {
           attainable: true,
           group: 'founder-crate',
           rate,
+          src: hit.src,
         };
         fastCatalog.indexes.groups['founder-crate'][sex].push(hit.id);
         fastCatalog.indexes.search.push({
@@ -438,6 +504,7 @@ for (const banner of rotations.current) {
           attainable: true,
           group: 'aurora-crate',
           rate,
+          src: hit.src,
         };
         fastCatalog.indexes.groups['aurora-crate'][sex].push(hit.id);
         fastCatalog.indexes.search.push({
@@ -480,6 +547,7 @@ for (const banner of rotations.current) {
           bannerId: banner.id,
           attainable: true,
           group: 'cover-10day',
+          src: hit.src,
         };
         fastCatalog.indexes.groups['cover-10day'][sex].push(hit.id);
         fastCatalog.indexes.search.push({
@@ -508,6 +576,7 @@ for (const item of dump) {
     group: 'classic-equips',
     requiredJobs: item.requiredJobs,
     requiredLevel: item.requiredLevel,
+    src: item.src,
   };
   fastCatalog.indexes.groups['classic-equips'][sex].push(item.id);
   fastCatalog.indexes.search.push({ id: item.id, name: item.name, sub: item.typeInfo.subCategory, sex });
@@ -575,7 +644,7 @@ for (const banner of rotations.past || []) {
 
 // Starter salon styles remain available for free after coupon rotations end.
 const starterHairs = { m: [3000, 3002, 3003], f: [3100, 3104] };
-const starterFaces = { m: [20000], f: [21000] };
+const starterFaces = { m: [20000, 20001, 20002], f: [21000, 21001, 21002] };
 for (const sex of ['m', 'f'] as const) {
   for (const id of starterHairs[sex]) {
     const style = fastCatalog.styles[id];
@@ -587,13 +656,27 @@ for (const sex of ['m', 'f'] as const) {
     fastCatalog.indexes.hairs[sex].past = fastCatalog.indexes.hairs[sex].past.filter(value => value !== id);
   }
   for (const id of starterFaces[sex]) {
+    const source = osmsById.get(id);
+    if (!fastCatalog.items[id] && source) {
+      fastCatalog.items[id] = {
+        name: source.name,
+        sub: 'Face',
+        sex,
+        bannerId: '',
+        attainable: true,
+        src: 'OSMS',
+      };
+      fastCatalog.indexes.search.push({ id, name: source.name, sub: 'Face', sex });
+    }
     const face = fastCatalog.items[id];
-    if (!face) continue;
+    if (!face) throw new Error(`Missing OSMS starter face ${id}`);
     face.attainable = true;
     face.bannerId = '';
+    face.src ??= 'OSMS';
     delete face.rate;
     delete face.history;
     delete face.group;
+    fastCatalog.indexes.faces[sex].active = fastCatalog.indexes.faces[sex].active.filter(value => value !== id);
     fastCatalog.indexes.faces[sex].past = fastCatalog.indexes.faces[sex].past.filter(value => value !== id);
   }
 }

@@ -132,3 +132,27 @@ test('each weapon family steers to a stance with renderer frames', () => {
 test('the initial preview is dressed before the randomized render loads', () => {
   for (const slot of ['Top', 'Bottom', 'Shoes', 'Glove']) assert.ok(DEFAULT_LOOK.items[slot]);
 });
+
+test('z-index ordering preserves proper back-to-front layer stacking', async () => {
+  const { getZIndex } = await import('../src/lib/zmap');
+  assert.ok(getZIndex('hairBelowBody') < getZIndex('body'));
+  assert.ok(getZIndex('body') < getZIndex('mailChest'));
+  assert.ok(getZIndex('mailChest') < getZIndex('head'));
+  assert.ok(getZIndex('head') < getZIndex('hair'));
+  assert.ok(getZIndex('hair') < getZIndex('hairOverHead'));
+});
+
+test('baked base bodies and item sprites are present on disk', async () => {
+  const { existsSync } = await import('node:fs');
+  const { fileURLToPath } = await import('node:url');
+  for (const skin of [2000, 2001, 2002, 2003, 2004, 2005, 2006]) {
+    for (const pose of ['stand1', 'stand2', 'alert']) {
+      assert.ok(existsSync(fileURLToPath(new URL(`../public/sprites/base/${skin}_${pose}_0.png`, import.meta.url))));
+    }
+  }
+  // Check default outfit items have baked sprite data
+  for (const itemId of [1040002, 1060002, 1072001, 1082000, 20000, 30130]) {
+    assert.ok(existsSync(fileURLToPath(new URL(`../public/sprites/items/${itemId}.json`, import.meta.url))));
+  }
+});
+

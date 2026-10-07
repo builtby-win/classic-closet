@@ -36,11 +36,12 @@ import {
   type Sex,
 } from '../lib/fashion';
 import catalogData from '../data/catalog.json';
+import CharacterCanvas from './character-canvas';
 import './fashion.css';
 
 const CATALOG = catalogData as FastCatalog;
 const STARTER_HAIRS: Record<Sex, number[]> = { m: [3000, 3002, 3003], f: [3100, 3104] };
-const STARTER_FACES: Record<Sex, number[]> = { m: [20000], f: [21000] };
+const STARTER_FACES: Record<Sex, number[]> = { m: [20000, 20001, 20002], f: [21000, 21001, 21002] };
 const HAIR_DOTS = ['#23232a', '#a83a32', '#d97b2e', '#e3c46a', '#4a8f4d', '#4a6fa5', '#7a4a8f', '#6e4a2f'];
 const EYE_DOTS = ['#24242b', '#4a82c5', '#c94747', '#4a9459', '#826044', '#48aeb6', '#8050aa', '#8c3440', '#e8e8e8'];
 const SKIN_TONES = ['#f7d7b5', '#e8b98a', '#c98d5f', '#8a5a33', '#5b6b7a', '#cfcfcf', '#f2e3c6'];
@@ -120,7 +121,6 @@ export default function FashionIsland() {
   const [copied, setCopied] = useState(false);
   const [equipToast, setEquipToast] = useState<{ id: number; name: string; action: 'Equipped' | 'Removed' | 'Blocked'; replaced: string; sequence: number } | null>(null);
   const toastSequence = useRef(0);
-  const imgRef = useRef<HTMLImageElement>(null);
 
   useEffect(() => {
     if (!equipToast) return;
@@ -137,21 +137,7 @@ export default function FashionIsland() {
       .catch(() => {});
   }, []);
 
-  const url = useMemo(() => renderURL(look), [look]);
-
   useEffect(() => {
-    let cancelled = false;
-    setRendering(true);
-    const img = imgRef.current;
-    const onLoad = () => { if (!cancelled) setRendering(false); };
-    if (img) {
-      img.onload = onLoad;
-      img.onerror = () => {
-        if (!cancelled) setRendering(false);
-      };
-      img.src = url;
-    }
-
     // Synchronize query parameter and localStorage
     const encoded = encodeLook(look);
     const currentUrl = new URL(window.location.href);
@@ -160,12 +146,7 @@ export default function FashionIsland() {
     history.replaceState(null, '', currentUrl.pathname + currentUrl.search);
     saveLookToStorage(look);
     updateSocialMeta(look);
-
-    return () => {
-      cancelled = true;
-      if (img?.onload === onLoad) img.onload = null;
-    };
-  }, [url, look]);
+  }, [look]);
 
   const patch = useCallback((p: Partial<Look>) => {
     setLook((l) => ({ ...l, ...p }));
@@ -402,7 +383,7 @@ export default function FashionIsland() {
           <button id="shuffle" onClick={() => setLook(randomLook(look.sex, Math.random, excludedSlots, nxOnly, classJob))} aria-label="Randomize outfit"><Icon name="shuffle" /></button>
         </div>
         <div id="canvas">
-          <img ref={imgRef} id="preview" alt="character preview" src={url} />
+          <CharacterCanvas look={look} onRendered={() => setRendering(false)} />
           {rendering && <div id="spin" />}
         </div>
         <div className="equip-toast-slot" role="status" aria-live="polite" aria-atomic="true">
