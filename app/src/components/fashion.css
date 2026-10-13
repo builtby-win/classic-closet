@@ -568,7 +568,15 @@
 .tile-badge svg { width: 12px; height: 12px; flex: none; }
 .tile.on::after { content: ''; position: absolute; top: 4px; right: 4px; width: 16px; height: 16px; border-radius: 50%; background: var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m3.5 8.5 3 3 6-7'/%3E%3C/svg%3E") center/10px no-repeat; box-shadow: 0 1px 2px rgba(0,0,0,0.3); z-index: 1; pointer-events: none; }
 .tile.mini.on::after { width: 12px; height: 12px; top: 2px; right: 2px; background-size: 8px; }
-.tile .tile-expiration.expired { color: #ff8a80; }
+/* Worn limited tile: the check keeps its corner, the clock drops below it and
+ * turns outline so the two amber marks stay distinct. */
+.tile.on .tile-expiration { position: absolute; top: 20px; right: 0; background: var(--bg); color: #ffb020; }
+.tile.on .tile-expiration.expired { background: var(--bg); color: #ff8a80; }
+.tile.mini.on .tile-expiration { top: 14px; }
+.tile .tile-expiration { background: #ffb020; border-color: #ffb020; color: #1a1200; }
+.tile .tile-expiration.expired { background: #ff8a80; border-color: #ff8a80; color: #2a0500; }
+.tile-expiration svg { width: 14px; height: 14px; }
+.tile.mini .tile-expiration svg { width: 10px; height: 10px; }
 .tile-rate-badge { position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%); font-size: 11px; font-weight: 800; letter-spacing: 0.02em; color: #fff; background: rgba(0,0,0,0.72); border: 1px solid rgba(255,255,255,0.22); border-radius: 999px; padding: 2px 8px; line-height: 1.5; white-space: nowrap; pointer-events: none; box-shadow: 0 1px 4px rgba(0,0,0,0.45); }
 
 /* ── Category page ── */
@@ -757,6 +765,8 @@
 #drawer-grid { overflow: visible; flex: none; }
 @media (min-width: 900px) {
   #rail { flex: none; }
+  /* Desktop rail is narrow; wrap quick tiles so See all is never clipped. */
+  .slot-tiles { flex-wrap: wrap; overflow-x: visible; }
 }
 
 .banner-essentials { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 12px; }

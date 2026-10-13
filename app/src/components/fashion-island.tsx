@@ -748,6 +748,8 @@ export default function FashionIsland() {
                           img={iconURL(row.id * 10 + look.hairCol)}
                           label={meta.name}
                           coupon={meta.coupon}
+                          bannerId={meta.bannerId}
+                          attainable={meta.attainable}
                           onClick={() => wearItemById(row.id * 10 + look.hairCol, 'Hair')}
                         />
                       );
@@ -764,6 +766,8 @@ export default function FashionIsland() {
                         img={iconURL(faceId)}
                         label={item.name}
                         coupon={item.coupon}
+                        bannerId={item.bannerId}
+                        attainable={item.attainable}
                         mismatched={row.mismatch}
                         mismatchJob={row.mismatch ? item.requiredJobs?.find((j) => j !== 'Beginner') : undefined}
                         onClick={() => wearItemById(row.id, item.sub)}
@@ -794,7 +798,7 @@ export default function FashionIsland() {
               )}
             </div>
             {(catSec === 'Face' || catSec === 'Hair') && (
-              <p className="cat-sub compact">🎲 Mystery = random · 👆 Signature = you pick · <button className="inline-link" onClick={() => setRatesOpen(true)}>rates</button></p>
+              <p className="cat-sub compact">🎲 Mystery = random · 👆 Signature = you pick · 🕒 Limited-time · <button className="inline-link" onClick={() => setRatesOpen(true)}>rates</button></p>
             )}
             {catSec === 'cover-10day' && (
               <p className="cat-sub">10-day duration · sale ends Nov 18 · <a href={NEWS_POST} target="_blank" rel="noreferrer">cash shop post</a></p>
@@ -1075,15 +1079,10 @@ function Tile(props: {
   const jobLabel = props.equipInfo;
   const notAttainable = props.attainable === false;
   const banner = getBanner(CATALOG, props.bannerId);
-  const methods = props.coupon === 'signature'
-    ? ['select'] as const
-    : props.coupon === 'mystery'
-      ? ['random'] as const
-      : props.bannerId === 'style-oct26'
-        ? ['random', 'select'] as const
-        : props.bannerId === 'founder-crate-oct26' || props.bannerId === 'beta-style-sep26'
-          ? ['random'] as const
-          : banner ? ['select'] as const : [];
+  // Only choice-based acquisition gets a method badge. Random/mystery is the
+  // default and the % badge already signals chance, so no dice badge.
+  const randomOnly = props.coupon === 'mystery' || props.bannerId === 'founder-crate-oct26' || props.bannerId === 'beta-style-sep26';
+  const showSelect = !randomOnly && (props.coupon === 'signature' || !!banner);
   const isCover = props.bannerId === 'covers-10day-nov26';
   const expiration = isCover
     ? `10-day duration · sale ends ${banner?.end ?? 'Nov 18'}`
@@ -1093,20 +1092,20 @@ function Tile(props: {
   return (
     <button type="button" aria-pressed={props.on} aria-label={props.mismatched && props.mismatchJob ? `${props.label} (switches class to ${props.mismatchJob})` : props.label || undefined} title={props.mismatched && props.mismatchJob ? `Off-job · tap switches class to ${props.mismatchJob}` : undefined} className={'tile' + (props.mini ? ' mini' : '') + (props.on ? ' on' : '') + (notAttainable ? ' not-attainable' : '') + (props.mismatched ? ' mismatch' : '')} onClick={props.onClick}>
       <div className="tile-preview">
-      {(methods.length > 0 || expiration) && (
+      {expiration && (
         <div className="tile-badges">
           <div className="tile-methods">
-            {methods.map((method) => (
-              <span key={method} className="tile-badge" role="img" aria-label={method === 'random' ? 'Random acquisition' : 'Select your choice'} title={method === 'random' ? `Random${props.rate ? ` · ${props.rate}` : ''}` : 'Select your choice'}>
+            {showSelect && (
+              <span className="tile-badge" role="img" aria-label="Select your choice" title="Select your choice">
                 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-                  {method === 'random' ? <><rect x="2" y="2" width="12" height="12" rx="3" /><path d="M5 5h.01M11 5h.01M8 8h.01M5 11h.01M11 11h.01" strokeWidth="2.5" strokeLinecap="round" /></> : <path d="m3 2 10 6-5 1-2 5-3-12Z" strokeLinejoin="round" />}
+                  <path d="m3 2 10 6-5 1-2 5-3-12Z" strokeLinejoin="round" />
                 </svg>
               </span>
-            ))}
+            )}
           </div>
-          {expiration && <span className={'tile-badge tile-expiration' + (notAttainable ? ' expired' : '')} role="img" aria-label={expiration} title={[expiration, props.lastText].filter(Boolean).join(' · ')}>
-            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><circle cx="8" cy="8" r="6" /><path d="M8 4v4l3 2" strokeLinecap="round" /></svg>
-          </span>}
+          <span className={'tile-badge tile-expiration' + (notAttainable ? ' expired' : '')} role="img" aria-label={expiration} title={[expiration, props.lastText].filter(Boolean).join(' · ')}>
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="8" cy="8" r="6" /><path d="M8 4v4l3 2" strokeLinecap="round" /></svg>
+          </span>
         </div>
       )}
       {props.img ? (
