@@ -30,6 +30,8 @@ export interface CastPlan {
   poses: PosePhase[];
   effects: EffectCue[];
   projectiles: ProjectileCue[];
+  /** Whether the worn weapon's swipe trails the poses; skills with their own slash art turn it off. */
+  weaponSwipe: boolean;
 }
 
 /** Total length: the cast ends once the body and every effect have finished. */
@@ -88,6 +90,7 @@ export function castPlan(skill: BakedSkill, weaponAttack: string): CastPlan {
     return {
       poses: [...round, ...round],
       projectiles: [],
+      weaponSwipe: false,
       effects: [
         { frames: effect, at: 0, x: 0, y: 0 },
         ...hits.map((hit, index): EffectCue => ({
@@ -99,17 +102,12 @@ export function castPlan(skill: BakedSkill, weaponAttack: string): CastPlan {
       ],
     };
   }
-  // Lucky Seven: a quick throw, two stars fly out one after the other and each lands a hit.
-  // The skill's own "effect" art is a fixed glow that reads as a glitch without the star item, so it is not played.
-  const hit = skill.sequences['hit/0'] ?? [];
-  const star = skill.projectile;
-  const flight = 260;
-  const throws = [{ at: 130, y: -36 }, { at: 250, y: -30 }];
+  // Lucky Seven: the skill's own effect is the pair of stars in flight (its first frame is a 1px wind-up
+  // placeholder), so it plays from the throw with nothing added where they land.
   return {
     poses: swing(weaponAttack, 90),
-    effects: throws.map((t): EffectCue => ({ frames: hit, at: t.at + flight, x: TARGET_X - 20, y: t.y })),
-    projectiles: star ? throws.map((t): ProjectileCue => ({
-      image: star, at: t.at, ms: flight, from: { x: -16, y: t.y }, to: { x: TARGET_X - 20, y: t.y },
-    })) : [],
+    projectiles: [],
+    weaponSwipe: true,
+    effects: [{ frames: effect, at: 0, x: 0, y: 0 }],
   };
 }

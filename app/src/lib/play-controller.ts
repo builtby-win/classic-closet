@@ -254,11 +254,28 @@ export class PlayController {
     return null;
   }
 
-  private drawEffects(swing: Swing | null, level: number): void {
+  /** Every pose run of the cast, so an earlier swing's afterimage keeps fading while the next pose plays. */
+  private castSwings(plan: CastPlan, t: number): Swing[] {
+    const swings: Swing[] = [];
+    let start = 0;
+    for (let i = 0; i < plan.poses.length; i++) {
+      const phase = plan.poses[i]!;
+      if (plan.poses[i - 1]?.anim !== phase.anim) {
+        if (t >= start && t - start < 600) swings.push({ anim: phase.anim, t: t - start, frameMs: phase.ms });
+      }
+      start += phase.ms;
+    }
+    return swings;
+  }
+
+  private drawEffects(swings: Swing[], level: number): void {
     const { fx, plan } = this;
     if (!fx) return;
-    const sprites = swing && this.swipeData ? swipeActions(this.swipeData, level, swing.anim) : null;
-    if (!plan && !sprites) {
+    const swipes = this.swipeData && (plan?.weaponSwipe ?? true) ? swings.flatMap((swing) => {
+      const action = swipeActions(this.swipeData!, level, swing.anim);
+      return action ? [{ swing, frames: action.frames }] : [];
+    }) : [];
+    if (!plan && !swipes.length) {
       if (this.fxDirty) { fx.clearRect(0, 0, FX_SIZE, FX_SIZE); this.fxDirty = false; }
       return;
     }
@@ -266,7 +283,7 @@ export class PlayController {
     this.fxDirty = true;
     const ox = FX_PAD + origin.x;
     const oy = FX_PAD + origin.y;
-    if (swing && sprites && this.swipeData) this.drawSwipe(fx, this.swipeData.set, sprites.frames, swing, ox, oy);
+    for (const { swing, frames } of swipes) this.drawSwipe(fx, this.swipeData!.set, frames, swing, ox, oy);
     if (!plan) return;
     for (const cue of plan.effects) {
       const hit = frameAt(cue.frames, this.castClock - cue.at);
@@ -393,12 +410,13 @@ export class PlayController {
       strike = Math.min(1, this.clock / (attackFrames * ATTACK_MS));
       swing = { anim: this.attackAnim, t: this.clock, frameMs: ATTACK_MS };
     }
-    if (swing) this.tail = { ...swing };
+    if (swing) this.tail = this.plan && !this.plan.weaponSwipe ? null : { ...swing };
     else if (this.tail) {
       this.tail.t += dt;
       if (this.tail.t > 1500) this.tail = null;
     }
-    this.drawEffects(swing ?? this.tail, this.swipeOverride ?? worn.level);
+    const swings = this.plan ? this.castSwings(this.plan, this.castClock) : swing ?? this.tail ? [swing ?? this.tail!] : [];
+    this.drawEffects(swings, this.swipeOverride ?? worn.level);
     const lunge = strike === null ? 0 : Math.sin(Math.min(1, strike) * Math.PI) * canvasWidth * 0.05 * this.facing;
     this.element.style.transform = `translate(${this.x + lunge}px, ${-lift}px) scaleX(${-this.facing})`;
     this.raf = requestAnimationFrame(this.tick);
