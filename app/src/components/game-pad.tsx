@@ -1,6 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react';
 import type { PlayController, PlayInput } from '../lib/play-controller';
+import { loadSkills, SKILL_IDS, type BakedSkill } from '../lib/skills';
 
 const KEYS: Record<string, PlayInput> = {
   ArrowLeft: 'left', a: 'left',
@@ -8,6 +9,7 @@ const KEYS: Record<string, PlayInput> = {
   ArrowDown: 'down', s: 'down',
   ArrowUp: 'jump', w: 'jump', ' ': 'jump',
   z: 'attack', x: 'attack', Control: 'attack',
+  c: 'skill',
 };
 
 function isTyping(target: EventTarget | null): boolean {
@@ -43,6 +45,16 @@ function PadButton({ input, controller, className, label, children }: {
 /** On-screen pad for play mode; keyboard works at the same time on desktop. */
 export default function GamePad({ controller, onExit }: { controller: PlayController; onExit: () => void }) {
   const swipeY = useRef<number | null>(null);
+  const [skills, setSkills] = useState<BakedSkill[]>([]);
+  const [picked, setPicked] = useState(0);
+  const skill = skills[picked];
+
+  useEffect(() => {
+    void loadSkills().then((all) => setSkills(SKILL_IDS.flatMap((id) => all[id] ?? [])));
+  }, []);
+  useEffect(() => {
+    if (skill) controller.selectSkill(skill.id);
+  }, [controller, skill]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent, down: boolean) => {
@@ -84,11 +96,17 @@ export default function GamePad({ controller, onExit }: { controller: PlayContro
           <PadButton input="right" controller={controller} className="pad-right" label="Walk right">▶</PadButton>
         </div>
         <div className="pad-actions">
+          {skill && <div className="pad-skill">
+            <PadButton input="skill" controller={controller} className="pad-cast" label={`Cast ${skill.name}`}>
+              <img src={skill.icon} alt="" draggable={false} />
+            </PadButton>
+            {skills.length > 1 && <button type="button" className="pad-swap" aria-label={`Skill: ${skill.name}. Tap to switch`} title={skill.name} onClick={() => setPicked((picked + 1) % skills.length)}>⇄</button>}
+          </div>}
           <PadButton input="jump" controller={controller} className="pad-jump" label="Jump">Jump</PadButton>
           <PadButton input="attack" controller={controller} className="pad-attack" label="Attack">Attack</PadButton>
         </div>
       </div>
-      <p className="pad-hint">←/→ walk · ↓ duck · Space jump · Z attack · Esc closet</p>
+      <p className="pad-hint">←/→ walk · ↓ duck · Space jump · Z attack · C skill · Esc closet</p>
     </div>
   );
 }

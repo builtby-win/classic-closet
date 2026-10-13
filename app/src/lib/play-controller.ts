@@ -1,4 +1,5 @@
 import { weaponMotion } from './fashion';
+import { castPlan, loadSkills, sequenceMs, type BakedSkillFrame, type CastPlan, type PosePhase } from './skills';
 
 /** Pose override read by the preview canvas while play mode is running. */
 export interface PlayPose {
@@ -24,7 +25,39 @@ function setPlayPose(next: PlayPose | null): void {
   listeners.forEach((listener) => listener());
 }
 
-export type PlayInput = 'left' | 'right' | 'down' | 'attack' | 'jump';
+let origin = { x: 64, y: 96 };
+
+/** Where the character's source origin sits on the 128px preview canvas (set by the canvas after each draw). */
+export function setPlayOrigin(next: { x: number; y: number }): void {
+  origin = next;
+}
+
+export type PlayInput = 'left' | 'right' | 'down' | 'attack' | 'jump' | 'skill';
+
+const FX_PAD = 128; // the fx canvas extends one sprite canvas past each edge
+const imageCache = new Map<string, Promise<HTMLImageElement>>();
+function fxImage(src: string): Promise<HTMLImageElement> {
+  let image = imageCache.get(src);
+  if (!image) {
+    image = new Promise((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error(`Could not load ${src}`));
+      el.src = src;
+    });
+    imageCache.set(src, image);
+  }
+  return image;
+}
+
+function frameAt(frames: BakedSkillFrame[], t: number): { frame: BakedSkillFrame; mix: number } | null {
+  let start = 0;
+  for (const frame of frames) {
+    if (t < start + frame.delay) return { frame, mix: (t - start) / frame.delay };
+    start += frame.delay;
+  }
+  return null;
+}
 
 /** Frame counts of the baked play poses (base.json). */
 const ATTACK_FRAMES: Record<string, number> = {
@@ -59,11 +92,26 @@ export class PlayController {
   private attackAnim = 'swingO1';
   private jumpAt = -1; // ms since takeoff, -1 on the ground
   private attackQueued = false;
+  private skillQueued = false;
+  private skillId = '4201003';
+  private plan: CastPlan | null = null;
+  private castClock = 0;
+  private readonly fx: CanvasRenderingContext2D | null;
+  private fxDirty = false;
 
   constructor(
     private readonly element: HTMLElement,
     private readonly weaponSub: () => string | undefined,
-  ) {}
+  ) {
+    this.fx = element.querySelector<HTMLCanvasElement>('.preview-fx')?.getContext('2d') ?? null;
+    this.fx && (this.fx.imageSmoothingEnabled = false);
+    void loadSkills().then((skills) => Object.values(skills).forEach((skill) =>
+      Object.values(skill.sequences).flat().forEach((frame) => void fxImage(frame.image).catch(() => undefined))));
+  }
+
+  selectSkill(id: string): void {
+    this.skillId = id;
+  }
 
   start(): void {
     this.last = performance.now();
@@ -75,15 +123,59 @@ export class PlayController {
     this.held.clear();
     setPlayPose(null);
     this.element.style.transform = '';
+    this.fx?.clearRect(0, 0, 384, 384);
   }
 
   set(input: PlayInput, down: boolean): void {
     if (down) {
       this.held.add(input);
       if (input === 'attack') this.attackQueued = true;
+      if (input === 'skill') this.skillQueued = true;
       if (input === 'jump' && this.jumpAt < 0 && this.mode !== 'prone') this.jumpAt = 0;
     } else {
       this.held.delete(input);
+    }
+  }
+
+  private async startCast(weaponAttack: string): Promise<void> {
+    const skill = (await loadSkills())[this.skillId];
+    if (!skill || this.plan) return;
+    this.mode = 'attack'; // ends any queued melee swing; the plan takes over next tick
+    this.castClock = 0;
+    this.plan = castPlan(skill, weaponAttack);
+  }
+
+  private phaseAt(plan: CastPlan, t: number): PosePhase | null {
+    let start = 0;
+    for (const phase of plan.poses) {
+      if (t < start + phase.ms) return phase;
+      start += phase.ms;
+    }
+    // Hold the last pose until the effects finish too.
+    const end = Math.max(start, ...plan.effects.map((cue) => cue.at + sequenceMs(cue.frames)));
+    return t < end ? plan.poses.at(-1) ?? null : null;
+  }
+
+  private drawEffects(): void {
+    const { fx, plan } = this;
+    if (!fx) return;
+    if (!plan) {
+      if (this.fxDirty) { fx.clearRect(0, 0, 384, 384); this.fxDirty = false; }
+      return;
+    }
+    fx.clearRect(0, 0, 384, 384);
+    this.fxDirty = true;
+    for (const cue of plan.effects) {
+      const hit = frameAt(cue.frames, this.castClock - cue.at);
+      if (!hit || this.castClock < cue.at) continue;
+      const cached = imageCache.get(hit.frame.image);
+      if (!cached) { void fxImage(hit.frame.image); continue; }
+      void cached.then((image) => {
+        if (this.plan !== plan) return;
+        fx.globalAlpha = (hit.frame.a0 + (hit.frame.a1 - hit.frame.a0) * hit.mix) / 255;
+        fx.drawImage(image, Math.round(FX_PAD + origin.x + cue.x - hit.frame.origin.x), Math.round(FX_PAD + origin.y + cue.y - hit.frame.origin.y));
+        fx.globalAlpha = 1;
+      });
     }
   }
 
@@ -103,9 +195,23 @@ export class PlayController {
       }
     }
 
+    if (this.skillQueued) {
+      this.skillQueued = false;
+      if (!this.plan && this.mode !== 'prone') void this.startCast(motion.attack);
+    }
+
     let next: PlayPose;
     const attackFrames = ATTACK_FRAMES[this.attackAnim] ?? 3;
-    if (this.mode === 'attack') {
+    let casting: PosePhase | null = null;
+    if (this.plan) {
+      this.castClock += dt;
+      casting = this.phaseAt(this.plan, this.castClock);
+      if (!casting) { this.plan = null; this.mode = 'idle'; this.clock = 0; }
+    }
+
+    if (casting) {
+      // A cast owns the body: the pose comes from its timeline below.
+    } else if (this.mode === 'attack') {
       this.clock += dt;
       const frame = Math.floor(this.clock / ATTACK_MS);
       if (frame >= attackFrames) {
@@ -121,8 +227,8 @@ export class PlayController {
       this.clock = 0;
     }
 
-    const canMove = this.mode === 'walk' || (airborne && this.mode !== 'attack');
-    if (dir !== 0 && this.mode !== 'attack' && this.mode !== 'prone') this.facing = dir > 0 ? 1 : -1;
+    const canMove = !casting && (this.mode === 'walk' || (airborne && this.mode !== 'attack'));
+    if (dir !== 0 && !casting && this.mode !== 'attack' && this.mode !== 'prone') this.facing = dir > 0 ? 1 : -1;
     const canvasWidth = this.element.clientWidth || 128;
     if (canMove && dir !== 0) {
       const limit = Math.max(0, (this.element.parentElement?.parentElement?.clientWidth ?? canvasWidth) / 2 - canvasWidth * 0.28);
@@ -137,7 +243,9 @@ export class PlayController {
       else lift = 4 * t * (1 - t) * JUMP_HEIGHT * canvasWidth;
     }
 
-    if (this.mode === 'attack') {
+    if (casting) {
+      next = { anim: casting.anim, frame: casting.frame };
+    } else if (this.mode === 'attack') {
       next = { anim: this.attackAnim, frame: Math.min(attackFrames - 1, Math.floor(this.clock / ATTACK_MS)) };
     } else if (this.jumpAt >= 0) {
       next = { anim: 'jump', frame: 0 };
@@ -151,6 +259,7 @@ export class PlayController {
       next = { anim: motion.stand, frame: IDLE_CYCLE[Math.floor(this.clock / IDLE_MS) % IDLE_CYCLE.length]! };
     }
     setPlayPose(next);
+    this.drawEffects();
 
     this.element.style.transform = `translate(${this.x}px, ${-lift}px) scaleX(${-this.facing})`;
     this.raf = requestAnimationFrame(this.tick);

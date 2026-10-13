@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import type { Look } from '../lib/fashion';
 import { renderLayeredCharacter } from '../lib/layered-client-renderer';
-import { getPlayPose, subscribePlayPose } from '../lib/play-controller';
+import { getPlayPose, setPlayOrigin, subscribePlayPose } from '../lib/play-controller';
 
 interface LayeredCharacterCanvasProps {
   look: Look;
@@ -38,6 +38,7 @@ export default function LayeredCharacterCanvas({ look: baseLook, onRendered }: L
       if (cancelled) return;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(buffer, 0, 0);
+      setPlayOrigin(result.origin);
       canvas.dataset.renderState = result.missing.length || result.unresolved.length ? 'partial' : 'ready';
       canvas.dataset.missingAssets = result.missing.join(',');
       canvas.dataset.unresolvedLayers = result.unresolved.join(',');
@@ -55,6 +56,8 @@ export default function LayeredCharacterCanvas({ look: baseLook, onRendered }: L
   return (
     <div id="preview" role="img" aria-label="Character preview">
       <canvas ref={canvasRef} className="preview-local" width={128} height={128} aria-hidden="true" />
+      {/* Skill effects: 3x the sprite canvas so casts can reach past the character; see play-controller. */}
+      <canvas className="preview-fx" width={384} height={384} aria-hidden="true" />
     </div>
   );
 }

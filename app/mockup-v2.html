@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Maple Fashion — Redesign Mockup</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0a0a0f;
+    --surface: #141419;
+    --surface-2: #1c1c24;
+    --line: rgba(255,255,255,0.06);
+    --txt: #f5f5f7;
+    --dim: #8e8e93;
+    --accent: #f5a623;
+    --accent-soft: rgba(245,166,35,0.12);
+    --accent-glow: rgba(245,166,35,0.25);
+    --blue: #0a84ff;
+    --green: #30d158;
+    --red: #ff453a;
+    --radius: 16px;
+    --radius-sm: 12px;
+    --shadow: 0 4px 24px rgba(0,0,0,0.4);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--txt);
+    font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Character Stage ── */
+  #stage {
+    position: relative;
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px 16px 16px;
+    background: linear-gradient(180deg, var(--bg) 0%, rgba(245,166,35,0.03) 100%);
+  }
+  #stage-bg {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 80% 60% at 50% 40%, rgba(245,166,35,0.06) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  #canvas {
+    position: relative;
+    width: 180px;
+    height: 180px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  #canvas::before {
+    content: '';
+    position: absolute;
+    inset: -20px;
+    background: radial-gradient(circle, rgba(245,166,35,0.08) 0%, transparent 70%);
+    border-radius: 50%;
+  }
+  #preview {
+    width: 160px;
+    height: 160px;
+    object-fit: contain;
+    image-rendering: pixelated;
+    filter: drop-shadow(0 8px 24px rgba(0,0,0,0.5));
+    position: relative;
+    z-index: 1;
+  }
+  #look-info {
+    margin-top: 12px;
+    text-align: center;
+    position: relative;
+    z-index: 1;
+  }
+  #look-name {
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  #look-sub {
+    font-size: 13px;
+    color: var(--dim);
+    margin-top: 2px;
+  }
+  #controls {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    display: flex;
+    gap: 8px;
+    z-index: 2;
+  }
+  .icon-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: none;
+    background: var(--surface);
+    color: var(--dim);
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+  }
+  .icon-btn:active { transform: scale(0.92); background: var(--surface-2); }
+
+  /* ── Bottom Sheet ── */
+  #sheet {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: var(--surface);
+    border-radius: 20px 20px 0 0;
+    margin-top: -12px;
+    overflow: hidden;
+    border-top: 1px solid var(--line);
+    min-height: 0;
+    position: relative;
+  }
+  #grab {
+    width: 36px;
+    height: 5px;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.15);
+    margin: 10px auto 4px;
+    flex: none;
+  }
+
+  /* ── Search ── */
+  #search-wrap {
+    padding: 4px 16px 8px;
+    flex: none;
+  }
+  #search {
+    width: 100%;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    color: var(--txt);
+    border-radius: 10px;
+    padding: 10px 14px 10px 36px;
+    font-size: 15px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  #search:focus { border-color: var(--accent); }
+  #search-wrap::before {
+    content: '⌕';
+    position: absolute;
+    left: 28px;
+    top: 14px;
+    font-size: 18px;
+    color: var(--dim);
+    pointer-events: none;
+  }
+  #search-wrap { position: relative; }
+
+  /* ── Category Pills ── */
+  #pills {
+    display: flex;
+    gap: 6px;
+    padding: 0 16px 8px;
+    overflow-x: auto;
+    flex: none;
+    scrollbar-width: none;
+  }
+  #pills::-webkit-scrollbar { display: none; }
+  .pill {
+    flex: none;
+    padding: 6px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--surface-2);
+    color: var(--dim);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .pill.on {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* ── Scroll Content ── */
+  #scroll {
+    overflow-y: auto;
+    flex: 1;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 40px;
+    min-height: 0;
+  }
+
+  /* ── Sections ── */
+  .sec { padding: 16px 16px 0; }
+  .sec-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .sec-title {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--dim);
+  }
+  .see-all {
+    background: none;
+    border: none;
+    color: var(--accent);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    padding: 2px 0;
+  }
+
+  /* ── Tile Row ── */
+  .row {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+  .row::-webkit-scrollbar { display: none; }
+
+  /* ── Tiles ── */
+  .tile {
+    flex: none;
+    width: 72px;
+    border: 1.5px solid var(--line);
+    background: var(--surface-2);
+    border-radius: var(--radius-sm);
+    padding: 10px 4px 8px;
+    cursor: pointer;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.15s;
+  }
+  .tile:active { transform: scale(0.95); }
+  .tile.on {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .tile img {
+    width: 36px;
+    height: 36px;
+    object-fit: contain;
+    image-rendering: pixelated;
+  }
+  .tile span {
+    font-size: 10px;
+    color: var(--dim);
+    line-height: 1.2;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .tile.on span { color: var(--accent); font-weight: 600; }
+  .dot {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 2px solid var(--line);
+  }
+  .tile.on .dot { border-color: var(--accent); }
+
+  /* ── Color dots row ── */
+  .color-row {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+  .color-row::-webkit-scrollbar { display: none; }
+  .color-dot {
+    flex: none;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 2.5px solid var(--line);
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+  }
+  .color-dot.on {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  .color-dot.on::after {
+    content: '✓';
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    color: #fff;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+  }
+
+  /* ── Settings Drawer ── */
+  #settings {
+    display: none;
+    flex-direction: column;
+    gap: 16px;
+    padding: 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
+  }
+  #settings.open { display: flex; }
+  .set-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .set-label {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--dim);
+  }
+  .seg {
+    display: flex;
+    background: var(--surface-2);
+    border-radius: 10px;
+    padding: 2px;
+    gap: 2px;
+  }
+  .seg button {
+    flex: 1;
+    padding: 8px;
+    border: none;
+    border-radius: 8px;
+    background: none;
+    color: var(--dim);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .seg button.on {
+    background: var(--surface);
+    color: var(--txt);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  }
+  .skin-row {
+    display: flex;
+    gap: 8px;
+  }
+  .skin-dot {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid var(--line);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .skin-dot.on { border-color: var(--accent); }
+
+  /* ── Category Page ── */
+  #catpage {
+    display: none;
+    flex: 1;
+    flex-direction: column;
+    overflow: hidden;
+    min-height: 0;
+  }
+  #catpage.open { display: flex; }
+  #scroll.hidden { display: none; }
+  #cathead {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    flex: none;
+  }
+  #back {
+    background: none;
+    border: none;
+    color: var(--accent);
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    padding: 4px 0;
+  }
+  #cattitle { font-weight: 600; font-size: 16px; flex: 1; }
+  #catgrid {
+    overflow-y: auto;
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    padding: 0 16px 32px;
+    align-content: start;
+    -webkit-overflow-scrolling: touch;
+  }
+  #catgrid .tile { width: auto; }
+
+  /* ── Status Bar ── */
+  #status {
+    color: var(--dim);
+    font-size: 11px;
+    text-align: center;
+    padding: 8px;
+    flex: none;
+    background: var(--surface);
+  }
+
+  /* ── Gender Gate ── */
+  #gate {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    z-index: 50;
+    padding: 24px;
+  }
+  #gate h1 {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  #gate p { color: var(--dim); font-size: 15px; }
+  .gate-btn {
+    width: min(280px, 80vw);
+    padding: 16px;
+    font-size: 17px;
+    font-weight: 600;
+    border-radius: 14px;
+    border: 1.5px solid var(--line);
+    background: var(--surface);
+    color: var(--txt);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .gate-btn:active { transform: scale(0.97); background: var(--surface-2); }
+  .gate-btn.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #000;
+  }
+
+  /* ── Desktop ── */
+  @media (min-width: 900px) {
+    body { flex-direction: row; }
+    #stage {
+      width: 420px;
+      flex: none;
+      height: 100dvh;
+      justify-content: center;
+      padding: 24px;
+    }
+    #canvas { width: 220px; height: 220px; }
+    #preview { width: 200px; height: 200px; }
+    #sheet {
+      margin-top: 0;
+      border-radius: 0;
+      height: 100dvh;
+      border-top: none;
+      border-left: 1px solid var(--line);
+    }
+    #catgrid { grid-template-columns: repeat(6, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<!-- Gender Gate -->
+<div id="gate">
+  <h1>Maple Fashion</h1>
+  <p>Classic world · who are you dressing?</p>
+  <button class="gate-btn primary" onclick="document.getElementById('gate').style.display='none'">♂ Male</button>
+  <button class="gate-btn" onclick="document.getElementById('gate').style.display='none'">♀ Female</button>
+</div>
+
+<!-- Character Stage -->
+<div id="stage">
+  <div id="stage-bg"></div>
+  <div id="controls">
+    <button class="icon-btn" title="Settings">⚙</button>
+  </div>
+  <div id="canvas">
+    <img id="preview" src="https://maplestory.io/api/MCW/CBT2/Character/2000/30000/20000/stand1/0" alt="character">
+  </div>
+  <div id="look-info">
+    <div id="look-name">Dreamcatcher · Black</div>
+    <div id="look-sub">face 20000 · ♂ male</div>
+  </div>
+</div>
+
+<!-- Bottom Sheet -->
+<div id="sheet">
+  <div id="grab"></div>
+
+  <!-- Search -->
+  <div id="search-wrap">
+    <input id="search" placeholder="Search all items…" enterKeyHint="search">
+  </div>
+
+  <!-- Category Pills -->
+  <div id="pills">
+    <div class="pill on">All</div>
+    <div class="pill">Hair · 49</div>
+    <div class="pill">Faces · 12</div>
+    <div class="pill">Founder · 50</div>
+    <div class="pill">Style · 49</div>
+    <div class="pill">Classic · 878</div>
+  </div>
+
+  <!-- Settings (hidden by default) -->
+  <div id="settings">
+    <div class="set-group">
+      <div class="set-label">Playing</div>
+      <div class="seg">
+        <button class="on">♂ Male</button>
+        <button>♀ Female</button>
+      </div>
+    </div>
+    <div class="set-group">
+      <div class="set-label">Skin</div>
+      <div class="skin-row">
+        <div class="skin-dot on" style="background:#f7d7b5"></div>
+        <div class="skin-dot" style="background:#e8b98a"></div>
+        <div class="skin-dot" style="background:#c98d5f"></div>
+        <div class="skin-dot" style="background:#8a5a33"></div>
+        <div class="skin-dot" style="background:#5b6b7a"></div>
+        <div class="skin-dot" style="background:#cfcfcf"></div>
+      </div>
+    </div>
+    <div class="set-group">
+      <div class="set-label">Pose</div>
+      <div class="seg">
+        <button class="on">stand1</button>
+        <button>walk1</button>
+        <button>jump</button>
+        <button>sit</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Scroll -->
+  <div id="scroll">
+    <!-- Style Coupons Hair -->
+    <div class="sec">
+      <div class="sec-header">
+        <div class="sec-title">★ Style Coupons · Hair</div>
+        <button class="see-all">See all →</button>
+      </div>
+      <div class="row">
+        <div class="tile">
+          <img src="https://maplestory.io/api/MCW/CBT2/item/30000/icon" alt="">
+          <span>Zeta</span>
+        </div>
+        <div class="tile">
+          <img src="https://maplestory.io/api/MCW/CBT2/item/30001/icon" alt="">
+          <span>Unkempt Hair</span>
+        </div>
+        <div class="tile on">
+          <img src="https://maplestory.io/api/MCW/CBT2/item/30002/icon" alt="">
+          <span>Dreamcatcher</span>
+        </div>
+        <div class="tile">
+          <img src="https://maplestory.io/api/MCW/CBT2/item/30003/icon" alt="">
+          <span>Bed Head Hair</span>
+        </div>
+        <div class="tile">
+          <img src="https://maplestory.io/api/MCW/CBT2/item/30004/icon" alt="">
+          <span>Prince Hair</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hair Color -->
+    <div class="sec">
+      <div class="sec-header">
+        <div class="sec-title">Hair Color</div>
+      </div>
+      <div class="color-row">
+        <div class="color-dot on" style="background:#23232a"></div>
+        <div class="color-dot" style="background:#a83a32"></div>
+        <div class="color-dot" style="background:#d97b2e"></div>
+        <div class="color-dot" style="background:#e3c46a"></div>
+        <div class="color-dot" style="background:#4a8f4d"></div>
+        <div class="color-dot" style="background:#4a6fa5"></div>
+        <div class="color-dot" style="background:#7a4a8f"></div>
+        <div class="color-dot" style="background:#6e4a2f"></div>
+      </div>
+    </div>
+
+    <!-- Classic Hair -->
+    <div class="sec">
+      <div class="sec-header">
+        <div class="sec-title">Classic Salon · Hair</div>
+        <button class="see-all">See all →</button>
+      </div>
+      <div class="row">
+        <div class="tile">
+          <img src="https://maplestory.io/api/MCW/CBT2/item/30010/icon" alt="">
+          <span>Zeta</span>
+        </div>
+        <div class="tile">
+          <img src="https://maplestory.io/api/MCW/CBT2/item/30011/icon" alt="">
+          <span>Unkempt Hair</span>
+        </div>
+        <div class="tile">
+          <img src="https://maplestory.io/api/MCW/CBT2/item/30012/icon" alt="">
+          <span>Shaved Hair</span>
+        </div>
+        <div class="tile">
+          <img src="https://maplestory.io/api/MCW/CBT2/item/30013/icon" alt="">
+          <span>Rockstar</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Faces -->
+    <div class="sec">
+      <div class="sec-header">
+        <div class="sec-title">★ Style Coupons · Faces</div>
+        <button class="see-all">See all →</button>
+      </div>
+      <div class="row">
+        <div class="tile on">
+          <img src="https://maplestory.io/api/MCW/CBT2/item/20000/icon" alt="">
+          <span>Face 20000</span>
+        </div>
+        <div class="tile">
+          <img src="https://maplestory.io/api/MCW/CBT2/item/20001/icon" alt="">
+          <span>Face 20001</span>
+        </div>
+        <div class="tile">
+          <img src="https://maplestory.io/api/MCW/CBT2/item/20002/icon" alt="">
+          <span>Face 20002</span>
+        </div>
+        <div class="tile">
+          <img src="https://maplestory.io/api/MCW/CBT2/item/20003/icon" alt="">
+          <span>Face 20003</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Founder's Crate -->
+    <div class="sec">
+      <div class="sec-header">
+        <div class="sec-title">Founder's Crate</div>
+        <button class="see-all">See all →</button>
+      </div>
+      <div class="row">
+        <div class="tile">
+          <img src="https://maplestory.io/api/MCW/CBT2/item/10000/icon" alt="">
+          <span>Item</span>
+        </div>
+        <div class="tile">
+          <img src="https://maplestory.io/api/MCW/CBT2/item/10001/icon" alt="">
+          <span>Item</span>
+        </div>
+        <div class="tile">
+          <img src="https://maplestory.io/api/MCW/CBT2/item/10002/icon" alt="">
+          <span>Item</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Category Page (hidden) -->
+  <div id="catpage">
+    <div id="cathead">
+      <button id="back">‹ Back</button>
+      <div id="cattitle">All Hair</div>
+    </div>
+    <div id="catgrid">
+      <div class="tile on"><img src="https://maplestory.io/api/MCW/CBT2/item/30000/icon" alt=""><span>Zeta</span></div>
+      <div class="tile"><img src="https://maplestory.io/api/MCW/CBT2/item/30001/icon" alt=""><span>Unkempt</span></div>
+      <div class="tile"><img src="https://maplestory.io/api/MCW/CBT2/item/30002/icon" alt=""><span>Dreamcatcher</span></div>
+      <div class="tile"><img src="https://maplestory.io/api/MCW/CBT2/item/30003/icon" alt=""><span>Bed Head</span></div>
+      <div class="tile"><img src="https://maplestory.io/api/MCW/CBT2/item/30004/icon" alt=""><span>Prince</span></div>
+      <div class="tile"><img src="https://maplestory.io/api/MCW/CBT2/item/30005/icon" alt=""><span>Style</span></div>
+      <div class="tile"><img src="https://maplestory.io/api/MCW/CBT2/item/30006/icon" alt=""><span>Look</span></div>
+      <div class="tile"><img src="https://maplestory.io/api/MCW/CBT2/item/30007/icon" alt=""><span>Hair</span></div>
+    </div>
+  </div>
+
+  <div id="status">1017 items · ♂ male · tap to wear</div>
+</div>
+
+</body>
+</html>

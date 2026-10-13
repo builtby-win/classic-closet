@@ -792,3 +792,12 @@
   #gamepad { right: 380px; border-radius: 18px 18px 0 0; }
   .pad-hint { display: block; }
 }
+.preview-fx { position: absolute; left: -100%; top: -100%; width: 300%; height: 300%; image-rendering: pixelated; pointer-events: none; z-index: 2; }
+.pad-skill { position: relative; }
+.pad-cast { width: 56px !important; height: 56px !important; display: grid; place-items: center; padding: 0; }
+.pad-cast img { width: 32px; height: 32px; image-rendering: pixelated; pointer-events: none; }
+.pad-swap { position: absolute; top: -6px; right: -6px; width: 24px; height: 24px; padding: 0; border: 1px solid var(--line); border-radius: 50%; background: var(--surface); color: var(--txt); font-size: 12px; line-height: 1; cursor: pointer; }
+@media (max-width: 420px) { .pad-dir, .pad-actions { gap: 6px; } .pad-btn { width: 50px; height: 50px; } .pad-actions .pad-btn { width: 58px; height: 58px; } .pad-cast { width: 50px !important; height: 50px !important; } }
+/* Smaller character in play mode so skill effects (up to ~110 sprite px out) stay on screen. */
+.mf.playing #canvas { max-width: 230px; }
+.mf.playing .name-row { opacity: 0; }

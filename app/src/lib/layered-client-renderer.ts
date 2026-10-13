@@ -127,7 +127,7 @@ export async function renderLayeredCharacter(
   look: Look,
   width = 128,
   height = 128,
-): Promise<{ missing: number[]; unresolved: string[] }> {
+): Promise<{ missing: number[]; unresolved: string[]; origin: Point }> {
   const missing: number[] = [];
   const spriteLayers: SourceLayer[] = [];
   const base = await localBase();
@@ -204,8 +204,8 @@ export async function renderLayeredCharacter(
   }
 
   const composition = composeLayers(spriteLayers, CLASSIC_ZMAP_ORDER);
-  drawComposition(ctx, composition, width, height);
-  return { missing: [...new Set(missing)], unresolved: composition.unresolved };
+  const origin = drawComposition(ctx, composition, width, height);
+  return { missing: [...new Set(missing)], unresolved: composition.unresolved, origin };
 }
 
 /** Decode every frame of the given poses ahead of time so play mode never stalls on first use. */

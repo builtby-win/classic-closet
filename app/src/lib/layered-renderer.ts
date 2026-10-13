@@ -187,16 +187,16 @@ export function composeLayers(
   return { layers: placed, bounds, unresolved };
 }
 
-/** Draw a composition into a fixed-size canvas with pixel art smoothing off. */
+/** Draw a composition into a fixed-size canvas with pixel art smoothing off; returns the source origin's canvas position. */
 export function drawComposition(
   ctx: CanvasRenderingContext2D,
   composition: Composition,
   width: number,
   height: number,
-): void {
+): Point {
   ctx.imageSmoothingEnabled = false;
   ctx.clearRect(0, 0, width, height);
-  if (!composition.layers.length) return;
+  if (!composition.layers.length) return { x: width / 2, y: height / 2 };
   // Center the complete base character, excluding equipment bounds so a
   // long weapon cannot move the character across the preview.
   const root = composition.layers.find((layer) => layer.part === 'body' && layer.name === 'body');
@@ -213,4 +213,6 @@ export function drawComposition(
   for (const layer of composition.layers) {
     ctx.drawImage(layer.image, Math.round(layer.x + xOffset), Math.round(layer.y + yOffset));
   }
+  // Where the character's source origin (0,0) landed on the canvas.
+  return { x: xOffset, y: yOffset };
 }
