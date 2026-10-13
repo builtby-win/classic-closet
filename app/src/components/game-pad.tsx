@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react';
-import { MASTERY_TIERS, type PlayController, type PlayInput } from '../lib/play-controller';
+import type { PlayController, PlayInput } from '../lib/play-controller';
 import { loadSkills, SKILL_IDS, type BakedSkill } from '../lib/skills';
 
 const KEYS: Record<string, PlayInput> = {
@@ -48,16 +48,6 @@ export default function GamePad({ controller, onExit }: { controller: PlayContro
   const [skills, setSkills] = useState<BakedSkill[]>([]);
   const [picked, setPicked] = useState(0);
   const skill = skills[picked];
-  const [mastery, setMastery] = useState(() => {
-    const saved = Number(window.localStorage.getItem('mf-mastery'));
-    return Number.isInteger(saved) && saved >= 0 && saved < MASTERY_TIERS.length ? saved : 0;
-  });
-  const tier = MASTERY_TIERS[mastery]!;
-  useEffect(() => {
-    controller.setMastery(mastery);
-    window.localStorage.setItem('mf-mastery', String(mastery));
-  }, [controller, mastery]);
-
   useEffect(() => {
     void loadSkills().then((all) => setSkills(SKILL_IDS.flatMap((id) => all[id] ?? [])));
   }, []);
@@ -98,9 +88,6 @@ export default function GamePad({ controller, onExit }: { controller: PlayContro
           swipeY.current = null;
         }}
       ><span /><small>Closet</small></button>
-      <button type="button" className="pad-mastery" onClick={() => setMastery((current) => (current + 1) % MASTERY_TIERS.length)} aria-label={`Weapon swipe mastery ${mastery + 1}: ${tier.name}. Tap to change`}>
-        <i style={{ background: tier.dot }} />Mastery {mastery + 1}
-      </button>
       <div className="pad-row">
         <div className="pad-dir">
           <PadButton input="left" controller={controller} className="pad-left" label="Walk left">◀</PadButton>

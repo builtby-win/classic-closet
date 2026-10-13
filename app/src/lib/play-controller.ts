@@ -82,56 +82,6 @@ const SPEED = 0.45; // canvas widths per second
 const IDLE_CYCLE = [0, 1, 2, 1];
 
 /**
- * Weapon swipe: a fading crescent for swings, a streak for stabs. Drawn in the left-facing frame
- * around the torso (ox, oy is the character origin on the fx canvas); the preview's flip handles facing.
- */
-export const MASTERY_TIERS = [
-  { name: 'Blue', core: '235, 245, 255', glow: 'rgba(150, 200, 255, 0.9)', dot: '#6fb1ff', size: 1 },
-  { name: 'Purple', core: '244, 230, 255', glow: 'rgba(190, 120, 255, 0.95)', dot: '#b57bff', size: 1.12 },
-  { name: 'Red', core: '255, 238, 232', glow: 'rgba(255, 90, 70, 0.95)', dot: '#ff5e4d', size: 1.25 },
-] as const;
-
-function drawSwipe(fx: CanvasRenderingContext2D, anim: string, progress: number, ox: number, oy: number, tier: number): void {
-  const look = MASTERY_TIERS[tier] ?? MASTERY_TIERS[0];
-  const p = Math.max(0, Math.min(1, progress));
-  const fade = p > 0.8 ? (1 - p) / 0.2 : 1;
-  if (fade <= 0 || p < 0.05) return;
-  const big = (/T1|P1/.test(anim) ? 1.25 : 1) * look.size;
-  const cx = ox - 4;
-  const cy = oy - 34;
-  fx.save();
-  fx.lineCap = 'round';
-  fx.shadowColor = look.glow;
-  fx.shadowBlur = 8;
-  if (anim.startsWith('swing')) {
-    const head = (270 - 200 * p) * Math.PI / 180; // overhead, down through the front
-    const tail = 85 * Math.PI / 180;
-    const steps = 14;
-    for (let i = 0; i < steps; i++) {
-      const k = i / steps;
-      fx.strokeStyle = `rgba(${look.core}, ${0.85 * (1 - k) ** 1.4 * fade})`;
-      fx.lineWidth = (1.5 + 7 * (1 - k)) * look.size;
-      fx.beginPath();
-      fx.arc(cx, cy, 40 * big, head + k * tail, head + (k + 1 / steps) * tail + 0.02);
-      fx.stroke();
-    }
-  } else if (anim.startsWith('stab')) {
-    const reach = 22 + 62 * (1 - (1 - p) ** 2);
-    const steps = 10;
-    for (let i = 0; i < steps; i++) {
-      const k = i / steps;
-      fx.strokeStyle = `rgba(${look.core}, ${0.8 * (1 - k) * fade})`;
-      fx.lineWidth = (1 + 4.5 * (1 - k)) * look.size;
-      fx.beginPath();
-      fx.moveTo(cx - reach + k * 46 * big, cy + 2);
-      fx.lineTo(cx - reach + (k + 1 / steps) * 46 * big, cy + 2);
-      fx.stroke();
-    }
-  }
-  fx.restore();
-}
-
-/**
  * Rudimentary mock-control loop: keeps a pose in the play-pose store and moves
  * the preview element with CSS only, so React never re-renders per frame.
  * Sprites face left, so facing right is a horizontal flip.
@@ -149,7 +99,6 @@ export class PlayController {
   private attackQueued = false;
   private skillQueued = false;
   private skillId = '4201003';
-  private mastery = 0;
   private plan: CastPlan | null = null;
   private castClock = 0;
   private readonly fx: CanvasRenderingContext2D | null;
@@ -164,11 +113,6 @@ export class PlayController {
     void loadSkills().then((skills) => Object.values(skills).forEach((skill) =>
       [...Object.values(skill.sequences).flat().map((frame) => frame.image), ...(skill.projectile ? [skill.projectile] : [])]
         .forEach((src) => void fxImage(src).catch(() => undefined))));
-  }
-
-  /** Swipe tier: index into MASTERY_TIERS. */
-  setMastery(tier: number): void {
-    this.mastery = tier;
   }
 
   selectSkill(id: string): void {
@@ -208,7 +152,7 @@ export class PlayController {
     this.plan = castPlan(skill, weaponAttack);
   }
 
-  /** The pose phase playing at `t`, plus how far through its run of same-pose phases it is (for the swipe). */
+  /** The pose phase playing at `t`, plus how far through its run of same-pose phases it is (for the lunge). */
   private poseAt(plan: CastPlan, t: number): { phase: PosePhase; run: number } | null {
     let start = 0;
     for (let i = 0; i < plan.poses.length; i++) {
@@ -227,10 +171,10 @@ export class PlayController {
     return null;
   }
 
-  private drawEffects(swipe: { anim: string; progress: number } | null): void {
+  private drawEffects(): void {
     const { fx, plan } = this;
     if (!fx) return;
-    if (!plan && !swipe) {
+    if (!plan) {
       if (this.fxDirty) { fx.clearRect(0, 0, FX_SIZE, FX_SIZE); this.fxDirty = false; }
       return;
     }
@@ -238,8 +182,6 @@ export class PlayController {
     this.fxDirty = true;
     const ox = FX_PAD + origin.x;
     const oy = FX_PAD + origin.y;
-    if (swipe) drawSwipe(fx, swipe.anim, swipe.progress, ox, oy, this.mastery);
-    if (!plan) return;
     for (const cue of plan.effects) {
       const hit = frameAt(cue.frames, this.castClock - cue.at);
       if (!hit || this.castClock < cue.at) continue;
@@ -293,13 +235,13 @@ export class PlayController {
     let next: PlayPose;
     const attackFrames = ATTACK_FRAMES[this.attackAnim] ?? 3;
     let casting: PosePhase | null = null;
-    let swipe: { anim: string; progress: number } | null = null;
+    let strike: number | null = null; // 0..1 through the current swing, for the lunge
     if (this.plan) {
       this.castClock += dt;
       if (this.castClock >= planMs(this.plan)) this.plan = null;
       const pose = this.plan ? this.poseAt(this.plan, this.castClock) : null;
       casting = pose?.phase ?? null;
-      if (pose) swipe = { anim: pose.phase.anim, progress: pose.run };
+      if (pose) strike = pose.run;
     }
 
     if (casting) {
@@ -353,10 +295,10 @@ export class PlayController {
     }
     setPlayPose(next);
 
-    // Plain attacks swipe too; a short lunge into each swing keeps the body from feeling pinned.
-    if (!swipe && this.mode === 'attack') swipe = { anim: this.attackAnim, progress: Math.min(1, this.clock / (attackFrames * ATTACK_MS)) };
-    this.drawEffects(swipe);
-    const lunge = swipe ? Math.sin(Math.min(1, swipe.progress) * Math.PI) * canvasWidth * 0.05 * this.facing : 0;
+    // A short lunge into each swing keeps the body from feeling pinned.
+    if (strike === null && this.mode === 'attack') strike = Math.min(1, this.clock / (attackFrames * ATTACK_MS));
+    this.drawEffects();
+    const lunge = strike === null ? 0 : Math.sin(Math.min(1, strike) * Math.PI) * canvasWidth * 0.05 * this.facing;
     this.element.style.transform = `translate(${this.x + lunge}px, ${-lift}px) scaleX(${-this.facing})`;
     this.raf = requestAnimationFrame(this.tick);
   };

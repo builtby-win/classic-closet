@@ -811,5 +811,3 @@
 /* Smaller character in play mode so skill effects (up to ~110 sprite px out) stay on screen. */
 .mf.playing #canvas { max-width: 230px; }
 .mf.playing .name-row { opacity: 0; }
-.pad-mastery { position: absolute; top: 6px; right: 14px; display: flex; align-items: center; gap: 6px; padding: 5px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-2); color: var(--txt); font: 600 11px/1 'Inter', system-ui, sans-serif; cursor: pointer; }
-.pad-mastery i { width: 9px; height: 9px; border-radius: 50%; }
