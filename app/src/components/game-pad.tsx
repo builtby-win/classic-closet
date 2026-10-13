@@ -13,6 +13,17 @@ const KEYS: Record<string, PlayInput> = {
   c: 'skill',
 };
 
+const ARROW_ROTATE = { left: 270, down: 180, right: 90 } as const;
+
+/** Chunky white arrow with a dark outline, in the MapleStory UI style. */
+function Arrow({ dir }: { dir: keyof typeof ARROW_ROTATE }) {
+  return (
+    <svg viewBox="0 0 24 24" width="32" height="32" aria-hidden="true" style={{ transform: `rotate(${ARROW_ROTATE[dir]}deg)` }}>
+      <path d="M12 3 L21 13 H15.5 V21 H8.5 V13 H3 Z" fill="#fff" stroke="#1d2b4a" strokeWidth="2" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 function isTyping(target: EventTarget | null): boolean {
   return target instanceof HTMLElement && /^(INPUT|SELECT|TEXTAREA)$/.test(target.tagName);
 }
@@ -104,9 +115,9 @@ export default function GamePad({ controller, onExit }: { controller: PlayContro
       </button>
       <div className="pad-row">
         <div className="pad-dir">
-          <PadButton input="left" controller={controller} className="pad-left" label="Walk left">◀</PadButton>
-          <PadButton input="down" controller={controller} className="pad-down" label="Duck">▼</PadButton>
-          <PadButton input="right" controller={controller} className="pad-right" label="Walk right">▶</PadButton>
+          <PadButton input="left" controller={controller} className="pad-left" label="Walk left"><Arrow dir="left" /></PadButton>
+          <PadButton input="down" controller={controller} className="pad-down" label="Duck"><Arrow dir="down" /></PadButton>
+          <PadButton input="right" controller={controller} className="pad-right" label="Walk right"><Arrow dir="right" /></PadButton>
         </div>
         <div className="pad-actions">
           {skill && <div className="pad-skill">
