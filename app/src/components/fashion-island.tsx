@@ -158,7 +158,6 @@ export default function FashionIsland() {
   const [controller, setController] = useState<PlayController | null>(null);
   const lookRef = useRef(look);
   lookRef.current = look;
-  const swipeStart = useRef<{ y: number; atTop: boolean } | null>(null);
   const [ratesOpen, setRatesOpen] = useState(false);
   // Read before useLook's effect persists the default look.
   const firstVisit = useRef(isFirstVisit());
@@ -522,17 +521,66 @@ export default function FashionIsland() {
     if (controller) void warmPoses(look, PLAY_POSES);
   }, [controller, look]);
 
-  // Swipe down on the sheet (from its scroll top) to put the closet away and show the pad.
-  const onRailTouchStart = (event: React.TouchEvent) => {
-    const scroller = (event.target as HTMLElement).closest('#slot-list, #drawer');
-    swipeStart.current = { y: event.touches[0]!.clientY, atTop: !scroller || scroller.scrollTop <= 0 };
-  };
-  const onRailTouchEnd = (event: React.TouchEvent) => {
-    const start = swipeStart.current;
-    swipeStart.current = null;
-    if (!start?.atTop || welcomeOpen || catSec || searchScope) return;
-    if (event.changedTouches[0]!.clientY - start.y > 70) startPlay();
-  };
+  // Drag the sheet down: it follows the finger while the stage grows to show the whole
+  // character; letting go past the threshold starts play mode, otherwise it snaps back.
+  const rootRef = useRef<HTMLDivElement>(null);
+  const railRef = useRef<HTMLDivElement>(null);
+  const dragGate = useRef({ locked: false, start: startPlay });
+  dragGate.current = { locked: welcomeOpen || !!controller, start: startPlay };
+  useEffect(() => {
+    const root = rootRef.current;
+    const rail = railRef.current;
+    if (!root || !rail) return;
+    const phone = window.matchMedia('(max-width: 899px)');
+    let drag: { x: number; y: number; atTop: boolean; active: boolean; max: number; pull: number } | null = null;
+    const setPull = (px: number | null) => {
+      if (px === null) root.style.removeProperty('--pull');
+      else root.style.setProperty('--pull', `${px}px`);
+    };
+    const onStart = (event: TouchEvent) => {
+      if (!phone.matches || dragGate.current.locked || event.touches.length !== 1) return;
+      const scroller = (event.target as HTMLElement).closest('#slot-list, #drawer');
+      const stage = root.querySelector<HTMLElement>('#stage');
+      const touch = event.touches[0]!;
+      drag = {
+        x: touch.clientX, y: touch.clientY, atTop: !scroller || scroller.scrollTop <= 0, active: false, pull: 0,
+        // Same height play mode gives the stage (see .mf.playing #stage).
+        max: Math.max(0, window.innerHeight - 190 - (stage?.offsetHeight ?? 0)),
+      };
+    };
+    const onMove = (event: TouchEvent) => {
+      if (!drag) return;
+      const touch = event.touches[0]!;
+      const dy = touch.clientY - drag.y;
+      if (!drag.active) {
+        if (!drag.atTop || dy < -8 || Math.abs(touch.clientX - drag.x) > Math.abs(dy)) { if (dy < -8) drag = null; return; }
+        if (dy < 8) return;
+        drag.active = true;
+        root.classList.add('dragging');
+      }
+      if (event.cancelable) event.preventDefault();
+      drag.pull = Math.max(0, Math.min(drag.max, dy));
+      setPull(drag.pull);
+    };
+    const onEnd = () => {
+      const finished = drag;
+      drag = null;
+      if (!finished?.active) return;
+      root.classList.remove('dragging');
+      setPull(null);
+      if (finished.pull > Math.min(110, finished.max * 0.4)) dragGate.current.start();
+    };
+    rail.addEventListener('touchstart', onStart, { passive: true });
+    rail.addEventListener('touchmove', onMove, { passive: false });
+    rail.addEventListener('touchend', onEnd);
+    rail.addEventListener('touchcancel', onEnd);
+    return () => {
+      rail.removeEventListener('touchstart', onStart);
+      rail.removeEventListener('touchmove', onMove);
+      rail.removeEventListener('touchend', onEnd);
+      rail.removeEventListener('touchcancel', onEnd);
+    };
+  }, []);
 
   const drawerTitle = useMemo(() => {
     if (!catSec) return '';
@@ -548,7 +596,7 @@ export default function FashionIsland() {
   }, [catSec]);
 
   return (
-    <div className={'mf' + (controller ? ' playing' : '')}>
+    <div ref={rootRef} className={'mf' + (controller ? ' playing' : '')}>
       <div id="stage" className={welcomeOpen ? (welcomeLeaving ? 'leaving' : 'welcoming') : undefined}>
         <div id="controls">
           <button id="avatar" onClick={() => setSettingsOpen(v => !v)} aria-label="Edit character" aria-expanded={settingsOpen} aria-controls="settings"><canvas ref={avatarRef} width={AVATAR_PX} height={AVATAR_PX} aria-hidden="true" /></button>
@@ -571,6 +619,7 @@ export default function FashionIsland() {
             </div>}
           </div>
         </div>
+        {!controller && !welcomeOpen && <button type="button" id="play-pill" onClick={(event) => { event.stopPropagation(); startPlay(); }}><Icon name="play" />Play</button>}
       </div>
       {controller && <GamePad controller={controller} onExit={stopPlay} />}
       {settingsOpen && (
@@ -628,8 +677,8 @@ export default function FashionIsland() {
         </div>
     )}
 
-    <div id="rail" className={welcomeOpen && !welcomeLeaving ? 'welcoming' : undefined} onTouchStart={onRailTouchStart} onTouchEnd={onRailTouchEnd}>
-      <div id="rail-grip" aria-hidden="true"><span /></div>
+    <div id="rail" ref={railRef} className={welcomeOpen && !welcomeLeaving ? 'welcoming' : undefined}>
+      <div id="rail-grip" aria-hidden="true"><span /><small>Drag down to play</small></div>
       {welcomeOpen && (
         <section id="welcome" className={welcomeLeaving ? 'leaving' : undefined} role="dialog" aria-labelledby="welcome-title">
           <header>

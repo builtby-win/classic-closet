@@ -766,12 +766,13 @@
 
 /* ── Play mode: pad + rail tucked away ── */
 #play[aria-pressed="true"] { color: var(--accent); }
-#rail-grip { display: none; flex: none; justify-content: center; padding: 6px 0 0; }
+#rail-grip { display: none; flex: none; flex-direction: column; align-items: center; gap: 3px; padding: 6px 0 0; touch-action: none; }
+#rail-grip small, #pad-grip small { color: var(--dim); font-size: 10px; font-weight: 600; letter-spacing: 0.02em; }
 #rail-grip span { width: 36px; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.18); }
 #preview { will-change: transform; }
 #gamepad { position: fixed; z-index: 8; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 0 16px calc(14px + env(safe-area-inset-bottom)); background: var(--surface); border-top: 1px solid var(--line); border-radius: 18px 18px 0 0; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; animation: pad-up 0.3s ease-out; }
 @keyframes pad-up { from { transform: translateY(100%); } }
-#pad-grip { width: 100%; display: flex; justify-content: center; padding: 8px 0 4px; border: 0; background: none; cursor: pointer; touch-action: none; }
+#pad-grip { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 0 4px; border: 0; background: none; cursor: pointer; touch-action: none; }
 #pad-grip span { width: 36px; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.18); }
 .pad-row { width: 100%; max-width: 560px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .pad-dir, .pad-actions { display: flex; gap: 8px; }
@@ -781,12 +782,19 @@
 .pad-attack { background: var(--accent); border-color: var(--accent); color: #1a1205; }
 .pad-attack:active { background: #ffbf55; }
 .pad-hint { display: none; color: var(--dim); font-size: 11px; }
+#play-pill { position: absolute; right: 16px; bottom: 12px; z-index: 3; display: flex; align-items: center; gap: 6px; padding: 8px 16px; border: 1px solid var(--accent); border-radius: 999px; background: var(--accent-soft); color: var(--accent); font: 650 13px/1 'Inter', system-ui, sans-serif; cursor: pointer; }
+#play-pill svg { width: 18px; height: 18px; }
+#play-pill:active { background: rgba(245,166,35,0.25); }
 @media (max-width: 899px) {
-  #rail { transition: transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1); }
+  #rail { transform: translateY(var(--pull, 0px)); transition: transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1); }
+  #rail.welcoming { transform: translateY(max(0px, calc(100% - 340px))); }
+  .mf.dragging #rail, .mf.dragging #stage { transition: none; }
+  #stage { height: calc(38dvh + var(--pull, 0px)); }
   #rail-grip { display: flex; }
   .mf.playing #rail { transform: translateY(100%); pointer-events: none; }
   #stage { transition: height 0.45s cubic-bezier(0.2, 0.8, 0.2, 1); }
   .mf.playing #stage { height: calc(100dvh - 190px - env(safe-area-inset-bottom)); }
+  .mf.playing #canvas { transition: none; }
 }
 @media (min-width: 900px) {
   #gamepad { right: 380px; border-radius: 18px 18px 0 0; }

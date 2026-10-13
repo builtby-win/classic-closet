@@ -88,7 +88,7 @@ export default function GamePad({ controller, onExit }: { controller: PlayContro
           if (swipeY.current !== null && swipeY.current - event.clientY > 30) onExit();
           swipeY.current = null;
         }}
-      ><span /></button>
+      ><span /><small>Closet</small></button>
       <div className="pad-row">
         <div className="pad-dir">
           <PadButton input="left" controller={controller} className="pad-left" label="Walk left">◀</PadButton>
