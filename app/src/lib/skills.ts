@@ -17,9 +17,28 @@ export interface EffectCue {
   y: number;
 }
 
+/** A sprite thrown from `from` to `to` (offsets from the character origin) over `ms`. */
+export interface ProjectileCue {
+  image: string;
+  at: number;
+  ms: number;
+  from: { x: number; y: number };
+  to: { x: number; y: number };
+}
+
 export interface CastPlan {
   poses: PosePhase[];
   effects: EffectCue[];
+  projectiles: ProjectileCue[];
+}
+
+/** Total length: the cast ends once the body and every effect have finished. */
+export function planMs(plan: CastPlan): number {
+  return Math.max(
+    plan.poses.reduce((total, phase) => total + phase.ms, 0),
+    ...plan.effects.map((cue) => cue.at + sequenceMs(cue.frames)),
+    ...plan.projectiles.map((cue) => cue.at + cue.ms),
+  );
 }
 
 export const SKILL_IDS = ['4201003', '4001003'] as const;
@@ -65,6 +84,7 @@ export function castPlan(skill: BakedSkill, weaponAttack: string): CastPlan {
     const hits = [0, 1, 2, 0, 1, 2];
     return {
       poses: [...round, ...round],
+      projectiles: [],
       effects: [
         { frames: effect, at: 0, x: 0, y: 0 },
         ...hits.map((hit, index): EffectCue => ({
@@ -76,14 +96,17 @@ export function castPlan(skill: BakedSkill, weaponAttack: string): CastPlan {
       ],
     };
   }
-  // Lucky Seven: wind-up, two stars fly out, each lands a hit.
+  // Lucky Seven: a quick throw, two stars fly out one after the other and each lands a hit.
+  // The skill's own "effect" art is a fixed glow that reads as a glitch without the star item, so it is not played.
   const hit = skill.sequences['hit/0'] ?? [];
+  const star = skill.projectile;
+  const flight = 260;
+  const throws = [{ at: 130, y: -36 }, { at: 250, y: -30 }];
   return {
-    poses: swing(weaponAttack, 130),
-    effects: [
-      { frames: effect, at: 0, x: 0, y: 0 },
-      { frames: hit, at: 620, x: TARGET_X - 40, y: TARGET_Y },
-      { frames: hit, at: 740, x: TARGET_X - 40, y: TARGET_Y },
-    ],
+    poses: swing(weaponAttack, 90),
+    effects: throws.map((t): EffectCue => ({ frames: hit, at: t.at + flight, x: TARGET_X - 20, y: t.y })),
+    projectiles: star ? throws.map((t): ProjectileCue => ({
+      image: star, at: t.at, ms: flight, from: { x: -16, y: t.y }, to: { x: TARGET_X - 20, y: t.y },
+    })) : [],
   };
 }

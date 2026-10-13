@@ -1,5 +1,5 @@
 import { weaponMotion } from './fashion';
-import { castPlan, loadSkills, sequenceMs, type BakedSkillFrame, type CastPlan, type PosePhase } from './skills';
+import { castPlan, loadSkills, planMs, type BakedSkillFrame, type CastPlan, type PosePhase } from './skills';
 
 /** Pose override read by the preview canvas while play mode is running. */
 export interface PlayPose {
@@ -39,12 +39,14 @@ export const SPRITE_CANVAS = 256;
 const FX_SIZE = SPRITE_CANVAS * 2;
 const FX_PAD = (FX_SIZE - SPRITE_CANVAS) / 2; // the fx canvas extends this far past the sprite canvas on each side
 const imageCache = new Map<string, Promise<HTMLImageElement>>();
+/** Decoded effect images, so the per-frame draw never has to wait on a promise. */
+const readyImages = new Map<string, HTMLImageElement>();
 function fxImage(src: string): Promise<HTMLImageElement> {
   let image = imageCache.get(src);
   if (!image) {
     image = new Promise((resolve, reject) => {
       const el = new Image();
-      el.onload = () => resolve(el);
+      el.onload = () => { readyImages.set(src, el); resolve(el); };
       el.onerror = () => reject(new Error(`Could not load ${src}`));
       el.src = src;
     });
@@ -80,6 +82,49 @@ const SPEED = 0.45; // canvas widths per second
 const IDLE_CYCLE = [0, 1, 2, 1];
 
 /**
+ * Weapon swipe: a fading crescent for swings, a streak for stabs. Drawn in the left-facing frame
+ * around the torso (ox, oy is the character origin on the fx canvas); the preview's flip handles facing.
+ */
+function drawSwipe(fx: CanvasRenderingContext2D, anim: string, progress: number, ox: number, oy: number): void {
+  const p = Math.max(0, Math.min(1, progress));
+  const fade = p > 0.8 ? (1 - p) / 0.2 : 1;
+  if (fade <= 0 || p < 0.05) return;
+  const big = /T1|P1/.test(anim) ? 1.25 : 1;
+  const cx = ox - 4;
+  const cy = oy - 34;
+  fx.save();
+  fx.lineCap = 'round';
+  fx.shadowColor = 'rgba(160, 205, 255, 0.9)';
+  fx.shadowBlur = 8;
+  if (anim.startsWith('swing')) {
+    const head = (270 - 200 * p) * Math.PI / 180; // overhead, down through the front
+    const tail = 85 * Math.PI / 180;
+    const steps = 14;
+    for (let i = 0; i < steps; i++) {
+      const k = i / steps;
+      fx.strokeStyle = `rgba(235, 245, 255, ${0.85 * (1 - k) ** 1.4 * fade})`;
+      fx.lineWidth = 1.5 + 7 * (1 - k);
+      fx.beginPath();
+      fx.arc(cx, cy, 40 * big, head + k * tail, head + (k + 1 / steps) * tail + 0.02);
+      fx.stroke();
+    }
+  } else if (anim.startsWith('stab')) {
+    const reach = 22 + 62 * (1 - (1 - p) ** 2);
+    const steps = 10;
+    for (let i = 0; i < steps; i++) {
+      const k = i / steps;
+      fx.strokeStyle = `rgba(235, 245, 255, ${0.8 * (1 - k) * fade})`;
+      fx.lineWidth = 1 + 4.5 * (1 - k);
+      fx.beginPath();
+      fx.moveTo(cx - reach + k * 46 * big, cy + 2);
+      fx.lineTo(cx - reach + (k + 1 / steps) * 46 * big, cy + 2);
+      fx.stroke();
+    }
+  }
+  fx.restore();
+}
+
+/**
  * Rudimentary mock-control loop: keeps a pose in the play-pose store and moves
  * the preview element with CSS only, so React never re-renders per frame.
  * Sprites face left, so facing right is a horizontal flip.
@@ -109,7 +154,8 @@ export class PlayController {
     this.fx = element.querySelector<HTMLCanvasElement>('.preview-fx')?.getContext('2d') ?? null;
     this.fx && (this.fx.imageSmoothingEnabled = false);
     void loadSkills().then((skills) => Object.values(skills).forEach((skill) =>
-      Object.values(skill.sequences).flat().forEach((frame) => void fxImage(frame.image).catch(() => undefined))));
+      [...Object.values(skill.sequences).flat().map((frame) => frame.image), ...(skill.projectile ? [skill.projectile] : [])]
+        .forEach((src) => void fxImage(src).catch(() => undefined))));
   }
 
   selectSkill(id: string): void {
@@ -143,42 +189,70 @@ export class PlayController {
   private async startCast(weaponAttack: string): Promise<void> {
     const skill = (await loadSkills())[this.skillId];
     if (!skill || this.plan) return;
-    this.mode = 'attack'; // ends any queued melee swing; the plan takes over next tick
+    this.mode = 'idle'; // the plan owns the body while its poses play
+    this.clock = 0;
     this.castClock = 0;
     this.plan = castPlan(skill, weaponAttack);
   }
 
-  private phaseAt(plan: CastPlan, t: number): PosePhase | null {
+  /** The pose phase playing at `t`, plus how far through its run of same-pose phases it is (for the swipe). */
+  private poseAt(plan: CastPlan, t: number): { phase: PosePhase; run: number } | null {
     let start = 0;
-    for (const phase of plan.poses) {
-      if (t < start + phase.ms) return phase;
+    for (let i = 0; i < plan.poses.length; i++) {
+      const phase = plan.poses[i]!;
+      if (t < start + phase.ms) {
+        let first = i;
+        while (first > 0 && plan.poses[first - 1]!.anim === phase.anim) first--;
+        let last = i;
+        while (last < plan.poses.length - 1 && plan.poses[last + 1]!.anim === phase.anim) last++;
+        const runStart = plan.poses.slice(0, first).reduce((total, p) => total + p.ms, 0);
+        const runMs = plan.poses.slice(first, last + 1).reduce((total, p) => total + p.ms, 0);
+        return { phase, run: (t - runStart) / runMs };
+      }
       start += phase.ms;
     }
-    // Hold the last pose until the effects finish too.
-    const end = Math.max(start, ...plan.effects.map((cue) => cue.at + sequenceMs(cue.frames)));
-    return t < end ? plan.poses.at(-1) ?? null : null;
+    return null;
   }
 
-  private drawEffects(): void {
+  private drawEffects(swipe: { anim: string; progress: number } | null): void {
     const { fx, plan } = this;
     if (!fx) return;
-    if (!plan) {
+    if (!plan && !swipe) {
       if (this.fxDirty) { fx.clearRect(0, 0, FX_SIZE, FX_SIZE); this.fxDirty = false; }
       return;
     }
     fx.clearRect(0, 0, FX_SIZE, FX_SIZE);
     this.fxDirty = true;
+    const ox = FX_PAD + origin.x;
+    const oy = FX_PAD + origin.y;
+    if (swipe) drawSwipe(fx, swipe.anim, swipe.progress, ox, oy);
+    if (!plan) return;
     for (const cue of plan.effects) {
       const hit = frameAt(cue.frames, this.castClock - cue.at);
       if (!hit || this.castClock < cue.at) continue;
-      const cached = imageCache.get(hit.frame.image);
-      if (!cached) { void fxImage(hit.frame.image); continue; }
-      void cached.then((image) => {
-        if (this.plan !== plan) return;
-        fx.globalAlpha = (hit.frame.a0 + (hit.frame.a1 - hit.frame.a0) * hit.mix) / 255;
-        fx.drawImage(image, Math.round(FX_PAD + origin.x + cue.x - hit.frame.origin.x), Math.round(FX_PAD + origin.y + cue.y - hit.frame.origin.y));
-        fx.globalAlpha = 1;
-      });
+      const image = readyImages.get(hit.frame.image);
+      if (!image) { void fxImage(hit.frame.image); continue; }
+      fx.globalAlpha = (hit.frame.a0 + (hit.frame.a1 - hit.frame.a0) * hit.mix) / 255;
+      fx.drawImage(image, Math.round(ox + cue.x - hit.frame.origin.x), Math.round(oy + cue.y - hit.frame.origin.y));
+    }
+    fx.globalAlpha = 1;
+    for (const cue of plan.projectiles) {
+      const t = (this.castClock - cue.at) / cue.ms;
+      const image = readyImages.get(cue.image);
+      if (t < 0 || t > 1 || !image) continue;
+      // Ghost copies behind the star read as motion at this frame rate.
+      for (let ghost = 3; ghost >= 0; ghost--) {
+        const g = Math.max(0, t - ghost * 0.06);
+        const e = 1 - (1 - g) * (1 - g) * 0.6 - 0.4 * (1 - g); // fast out of the hand, steady after
+        const x = ox + cue.from.x + (cue.to.x - cue.from.x) * e;
+        const y = oy + cue.from.y + (cue.to.y - cue.from.y) * e - Math.sin(g * Math.PI) * 4;
+        fx.save();
+        fx.globalAlpha = ghost === 0 ? 1 : 0.28 / ghost;
+        fx.translate(Math.round(x), Math.round(y));
+        fx.rotate(-g * cue.ms / 1000 * 28);
+        fx.drawImage(image, -image.width / 2, -image.height / 2);
+        fx.restore();
+      }
     }
   }
 
@@ -206,10 +280,13 @@ export class PlayController {
     let next: PlayPose;
     const attackFrames = ATTACK_FRAMES[this.attackAnim] ?? 3;
     let casting: PosePhase | null = null;
+    let swipe: { anim: string; progress: number } | null = null;
     if (this.plan) {
       this.castClock += dt;
-      casting = this.phaseAt(this.plan, this.castClock);
-      if (!casting) { this.plan = null; this.mode = 'idle'; this.clock = 0; }
+      if (this.castClock >= planMs(this.plan)) this.plan = null;
+      const pose = this.plan ? this.poseAt(this.plan, this.castClock) : null;
+      casting = pose?.phase ?? null;
+      if (pose) swipe = { anim: pose.phase.anim, progress: pose.run };
     }
 
     if (casting) {
@@ -262,9 +339,12 @@ export class PlayController {
       next = { anim: motion.stand, frame: IDLE_CYCLE[Math.floor(this.clock / IDLE_MS) % IDLE_CYCLE.length]! };
     }
     setPlayPose(next);
-    this.drawEffects();
 
-    this.element.style.transform = `translate(${this.x}px, ${-lift}px) scaleX(${-this.facing})`;
+    // Plain attacks swipe too; a short lunge into each swing keeps the body from feeling pinned.
+    if (!swipe && this.mode === 'attack') swipe = { anim: this.attackAnim, progress: Math.min(1, this.clock / (attackFrames * ATTACK_MS)) };
+    this.drawEffects(swipe);
+    const lunge = swipe ? Math.sin(Math.min(1, swipe.progress) * Math.PI) * canvasWidth * 0.05 * this.facing : 0;
+    this.element.style.transform = `translate(${this.x + lunge}px, ${-lift}px) scaleX(${-this.facing})`;
     this.raf = requestAnimationFrame(this.tick);
   };
 }

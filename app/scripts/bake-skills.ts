@@ -15,6 +15,12 @@ const REFERENCE_ROOT = 'https://javipen.github.io/maplestory-cosmetic-playground
 /** Skill ids as they appear in the reference data/skills/ folder. */
 const SKILL_IDS = ['4201003', '4001003']; // Savage Blow, Lucky Seven
 
+/**
+ * Thrown projectiles are item sprites, not part of the skill data: skill id -> item id
+ * whose icon flies at the target (Lucky Seven throws Subi throwing stars).
+ */
+const PROJECTILE_ITEMS: Record<string, number> = { '4001003': 2070000 };
+
 interface Point {
   x: number;
   y: number;
@@ -55,6 +61,8 @@ export interface BakedSkill {
   masterLevel: number;
   /** Source weapon-type codes this skill is recorded for (e.g. 33 dagger, 47 claw). */
   weaponTypes: string[];
+  /** Local path of the thrown sprite, for skills that throw something. */
+  projectile?: string;
   sequences: Record<string, BakedSkillFrame[]>;
 }
 
@@ -100,12 +108,25 @@ async function main(): Promise<void> {
       if (baked.length) sequences[name] = baked;
     }
     if (!raw.icon?.url) throw new Error(`Skill ${id} has no icon`);
+    let projectile: string | undefined;
+    const item = PROJECTILE_ITEMS[id];
+    if (item) {
+      const dest = join(skillDir, 'projectile.png');
+      if (!existsSync(dest)) {
+        const res = await fetch(`https://maplestory.io/api/GMS/270/item/${item}/icon`, { signal: AbortSignal.timeout(30000), headers: { 'user-agent': 'Mozilla/5.0' } });
+        const bytes = Buffer.from(await res.arrayBuffer());
+        if (!res.ok || bytes.length < 8 || bytes.readUInt32BE(0) !== 0x89504e47) throw new Error(`Projectile icon ${item}: ${res.status}`);
+        writeFileSync(dest, bytes);
+      }
+      projectile = `${publicDir}/projectile.png`;
+    }
     manifest[id] = {
       id,
       name: raw.name,
       icon: `${publicDir}/${await savePng(skillDir, raw.icon.url)}`,
       masterLevel: raw.max_stored_level,
       weaponTypes: raw.weapon_types,
+      projectile,
       sequences,
     };
     console.log(`${raw.name}: ${Object.entries(sequences).map(([k, v]) => `${k}=${v.length}`).join(' ')}`);
