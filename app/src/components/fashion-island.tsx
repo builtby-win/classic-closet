@@ -82,6 +82,20 @@ function shortDate(iso: string): string {
   const [m, d] = iso.split('-').slice(1).map(Number);
   return `${MONTHS[m - 1] ?? ''} ${d}`;
 }
+function daysUntil(isoDate: string): number {
+  const [y, m, d] = isoDate.split('-').map(Number);
+  const now = new Date();
+  const todayUTC = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  const targetUTC = Date.UTC(y, m - 1, d);
+  return Math.round((targetUTC - todayUTC) / (1000 * 60 * 60 * 24));
+}
+function formatCountdown(isoDate: string | null | undefined, attainable?: boolean): string | null {
+  if (attainable === false || !isoDate) return null;
+  const days = daysUntil(isoDate);
+  if (days < 0) return null;
+  if (days === 0) return '<1d';
+  return `${days}d`;
+}
 function equipInfo(item: ResolvedItem | undefined): string | undefined {
   if (item?.group === 'cover-10day') {
     const end = getBanner(CATALOG, item.bannerId)?.end;
@@ -408,9 +422,21 @@ export default function FashionIsland() {
   }, [catGroups, catSec, catRows]);
 
   const openCat = useCallback((sec: SectionId) => {
+    setSettingsOpen(false);
     setCatSec(sec);
     setCatQ('');
   }, []);
+
+  // Light-dismiss the character panel: taps outside it (backdropped by the
+  // scrim below) and the Escape key close it, not just the × button.
+  useEffect(() => {
+    if (!settingsOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSettingsOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [settingsOpen]);
 
   const shareLook = useCallback(async () => {
     const targetUrl = new URL(window.location.href);
@@ -628,10 +654,12 @@ export default function FashionIsland() {
       </div>
       {controller && <GamePad controller={controller} onExit={stopPlay} />}
       {settingsOpen && (
-        <div id="settings">
+        <div className="settings-scrim" aria-hidden="true" onClick={() => setSettingsOpen(false)} />
+      )}
+      {settingsOpen && (
+        <div id="settings" role="dialog" aria-label="My character">
           <header className="settings-head">
             <h2>My character</h2>
-            <button className="settings-close" aria-label="Close" onClick={() => setSettingsOpen(false)}><Icon name="close" /></button>
           </header>
           {unattainableWorn.length > 0 && <div className="worn-alert">
             {unattainableWorn.map(w => `${w.meta.name}: ${formatAttainableInfo(CATALOG, w.id).statusText}`).join(' · ')}
@@ -725,13 +753,27 @@ export default function FashionIsland() {
             const wornFaceRow = slot.id === 'Face'
               ? items.find((row) => row.type === 'item' && faceStyleId(look.face) === faceStyleId(row.id))?.id
               : undefined;
+            const featuredExpiryBanner = items.slice(0, 6).map((row) => {
+              const bannerId = row.type === 'hair' ? CATALOG.styles[row.id]?.bannerId : CATALOG.items[row.id]?.bannerId;
+              return bannerId ? getBanner(CATALOG, bannerId) : null;
+            }).find((b) => b?.end);
+            const expiryDays = featuredExpiryBanner?.end ? daysUntil(featuredExpiryBanner.end) : null;
+            const expiryLabel = expiryDays !== null && expiryDays >= 0
+              ? (expiryDays === 0 ? 'ends today' : `${expiryDays}d left`)
+              : null;
             return (
               <div
                 key={slot.id}
                 role="listitem"
                 className={'slot-row' + (catSec === slot.id ? ' on' : '')}
               >
-                <span className="slot-label">{slot.label}</span>
+                <div className="slot-head">
+                  <div className="slot-title-wrap">
+                    <span className="slot-label">{slot.label}</span>
+                    {expiryLabel && <span className="slot-expiry">· 🕒 {expiryLabel}</span>}
+                  </div>
+                  <button className="slot-seeall" aria-label={`See all ${slot.label}`} onClick={() => { openCat(slot.id); setCatQ(q); }}>See all →</button>
+                </div>
                 {(slot.id === 'Hair' || slot.id === 'Face') && <div className="rail-colors" role="group" aria-label={slot.id === 'Hair' ? 'Hair color' : 'Eye color'}>
                   {(slot.id === 'Hair' ? HAIR_COLORS : EYE_COLORS).map((color, i) => <ColorSwatch key={color} color={color} dot={(slot.id === 'Hair' ? HAIR_DOTS : EYE_DOTS)[i]} selected={(slot.id === 'Hair' ? look.hairCol : faceColorIndex(look.face)) === i} onClick={() => slot.id === 'Hair' ? patch({ hair: Math.floor(look.hair / 10) * 10 + i, hairCol: i }) : patch({ face: faceVariantId(look.sex, faceStyleId(look.face), i) })} />)}
                 </div>}
@@ -774,7 +816,6 @@ export default function FashionIsland() {
                       />
                     );
                   })}
-                  <button className="slot-seeall" aria-label={`See all ${slot.label}`} onClick={() => { openCat(slot.id); setCatQ(q); }}>See all →</button>
                 </div>
               </div>
             );
@@ -1089,6 +1130,7 @@ function Tile(props: {
     : banner?.end
       ? `${notAttainable ? 'Expired' : 'Available until'} ${banner.end}`
       : notAttainable ? 'Not currently attainable' : undefined;
+  const countdown = formatCountdown(banner?.end, props.attainable);
   return (
     <button type="button" aria-pressed={props.on} aria-label={props.mismatched && props.mismatchJob ? `${props.label} (switches class to ${props.mismatchJob})` : props.label || undefined} title={props.mismatched && props.mismatchJob ? `Off-job · tap switches class to ${props.mismatchJob}` : undefined} className={'tile' + (props.mini ? ' mini' : '') + (props.on ? ' on' : '') + (notAttainable ? ' not-attainable' : '') + (props.mismatched ? ' mismatch' : '')} onClick={props.onClick}>
       <div className="tile-preview">
@@ -1104,7 +1146,11 @@ function Tile(props: {
             )}
           </div>
           <span className={'tile-badge tile-expiration' + (notAttainable ? ' expired' : '')} role="img" aria-label={expiration} title={[expiration, props.lastText].filter(Boolean).join(' · ')}>
-            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="8" cy="8" r="6" /><path d="M8 4v4l3 2" strokeLinecap="round" /></svg>
+            {notAttainable || !countdown ? (
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="8" cy="8" r="6" /><path d="M8 4v4l3 2" strokeLinecap="round" /></svg>
+            ) : (
+              countdown
+            )}
           </span>
         </div>
       )}

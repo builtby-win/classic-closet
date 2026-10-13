@@ -159,6 +159,12 @@
 .name-tag.empty { color: var(--dim); font-weight: 500; }
 
 /* ── Character panel ── */
+.settings-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 9;
+  background: transparent;
+}
 #settings {
   position: fixed;
   top: 60px;
@@ -178,7 +184,6 @@
 }
 .settings-head { display: flex; align-items: center; justify-content: space-between; padding: 0 2px; }
 .settings-head h2 { font-size: 16px; font-weight: 650; }
-.settings-close { width: 30px; height: 30px; border: 0; border-radius: 50%; background: var(--surface-2); color: var(--dim); cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .set-card { display: flex; flex-direction: column; gap: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,0.02); }
 .char-editor { display: flex; flex-direction: column; gap: 12px; }
 .name-input { flex: 1; min-width: 0; min-height: 36px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); color: var(--txt); font-size: 16px; }
@@ -562,22 +567,19 @@
 .color-swatch { width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--line); cursor: pointer; padding: 0; flex: none; }
 .color-swatch:active { transform: scale(0.9); }
 .color-swatch.on { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-.tile-badges { position: absolute; top: 0; left: 0; display: flex; justify-content: space-between; align-items: center; width: 100%; min-height: 18px; gap: 4px; }
+.tile-badges { position: absolute; top: 2px; left: 2px; right: 2px; display: flex; justify-content: space-between; align-items: flex-start; pointer-events: none; z-index: 2; }
 .tile-methods { display: flex; gap: 3px; }
 .tile .tile-badge { display: flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 5px; background: var(--bg); color: var(--dim); border: 1px solid var(--line); }
 .tile-badge svg { width: 12px; height: 12px; flex: none; }
-.tile.on::after { content: ''; position: absolute; top: 4px; right: 4px; width: 16px; height: 16px; border-radius: 50%; background: var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m3.5 8.5 3 3 6-7'/%3E%3C/svg%3E") center/10px no-repeat; box-shadow: 0 1px 2px rgba(0,0,0,0.3); z-index: 1; pointer-events: none; }
-.tile.mini.on::after { width: 12px; height: 12px; top: 2px; right: 2px; background-size: 8px; }
-/* Worn limited tile: the check keeps its corner, the clock drops below it and
- * turns outline so the two amber marks stay distinct. */
-.tile.on .tile-expiration { position: absolute; top: 20px; right: 0; background: var(--bg); color: #ffb020; }
-.tile.on .tile-expiration.expired { background: var(--bg); color: #ff8a80; }
-.tile.mini.on .tile-expiration { top: 14px; }
-.tile .tile-expiration { background: #ffb020; border-color: #ffb020; color: #1a1200; }
-.tile .tile-expiration.expired { background: #ff8a80; border-color: #ff8a80; color: #2a0500; }
-.tile-expiration svg { width: 14px; height: 14px; }
+.tile.on::after { content: ''; position: absolute; bottom: 4px; right: 4px; width: 16px; height: 16px; border-radius: 50%; background: var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m3.5 8.5 3 3 6-7'/%3E%3C/svg%3E") center/10px no-repeat; box-shadow: 0 1px 2px rgba(0,0,0,0.3); z-index: 3; pointer-events: none; }
+.tile.mini.on::after { width: 12px; height: 12px; bottom: 2px; right: 2px; background-size: 8px; }
+.tile .tile-expiration, .tile.on .tile-expiration { background: #ffb020; border-color: #ffb020; color: #1a1200 !important; width: auto; min-width: 16px; height: 16px; padding: 0 4px; font-size: 8.5px; font-weight: 700; letter-spacing: -0.01em; line-height: 16px; border-radius: 4px; box-sizing: border-box; white-space: nowrap; }
+.tile .tile-expiration.expired, .tile.on .tile-expiration.expired { width: 18px; height: 18px; padding: 0; background: #ff8a80; border-color: #ff8a80; color: #2a0500 !important; }
+.tile.mini .tile-expiration, .tile.mini.on .tile-expiration { height: 13px; min-width: 15px; padding: 0 3px; font-size: 8px; font-weight: 700; border-radius: 3px; line-height: 13px; color: #1a1200 !important; }
+.tile.mini .tile-expiration.expired, .tile.mini.on .tile-expiration.expired { width: 14px; height: 14px; padding: 0; color: #2a0500 !important; }
+.tile-expiration svg { width: 12px; height: 12px; }
 .tile.mini .tile-expiration svg { width: 10px; height: 10px; }
-.tile-rate-badge { position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%); font-size: 11px; font-weight: 800; letter-spacing: 0.02em; color: #fff; background: rgba(0,0,0,0.72); border: 1px solid rgba(255,255,255,0.22); border-radius: 999px; padding: 2px 8px; line-height: 1.5; white-space: nowrap; pointer-events: none; box-shadow: 0 1px 4px rgba(0,0,0,0.45); }
+.tile-rate-badge, .tile.on .tile-rate-badge { position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%); font-size: 11px; font-weight: 800; letter-spacing: 0.02em; color: #fff; background: rgba(0,0,0,0.72); border: 1px solid rgba(255,255,255,0.22); border-radius: 999px; padding: 2px 8px; line-height: 1.5; white-space: nowrap; pointer-events: none; box-shadow: 0 1px 4px rgba(0,0,0,0.45); }
 
 /* ── Category page ── */
 #catpage { display: none; flex: 1; flex-direction: column; overflow: hidden; min-height: 0; }
@@ -700,7 +702,8 @@
   #rail.welcoming { transform: translateY(max(0px, calc(100% - 340px))); }
   #welcome { position: absolute; inset: 0; z-index: 5; }
   /* The character stands on the resting sheet and rides it up with a little hop. */
-  #stage { z-index: 6; }
+  #stage { z-index: 0; }
+  #stage.welcoming, #stage.leaving { z-index: 6; }
   #canvas { transition: transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1); }
   #stage.welcoming #canvas { transform: translateY(var(--ride, 0px)); }
   #stage.leaving #canvas { animation: char-hop 0.5s ease-out; }
@@ -732,13 +735,18 @@
 .randomizer-slots input { accent-color: var(--accent); width: 16px; height: 16px; }
 #rail > .setrow { padding: 0 16px 8px; font-size: 12px; color: var(--dim); }
 
-/* Compact quick rows with See all as the final scrolling tile. */
+/* Compact quick rows with See all in header */
 .slot-row { display: block; padding: 8px 10px; }
-.slot-label { display: block; min-width: 0; margin-bottom: 4px; font-size: 11px; }
-.slot-tiles { min-width: 0; gap: 6px; }
+.slot-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.slot-title-wrap { display: flex; align-items: baseline; gap: 4px; }
+.slot-label { font-size: 11px; font-weight: 600; color: var(--dim); min-width: 0; }
+.slot-expiry { font-size: 11px; font-weight: 600; color: #ffb020; }
+.slot-seeall { font-size: 11px; font-weight: 600; color: var(--accent); background: none; border: none; cursor: pointer; padding: 2px 4px; border-radius: 4px; line-height: 1; touch-action: manipulation; }
+.slot-seeall:hover { background: var(--accent-soft); }
+.slot-tiles { min-width: 0; gap: 6px; display: flex; overflow-x: auto; scrollbar-width: none; }
+.slot-tiles::-webkit-scrollbar { display: none; }
 .slot-tiles .tile.mini { width: 48px; height: 48px; touch-action: manipulation; }
 .slot-tiles .tile.mini .tile-preview img { width: 36px; height: 36px; }
-.slot-seeall { width: 48px; min-height: 48px; padding: 4px; border: 1px solid var(--line); border-radius: 8px; font-size: 11px; white-space: normal; touch-action: manipulation; }
 .slot-tiles .tile.on { animation: none; }
 
 #rail { position: relative; display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
@@ -765,8 +773,6 @@
 #drawer-grid { overflow: visible; flex: none; }
 @media (min-width: 900px) {
   #rail { flex: none; }
-  /* Desktop rail is narrow; wrap quick tiles so See all is never clipped. */
-  .slot-tiles { flex-wrap: wrap; overflow-x: visible; }
 }
 
 .banner-essentials { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 12px; }
