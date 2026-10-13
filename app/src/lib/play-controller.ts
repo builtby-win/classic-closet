@@ -85,16 +85,23 @@ const IDLE_CYCLE = [0, 1, 2, 1];
  * Weapon swipe: a fading crescent for swings, a streak for stabs. Drawn in the left-facing frame
  * around the torso (ox, oy is the character origin on the fx canvas); the preview's flip handles facing.
  */
-function drawSwipe(fx: CanvasRenderingContext2D, anim: string, progress: number, ox: number, oy: number): void {
+export const MASTERY_TIERS = [
+  { name: 'Blue', core: '235, 245, 255', glow: 'rgba(150, 200, 255, 0.9)', dot: '#6fb1ff', size: 1 },
+  { name: 'Purple', core: '244, 230, 255', glow: 'rgba(190, 120, 255, 0.95)', dot: '#b57bff', size: 1.12 },
+  { name: 'Red', core: '255, 238, 232', glow: 'rgba(255, 90, 70, 0.95)', dot: '#ff5e4d', size: 1.25 },
+] as const;
+
+function drawSwipe(fx: CanvasRenderingContext2D, anim: string, progress: number, ox: number, oy: number, tier: number): void {
+  const look = MASTERY_TIERS[tier] ?? MASTERY_TIERS[0];
   const p = Math.max(0, Math.min(1, progress));
   const fade = p > 0.8 ? (1 - p) / 0.2 : 1;
   if (fade <= 0 || p < 0.05) return;
-  const big = /T1|P1/.test(anim) ? 1.25 : 1;
+  const big = (/T1|P1/.test(anim) ? 1.25 : 1) * look.size;
   const cx = ox - 4;
   const cy = oy - 34;
   fx.save();
   fx.lineCap = 'round';
-  fx.shadowColor = 'rgba(160, 205, 255, 0.9)';
+  fx.shadowColor = look.glow;
   fx.shadowBlur = 8;
   if (anim.startsWith('swing')) {
     const head = (270 - 200 * p) * Math.PI / 180; // overhead, down through the front
@@ -102,8 +109,8 @@ function drawSwipe(fx: CanvasRenderingContext2D, anim: string, progress: number,
     const steps = 14;
     for (let i = 0; i < steps; i++) {
       const k = i / steps;
-      fx.strokeStyle = `rgba(235, 245, 255, ${0.85 * (1 - k) ** 1.4 * fade})`;
-      fx.lineWidth = 1.5 + 7 * (1 - k);
+      fx.strokeStyle = `rgba(${look.core}, ${0.85 * (1 - k) ** 1.4 * fade})`;
+      fx.lineWidth = (1.5 + 7 * (1 - k)) * look.size;
       fx.beginPath();
       fx.arc(cx, cy, 40 * big, head + k * tail, head + (k + 1 / steps) * tail + 0.02);
       fx.stroke();
@@ -113,8 +120,8 @@ function drawSwipe(fx: CanvasRenderingContext2D, anim: string, progress: number,
     const steps = 10;
     for (let i = 0; i < steps; i++) {
       const k = i / steps;
-      fx.strokeStyle = `rgba(235, 245, 255, ${0.8 * (1 - k) * fade})`;
-      fx.lineWidth = 1 + 4.5 * (1 - k);
+      fx.strokeStyle = `rgba(${look.core}, ${0.8 * (1 - k) * fade})`;
+      fx.lineWidth = (1 + 4.5 * (1 - k)) * look.size;
       fx.beginPath();
       fx.moveTo(cx - reach + k * 46 * big, cy + 2);
       fx.lineTo(cx - reach + (k + 1 / steps) * 46 * big, cy + 2);
@@ -142,6 +149,7 @@ export class PlayController {
   private attackQueued = false;
   private skillQueued = false;
   private skillId = '4201003';
+  private mastery = 0;
   private plan: CastPlan | null = null;
   private castClock = 0;
   private readonly fx: CanvasRenderingContext2D | null;
@@ -156,6 +164,11 @@ export class PlayController {
     void loadSkills().then((skills) => Object.values(skills).forEach((skill) =>
       [...Object.values(skill.sequences).flat().map((frame) => frame.image), ...(skill.projectile ? [skill.projectile] : [])]
         .forEach((src) => void fxImage(src).catch(() => undefined))));
+  }
+
+  /** Swipe tier: index into MASTERY_TIERS. */
+  setMastery(tier: number): void {
+    this.mastery = tier;
   }
 
   selectSkill(id: string): void {
@@ -225,7 +238,7 @@ export class PlayController {
     this.fxDirty = true;
     const ox = FX_PAD + origin.x;
     const oy = FX_PAD + origin.y;
-    if (swipe) drawSwipe(fx, swipe.anim, swipe.progress, ox, oy);
+    if (swipe) drawSwipe(fx, swipe.anim, swipe.progress, ox, oy, this.mastery);
     if (!plan) return;
     for (const cue of plan.effects) {
       const hit = frameAt(cue.frames, this.castClock - cue.at);
