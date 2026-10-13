@@ -39,7 +39,7 @@ import {
 import catalogData from '../data/catalog.json';
 import LayeredCharacterCanvas from './layered-character-canvas';
 import GamePad from './game-pad';
-import { PlayController, PLAY_POSES } from '../lib/play-controller';
+import { PlayController, PLAY_POSES, SPRITE_CANVAS } from '../lib/play-controller';
 import { warmPoses } from '../lib/layered-client-renderer';
 import './fashion.css';
 
@@ -59,7 +59,9 @@ const HAIR_DOTS = ['#23232a', '#a83a32', '#d97b2e', '#e3c46a', '#4a8f4d', '#4a6f
 const EYE_DOTS = ['#24242b', '#4a82c5', '#c94747', '#4a9459', '#826044', '#48aeb6', '#8050aa', '#8c3440', '#e8e8e8'];
 const SKIN_TONES: Record<number, string> = { 2000: '#ffddaa', 2001: '#bb9966', 2002: '#7a4a22', 2003: '#ffeecc', 2004: '#ccccdd', 2005: '#eeeeee', 2006: '#ffdddd' };
 const AVATAR_PX = 44;
-const AVATAR_CROP = { x: 34, y: 20, size: 60 };
+// Head-and-shoulders crop, in the centered 128px box of the sprite canvas.
+const AVATAR_INSET = (SPRITE_CANVAS - 128) / 2;
+const AVATAR_CROP = { x: AVATAR_INSET + 34, y: AVATAR_INSET + 20, size: 60 };
 const ANIMS = ['stand1', 'stand2', 'alert', 'jump'];
 const EQUIP_SECTIONS = [
   { id: 'Hat', label: 'Hats' },
@@ -179,8 +181,7 @@ export default function FashionIsland() {
     if (!src || !ctx) return;
     ctx.clearRect(0, 0, AVATAR_PX, AVATAR_PX);
     ctx.imageSmoothingEnabled = false;
-    // Head-and-shoulders crop of the 128px sprite canvas.
-    ctx.drawImage(src, AVATAR_CROP.x, AVATAR_CROP.y, AVATAR_CROP.size, AVATAR_CROP.size, 0, 0, AVATAR_PX, AVATAR_PX);
+        ctx.drawImage(src, AVATAR_CROP.x, AVATAR_CROP.y, AVATAR_CROP.size, AVATAR_CROP.size, 0, 0, AVATAR_PX, AVATAR_PX);
   }, []);
   useEffect(() => { drawAvatar(); }, [settingsOpen, drawAvatar]);
   useEffect(() => { if (firstVisit.current) setWelcomeOpen(true); }, []);

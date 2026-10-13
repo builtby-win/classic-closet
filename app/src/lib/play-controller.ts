@@ -25,16 +25,19 @@ function setPlayPose(next: PlayPose | null): void {
   listeners.forEach((listener) => listener());
 }
 
-let origin = { x: 64, y: 96 };
+let origin = { x: 128, y: 160 };
 
-/** Where the character's source origin sits on the 128px preview canvas (set by the canvas after each draw). */
+/** Where the character's source origin sits on the sprite canvas (set by the canvas after each draw). */
 export function setPlayOrigin(next: { x: number; y: number }): void {
   origin = next;
 }
 
 export type PlayInput = 'left' | 'right' | 'down' | 'attack' | 'jump' | 'skill';
 
-const FX_PAD = 128; // the fx canvas extends one sprite canvas past each edge
+/** Sprite canvas edge in source pixels: the 128px character box plus room so wide auras and effects aren't cropped. */
+export const SPRITE_CANVAS = 256;
+const FX_SIZE = SPRITE_CANVAS * 2;
+const FX_PAD = (FX_SIZE - SPRITE_CANVAS) / 2; // the fx canvas extends this far past the sprite canvas on each side
 const imageCache = new Map<string, Promise<HTMLImageElement>>();
 function fxImage(src: string): Promise<HTMLImageElement> {
   let image = imageCache.get(src);
@@ -123,7 +126,7 @@ export class PlayController {
     this.held.clear();
     setPlayPose(null);
     this.element.style.transform = '';
-    this.fx?.clearRect(0, 0, 384, 384);
+    this.fx?.clearRect(0, 0, FX_SIZE, FX_SIZE);
   }
 
   set(input: PlayInput, down: boolean): void {
@@ -160,10 +163,10 @@ export class PlayController {
     const { fx, plan } = this;
     if (!fx) return;
     if (!plan) {
-      if (this.fxDirty) { fx.clearRect(0, 0, 384, 384); this.fxDirty = false; }
+      if (this.fxDirty) { fx.clearRect(0, 0, FX_SIZE, FX_SIZE); this.fxDirty = false; }
       return;
     }
-    fx.clearRect(0, 0, 384, 384);
+    fx.clearRect(0, 0, FX_SIZE, FX_SIZE);
     this.fxDirty = true;
     for (const cue of plan.effects) {
       const hit = frameAt(cue.frames, this.castClock - cue.at);

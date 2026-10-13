@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import type { Look } from '../lib/fashion';
 import { renderLayeredCharacter } from '../lib/layered-client-renderer';
-import { getPlayPose, setPlayOrigin, subscribePlayPose } from '../lib/play-controller';
+import { getPlayPose, setPlayOrigin, SPRITE_CANVAS, subscribePlayPose } from '../lib/play-controller';
 
 interface LayeredCharacterCanvasProps {
   look: Look;
@@ -55,9 +55,9 @@ export default function LayeredCharacterCanvas({ look: baseLook, onRendered }: L
 
   return (
     <div id="preview" role="img" aria-label="Character preview">
-      <canvas ref={canvasRef} className="preview-local" width={128} height={128} aria-hidden="true" />
-      {/* Skill effects: 3x the sprite canvas so casts can reach past the character; see play-controller. */}
-      <canvas className="preview-fx" width={384} height={384} aria-hidden="true" />
+      <canvas ref={canvasRef} className="preview-local" width={SPRITE_CANVAS} height={SPRITE_CANVAS} aria-hidden="true" />
+      {/* Skill effects: twice the sprite canvas so casts can reach far past the character; see play-controller. */}
+      <canvas className="preview-fx" width={SPRITE_CANVAS * 2} height={SPRITE_CANVAS * 2} aria-hidden="true" />
     </div>
   );
 }
