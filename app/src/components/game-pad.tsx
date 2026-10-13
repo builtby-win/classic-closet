@@ -98,7 +98,7 @@ export default function GamePad({ controller, onExit }: { controller: PlayContro
           swipeY.current = null;
         }}
       ><span /><small>Closet</small></button>
-      <button type="button" className="pad-mastery" onClick={() => setMastery((mastery + 1) % MASTERY_TIERS.length)} aria-label={`Weapon swipe mastery ${mastery + 1}: ${tier.name}. Tap to change`}>
+      <button type="button" className="pad-mastery" onClick={() => setMastery((current) => (current + 1) % MASTERY_TIERS.length)} aria-label={`Weapon swipe mastery ${mastery + 1}: ${tier.name}. Tap to change`}>
         <i style={{ background: tier.dot }} />Mastery {mastery + 1}
       </button>
       <div className="pad-row">
