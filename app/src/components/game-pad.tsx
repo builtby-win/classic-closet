@@ -17,11 +17,12 @@ function isTyping(target: EventTarget | null): boolean {
   return target instanceof HTMLElement && /^(INPUT|SELECT|TEXTAREA)$/.test(target.tagName);
 }
 
-function PadButton({ input, controller, className, label, children }: {
+function PadButton({ input, controller, className, label, hotkey, children }: {
   input: PlayInput;
   controller: PlayController;
   className: string;
   label: string;
+  hotkey?: string;
   children: ReactNode;
 }) {
   const down = (event: ReactPointerEvent<HTMLButtonElement>) => {
@@ -39,7 +40,7 @@ function PadButton({ input, controller, className, label, children }: {
       onPointerCancel={up}
       onLostPointerCapture={up}
       onContextMenu={(event) => event.preventDefault()}
-    >{children}</button>
+    >{children}{hotkey && <kbd className="pad-key" aria-hidden="true">{hotkey}</kbd>}</button>
   );
 }
 
@@ -109,16 +110,16 @@ export default function GamePad({ controller, onExit }: { controller: PlayContro
         </div>
         <div className="pad-actions">
           {skill && <div className="pad-skill">
-            <PadButton input="skill" controller={controller} className="pad-cast" label={`Cast ${skill.name}`}>
+            <PadButton input="skill" controller={controller} className="pad-cast" label={`Cast ${skill.name}`} hotkey="C">
               <img src={skill.icon} alt="" draggable={false} />
             </PadButton>
             {skills.length > 1 && <button type="button" className="pad-swap" aria-label={`Skill: ${skill.name}. Tap to switch`} title={skill.name} onClick={() => setPicked((picked + 1) % skills.length)}>⇄</button>}
           </div>}
-          <PadButton input="jump" controller={controller} className="pad-jump" label="Jump">Jump</PadButton>
-          <PadButton input="attack" controller={controller} className="pad-attack" label="Attack">Attack</PadButton>
+          <PadButton input="jump" controller={controller} className="pad-jump" label="Jump" hotkey="Space">Jump</PadButton>
+          <PadButton input="attack" controller={controller} className="pad-attack" label="Attack" hotkey="Z">Attack</PadButton>
         </div>
       </div>
-      <p className="pad-hint">←/→ walk · ↓ duck · Space jump · Z attack · C skill · Esc closet</p>
+      <p className="pad-hint">←/→ or A/D walk · ↓ duck · Space jump · Z attack · C skill · Esc closet</p>
     </div>
   );
 }
