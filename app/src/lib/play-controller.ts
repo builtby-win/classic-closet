@@ -1,7 +1,7 @@
 import { weaponMotion } from './fashion';
 import { motionActions } from './layered-client-renderer';
 import { afterimageSetFor, loadAfterimage, swipeActions, swipeImageUrls, type AfterimageSet } from './afterimage';
-import { castPlan, loadSkills, planMs, type BakedSkillFrame, type CastPlan, type PosePhase } from './skills';
+import { ATTACK_FRAMES, castPlan, loadSkills, planMs, type BakedSkillFrame, type CastPlan, type PosePhase } from './skills';
 
 /** Pose override read by the preview canvas while play mode is running. */
 export interface PlayPose {
@@ -74,12 +74,8 @@ interface Swing {
 }
 
 /** Every melee pose a cash weapon might ship; filtered by what the item has. */
-const CASH_ATTACKS = ['swingO1', 'stabO1', 'swingT1', 'stabT1', 'swingP1'];
+const CASH_ATTACKS = Object.keys(ATTACK_FRAMES).filter((anim) => !anim.startsWith('shoot'));
 
-/** Frame counts of the baked play poses (base.json). */
-const ATTACK_FRAMES: Record<string, number> = {
-  swingO1: 3, stabO1: 2, swingT1: 3, stabT1: 3, swingP1: 3, shoot1: 3, shoot2: 5,
-};
 export const PLAY_POSES = [
   { anim: 'walk1', frames: 4 }, { anim: 'walk2', frames: 4 }, { anim: 'prone', frames: 1 }, { anim: 'jump', frames: 1 },
   ...Object.entries(ATTACK_FRAMES).map(([anim, frames]) => ({ anim, frames })),

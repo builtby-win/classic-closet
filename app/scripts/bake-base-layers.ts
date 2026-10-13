@@ -23,7 +23,9 @@ const SKIN_IDS = [2000, 2001, 2002, 2003, 2004, 2005, 2006];
 const POSES = [
   'stand1', 'stand2', 'alert', 'jump',
   // Play mode: walk, duck, and one attack pose per weapon family.
-  'walk1', 'walk2', 'prone', 'swingO1', 'stabO1', 'swingT1', 'stabT1', 'swingP1', 'shoot1', 'shoot2',
+  'walk1', 'walk2', 'prone', 'shoot1', 'shoot2',
+  'swingO1', 'swingO2', 'swingO3', 'stabO1', 'stabO2',
+  'swingT1', 'swingT2', 'swingT3', 'stabT1', 'stabT2', 'swingP1', 'swingP2',
 ];
 
 export interface BasePoint {
@@ -71,10 +73,18 @@ interface ReferenceBase {
   poses: Record<string, Record<string, ReferencePose>>;
 }
 
-async function fetchBytes(url: string): Promise<Buffer> {
-  const res = await fetch(url, { signal: AbortSignal.timeout(30000) });
-  if (!res.ok) throw new Error(`GET ${url} -> ${res.status}`);
-  return Buffer.from(await res.arrayBuffer());
+async function fetchBytes(url: string, tries = 5): Promise<Buffer> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(30000) });
+      if (!res.ok) throw new Error(`GET ${url} -> ${res.status}`);
+      return Buffer.from(await res.arrayBuffer());
+    } catch (error) {
+      // GitHub Pages sheds load with the odd 503; back off and retry before failing the bake.
+      if (attempt >= tries) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
+    }
+  }
 }
 
 export async function bakeBaseBodies(): Promise<void> {

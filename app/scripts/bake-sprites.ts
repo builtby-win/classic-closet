@@ -71,7 +71,13 @@ async function fetchItemData(id: number, src?: 'GMS' | 'OSMS', sub?: string, tri
 
 const BAKED_ACTIONS = new Set(['stand1', 'stand2', 'alert', 'jump', 'default']);
 /** Play-mode poses live in `<id>.motion.json`, fetched only when the pad opens. */
-const MOTION_ACTIONS = new Set(['walk1', 'walk2', 'prone', 'swingO1', 'stabO1', 'swingT1', 'stabT1', 'swingP1', 'shoot1', 'shoot2']);
+const MOTION_ACTIONS = new Set([
+  'walk1', 'walk2', 'prone', 'shoot1', 'shoot2',
+  'swingO1', 'swingO2', 'swingO3', 'stabO1', 'stabO2',
+  'swingT1', 'swingT2', 'swingT3', 'stabT1', 'stabT2', 'swingP1', 'swingP2',
+]);
+/** Bumped when MOTION_ACTIONS grows so existing motion files are re-fetched once. */
+const MOTION_VERSION = 2;
 
 function extractFrames(raw: any, actions: Set<string> = BAKED_ACTIONS): Record<string, any[]> {
   const frames: Record<string, any[]> = {};
@@ -139,11 +145,12 @@ async function backfillJump(id: number, meta: any): Promise<void> {
 /** Walk/duck/attack frames, kept out of the main item file so the editor stays light. */
 async function bakeMotion(id: number, meta: any): Promise<void> {
   const dest = join(ITEMS_DIR, `${id}.motion.json`);
-  if (existsSync(dest) || !existsSync(join(ITEMS_DIR, `${id}.json`))) return;
+  if (!existsSync(join(ITEMS_DIR, `${id}.json`))) return;
+  if (existsSync(dest) && JSON.parse(readFileSync(dest, 'utf8')).v >= MOTION_VERSION) return;
   const raw = await fetchItemData(id, meta?.src, meta?.sub);
   if (!raw?.frameBooks) return;
   // Written even when empty so reruns skip items (e.g. cash weapons) with no motion.
-  writeFileSync(dest, JSON.stringify({ id, frames: extractFrames(raw, MOTION_ACTIONS) }));
+  writeFileSync(dest, JSON.stringify({ id, v: MOTION_VERSION, frames: extractFrames(raw, MOTION_ACTIONS) }));
 }
 
 // Concurrency pool with progress

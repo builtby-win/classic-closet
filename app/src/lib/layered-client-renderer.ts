@@ -1,5 +1,6 @@
 import { CLASSIC_ZMAP_ORDER, composeLayers, drawComposition, type Point, type SourceLayer } from './layered-renderer';
 import type { Look } from './fashion';
+import { ATTACK_FRAMES } from './skills';
 
 interface BaseEffect {
   part: string;
@@ -34,7 +35,7 @@ interface ItemRecord {
 }
 
 /** Poses baked into `<id>.motion.json` (play mode) instead of the main item file. */
-export const MOTION_ANIMS = new Set(['walk1', 'walk2', 'prone', 'swingO1', 'stabO1', 'swingT1', 'stabT1', 'swingP1', 'shoot1', 'shoot2']);
+export const MOTION_ANIMS = new Set(['walk1', 'walk2', 'prone', ...Object.keys(ATTACK_FRAMES)]);
 
 const records = new Map<number, Promise<ItemRecord | null>>();
 const motionRecords = new Map<number, Promise<ItemRecord | null>>();

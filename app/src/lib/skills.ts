@@ -57,8 +57,11 @@ export function sequenceMs(frames: BakedSkillFrame[]): number {
   return frames.reduce((total, frame) => total + frame.delay, 0);
 }
 
-const ATTACK_FRAMES: Record<string, number> = {
-  swingO1: 3, stabO1: 2, swingT1: 3, stabT1: 3, swingP1: 3, shoot1: 3, shoot2: 5,
+/** Frame counts of the baked attack poses (base.json). */
+export const ATTACK_FRAMES: Record<string, number> = {
+  swingO1: 3, swingO2: 3, swingO3: 3, stabO1: 2, stabO2: 2,
+  swingT1: 3, swingT2: 3, swingT3: 3, stabT1: 3, stabT2: 3, swingP1: 3, swingP2: 3,
+  shoot1: 3, shoot2: 5,
 };
 
 function swing(anim: string, ms: number): PosePhase[] {

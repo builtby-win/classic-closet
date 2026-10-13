@@ -125,23 +125,23 @@ const WEAPON_SUBS: Record<string, true> = {
  *  bows use the regular stand1 idle stance.
  */
 const WEAPON_STANCE: Record<string, { stand: string; walk: string; attack: string; attacks: string[] }> = {
-  'One-Handed Sword': { stand: 'stand1', walk: 'walk1', attack: 'swingO1', attacks: ['swingO1', 'stabO1'] },
-  'One-Handed Axe': { stand: 'stand1', walk: 'walk1', attack: 'swingO1', attacks: ['swingO1', 'stabO1'] },
-  'One-Handed Blunt Weapon': { stand: 'stand1', walk: 'walk1', attack: 'swingO1', attacks: ['swingO1', 'stabO1'] },
-  Dagger: { stand: 'stand1', walk: 'walk1', attack: 'stabO1', attacks: ['swingO1', 'stabO1'] },
-  Claw: { stand: 'stand1', walk: 'walk1', attack: 'swingO1', attacks: ['swingO1'] },
-  Wand: { stand: 'stand1', walk: 'walk1', attack: 'swingO1', attacks: ['swingO1', 'stabO1'] },
-  Staff: { stand: 'stand1', walk: 'walk1', attack: 'swingO1', attacks: ['swingO1', 'stabO1'] },
-  'Two-Handed Sword': { stand: 'stand2', walk: 'walk1', attack: 'swingT1', attacks: ['swingT1', 'stabO1'] },
-  'Two-Handed Axe': { stand: 'stand2', walk: 'walk2', attack: 'swingT1', attacks: ['swingT1', 'stabO1'] },
-  'Two-Handed Blunt': { stand: 'stand2', walk: 'walk2', attack: 'swingT1', attacks: ['swingT1', 'stabO1'] },
-  Spear: { stand: 'stand2', walk: 'walk2', attack: 'stabT1', attacks: ['swingP1', 'stabT1'] },
-  'Pole Arm': { stand: 'stand2', walk: 'walk2', attack: 'swingP1', attacks: ['swingP1', 'stabT1'] },
+  'One-Handed Sword': { stand: 'stand1', walk: 'walk1', attack: 'swingO1', attacks: ['swingO1', 'swingO2', 'swingO3', 'stabO1', 'stabO2'] },
+  'One-Handed Axe': { stand: 'stand1', walk: 'walk1', attack: 'swingO1', attacks: ['swingO1', 'swingO2', 'swingO3', 'stabO1', 'stabO2'] },
+  'One-Handed Blunt Weapon': { stand: 'stand1', walk: 'walk1', attack: 'swingO1', attacks: ['swingO1', 'swingO2', 'swingO3', 'stabO1', 'stabO2'] },
+  Dagger: { stand: 'stand1', walk: 'walk1', attack: 'stabO1', attacks: ['swingO1', 'swingO2', 'swingO3', 'stabO1', 'stabO2'] },
+  Claw: { stand: 'stand1', walk: 'walk1', attack: 'swingO1', attacks: ['swingO1', 'swingO2', 'swingO3'] },
+  Wand: { stand: 'stand1', walk: 'walk1', attack: 'swingO1', attacks: ['swingO1', 'swingO2', 'swingO3', 'stabO1', 'stabO2'] },
+  Staff: { stand: 'stand1', walk: 'walk1', attack: 'swingO1', attacks: ['swingO1', 'swingO2', 'swingO3', 'stabO1', 'stabO2'] },
+  'Two-Handed Sword': { stand: 'stand2', walk: 'walk1', attack: 'swingT1', attacks: ['swingT1', 'swingT2', 'swingT3', 'stabO1', 'stabO2'] },
+  'Two-Handed Axe': { stand: 'stand2', walk: 'walk2', attack: 'swingT1', attacks: ['swingT1', 'swingT2', 'swingT3', 'stabO1', 'stabO2'] },
+  'Two-Handed Blunt': { stand: 'stand2', walk: 'walk2', attack: 'swingT1', attacks: ['swingT1', 'swingT2', 'swingT3', 'stabO1', 'stabO2'] },
+  Spear: { stand: 'stand2', walk: 'walk2', attack: 'stabT1', attacks: ['swingT2', 'swingP1', 'swingP2', 'stabT1', 'stabT2'] },
+  'Pole Arm': { stand: 'stand2', walk: 'walk2', attack: 'swingP1', attacks: ['swingT2', 'swingP1', 'swingP2', 'stabT1', 'stabT2'] },
   Crossbow: { stand: 'stand2', walk: 'walk2', attack: 'shoot2', attacks: ['shoot2'] },
   Bow: { stand: 'stand1', walk: 'walk1', attack: 'shoot1', attacks: ['shoot1'] },
   // NX cash weapons only ship stand1 frames (all four baked items include
   // them), so equipping one from a 2H stance steers back to stand1.
-  Cash: { stand: 'stand1', walk: 'walk1', attack: 'swingO1', attacks: ['swingO1'] },
+  Cash: { stand: 'stand1', walk: 'walk1', attack: 'swingO1', attacks: ['swingO1', 'swingO2', 'swingO3', 'stabO1', 'stabO2'] },
 };
 
 /** Poses play mode uses for the worn weapon (`attack` is the signature one, `attacks` the baked variants a plain attack picks from); bare hands swing like a 1H weapon. */
