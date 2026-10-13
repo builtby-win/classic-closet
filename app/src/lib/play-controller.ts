@@ -281,7 +281,7 @@ export class PlayController {
       this.attackQueued = false;
       if (this.mode !== 'attack' && this.mode !== 'prone') {
         this.mode = 'attack';
-        this.attackAnim = motion.attack;
+        this.attackAnim = motion.attacks[Math.floor(Math.random() * motion.attacks.length)] ?? motion.attack;
         this.clock = 0;
       }
     }
