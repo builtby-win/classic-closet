@@ -28,6 +28,7 @@ export default function LayeredCharacterCanvas({ look: baseLook, onRendered }: L
     if (!canvas || !ctx) return;
     let cancelled = false;
     canvas.dataset.renderState = 'loading';
+    canvas.dataset.pose = `${look.anim}:${look.frame}`;
     const buffer = document.createElement('canvas');
     buffer.width = canvas.width;
     buffer.height = canvas.height;

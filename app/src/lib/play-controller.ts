@@ -1,4 +1,5 @@
 import { weaponMotion } from './fashion';
+import { motionActions } from './layered-client-renderer';
 import { afterimageSetFor, loadAfterimage, swipeActions, swipeImageUrls, type AfterimageSet } from './afterimage';
 import { castPlan, loadSkills, planMs, type BakedSkillFrame, type CastPlan, type PosePhase } from './skills';
 
@@ -72,6 +73,9 @@ interface Swing {
   frameMs: number;
 }
 
+/** Every melee pose a cash weapon might ship; filtered by what the item has. */
+const CASH_ATTACKS = ['swingO1', 'stabO1', 'swingT1', 'stabT1', 'swingP1'];
+
 /** Frame counts of the baked play poses (base.json). */
 const ATTACK_FRAMES: Record<string, number> = {
   swingO1: 3, stabO1: 2, swingT1: 3, stabT1: 3, swingP1: 3, shoot1: 3, shoot2: 5,
@@ -107,6 +111,10 @@ export class PlayController {
   private attackQueued = false;
   private skillQueued = false;
   private skillId = '4201003';
+  private weaponId: number | undefined;
+  private weaponActions: Set<string> | null = null;
+  private lastAttack = '';
+  private repeats = 0;
   private swipeOverride: number | null = null;
   private swipeSet: string | null = null;
   private swipeData: AfterimageSet | null = null;
@@ -118,7 +126,7 @@ export class PlayController {
 
   constructor(
     private readonly element: HTMLElement,
-    private readonly weapon: () => { sub: string | undefined; level: number },
+    private readonly weapon: () => { id: number | undefined; sub: string | undefined; level: number },
   ) {
     this.fx = element.querySelector<HTMLCanvasElement>('.preview-fx')?.getContext('2d') ?? null;
     this.fx && (this.fx.imageSmoothingEnabled = false);
@@ -167,6 +175,31 @@ export class PlayController {
     this.clock = 0;
     this.castClock = 0;
     this.plan = castPlan(skill, weaponAttack);
+  }
+
+  private syncWeaponActions(id: number | undefined): void {
+    if (id === this.weaponId) return;
+    this.weaponId = id;
+    this.weaponActions = null;
+    if (id === undefined) return;
+    void motionActions(id).then((actions) => {
+      if (this.weaponId === id) this.weaponActions = actions;
+    });
+  }
+
+  /** A random attack the worn weapon really has frames for, avoiding an immediate repeat. */
+  private pickAttack(sub: string | undefined, motion: { attack: string; attacks: string[] }): string {
+    // A cash weapon's real moves are whatever its art ships, so offer every melee pose and let the frames decide.
+    const candidates = sub === 'Cash' ? CASH_ATTACKS : motion.attacks;
+    const have = this.weaponActions;
+    let pool = have ? candidates.filter((anim) => have.has(anim)) : candidates;
+    if (!pool.length) pool = [motion.attack];
+    // Random, but never the same move three times running.
+    const choices = this.repeats >= 2 ? pool.filter((anim) => anim !== this.lastAttack) : pool;
+    const pick = (choices.length ? choices : pool)[Math.floor(Math.random() * (choices.length || pool.length))]!;
+    this.repeats = pick === this.lastAttack ? this.repeats + 1 : 1;
+    this.lastAttack = pick;
+    return pick;
   }
 
   private syncSwipeSet(set: string | null): void {
@@ -274,6 +307,7 @@ export class PlayController {
     const worn = this.weapon();
     const motion = weaponMotion(worn.sub);
     this.syncSwipeSet(afterimageSetFor(worn.sub));
+    this.syncWeaponActions(worn.id);
     const airborne = this.jumpAt >= 0;
     const dir = (this.held.has('right') ? 1 : 0) - (this.held.has('left') ? 1 : 0);
 
@@ -281,7 +315,7 @@ export class PlayController {
       this.attackQueued = false;
       if (this.mode !== 'attack' && this.mode !== 'prone') {
         this.mode = 'attack';
-        this.attackAnim = motion.attacks[Math.floor(Math.random() * motion.attacks.length)] ?? motion.attack;
+        this.attackAnim = this.pickAttack(worn.sub, motion);
         this.clock = 0;
       }
     }

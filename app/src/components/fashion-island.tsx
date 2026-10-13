@@ -513,7 +513,7 @@ export default function FashionIsland() {
     setSettingsOpen(false);
     setController(new PlayController(element, () => {
       const weapon = getItem(CATALOG, lookRef.current.items.Weapon);
-      return { sub: weapon?.sub, level: autoSwipeLevel(weapon?.requiredLevel) };
+      return { id: lookRef.current.items.Weapon ?? undefined, sub: weapon?.sub, level: autoSwipeLevel(weapon?.requiredLevel) };
     }));
   }, []);
   useEffect(() => {

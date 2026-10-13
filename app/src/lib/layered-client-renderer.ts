@@ -218,3 +218,9 @@ export async function warmPoses(look: Look, poses: Array<{ anim: string; frames:
     }
   }
 }
+
+/** Attack poses an item actually has baked frames for (cash weapons ship whatever their art needs). */
+export async function motionActions(id: number): Promise<Set<string>> {
+  const record = await localMotionItem(id);
+  return new Set(Object.keys(record?.frames ?? {}).map((key) => key.split(':')[0]!));
+}
