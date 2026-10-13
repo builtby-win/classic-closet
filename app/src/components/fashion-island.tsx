@@ -39,6 +39,7 @@ import {
 import catalogData from '../data/catalog.json';
 import LayeredCharacterCanvas from './layered-character-canvas';
 import GamePad from './game-pad';
+import { autoSwipeLevel } from '../lib/afterimage';
 import { PlayController, PLAY_POSES, SPRITE_CANVAS } from '../lib/play-controller';
 import { warmPoses } from '../lib/layered-client-renderer';
 import './fashion.css';
@@ -510,7 +511,10 @@ export default function FashionIsland() {
     const element = document.getElementById('preview');
     if (!element) return;
     setSettingsOpen(false);
-    setController(new PlayController(element, () => getItem(CATALOG, lookRef.current.items.Weapon)?.sub));
+    setController(new PlayController(element, () => {
+      const weapon = getItem(CATALOG, lookRef.current.items.Weapon);
+      return { sub: weapon?.sub, level: autoSwipeLevel(weapon?.requiredLevel) };
+    }));
   }, []);
   useEffect(() => {
     if (!controller) return;

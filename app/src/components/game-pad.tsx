@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react';
 import type { PlayController, PlayInput } from '../lib/play-controller';
+import { SWIPE_LEVELS, swipeDot } from '../lib/afterimage';
 import { loadSkills, SKILL_IDS, type BakedSkill } from '../lib/skills';
 
 const KEYS: Record<string, PlayInput> = {
@@ -48,6 +49,15 @@ export default function GamePad({ controller, onExit }: { controller: PlayContro
   const [skills, setSkills] = useState<BakedSkill[]>([]);
   const [picked, setPicked] = useState(0);
   const skill = skills[picked];
+  const [swipe, setSwipe] = useState(() => {
+    const saved = Number(window.localStorage.getItem('mf-swipe'));
+    return Number.isInteger(saved) && saved >= 0 && saved < SWIPE_LEVELS.length ? saved : 0;
+  });
+  const tier = SWIPE_LEVELS[swipe]!;
+  useEffect(() => {
+    controller.setSwipeLevel(tier.level);
+    window.localStorage.setItem('mf-swipe', String(swipe));
+  }, [controller, swipe, tier.level]);
   useEffect(() => {
     void loadSkills().then((all) => setSkills(SKILL_IDS.flatMap((id) => all[id] ?? [])));
   }, []);
@@ -88,6 +98,9 @@ export default function GamePad({ controller, onExit }: { controller: PlayContro
           swipeY.current = null;
         }}
       ><span /><small>Closet</small></button>
+      <button type="button" className="pad-mastery" onClick={() => setSwipe((current) => (current + 1) % SWIPE_LEVELS.length)} aria-label={`Weapon swipe: ${tier.name}. Tap to change`}>
+        <i style={{ background: tier.level === null ? 'conic-gradient(#6f96ff, #c86eff, #ff5f6e, #6f96ff)' : swipeDot(tier.level) }} />Swipe · {tier.name}
+      </button>
       <div className="pad-row">
         <div className="pad-dir">
           <PadButton input="left" controller={controller} className="pad-left" label="Walk left">◀</PadButton>
