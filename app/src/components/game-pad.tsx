@@ -60,6 +60,7 @@ export default function GamePad({ controller, onExit }: { controller: PlayContro
   const swipeY = useRef<number | null>(null);
   const [skills, setSkills] = useState<BakedSkill[]>([]);
   const [picked, setPicked] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
   const skill = skills[picked];
   const [swipe, setSwipe] = useState(() => {
     const saved = Number(window.localStorage.getItem('mf-swipe'));
@@ -73,6 +74,15 @@ export default function GamePad({ controller, onExit }: { controller: PlayContro
   useEffect(() => {
     void loadSkills().then((all) => setSkills(SKILL_IDS.flatMap((id) => all[id] ?? [])));
   }, []);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const close = (event: Event) => {
+      if (event.target instanceof Element && event.target.closest('.pad-skill')) return;
+      setMenuOpen(false);
+    };
+    window.addEventListener('pointerdown', close);
+    return () => window.removeEventListener('pointerdown', close);
+  }, [menuOpen]);
   useEffect(() => {
     if (skill) controller.selectSkill(skill.id);
   }, [controller, skill]);
@@ -124,7 +134,18 @@ export default function GamePad({ controller, onExit }: { controller: PlayContro
             <PadButton input="skill" controller={controller} className="pad-cast" label={`Cast ${skill.name}`} hotkey="C">
               <img src={skill.icon} alt="" draggable={false} />
             </PadButton>
-            {skills.length > 1 && <button type="button" className="pad-swap" aria-label={`Skill: ${skill.name}. Tap to switch`} title={skill.name} onClick={() => setPicked((picked + 1) % skills.length)}>⇄</button>}
+            {skills.length > 1 && <button type="button" className="pad-swap" aria-label={`Skill: ${skill.name}. Choose skill`} aria-haspopup="menu" aria-expanded={menuOpen} title={skill.name} onClick={() => setMenuOpen(!menuOpen)}>
+              <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M5 8 L12 17 L19 8 Z" fill="#fff" stroke="#1d2b4a" strokeWidth="2.5" strokeLinejoin="round" /></svg>
+            </button>}
+            {menuOpen && <ul className="pad-skill-menu" role="menu">
+              {skills.map((option, index) => (
+                <li key={option.id} role="none">
+                  <button type="button" role="menuitemradio" aria-checked={index === picked} onClick={() => { setPicked(index); setMenuOpen(false); }}>
+                    <img src={option.icon} alt="" draggable={false} />{option.name}
+                  </button>
+                </li>
+              ))}
+            </ul>}
           </div>}
           <PadButton input="jump" controller={controller} className="pad-jump" label="Jump" hotkey="Space">Jump</PadButton>
           <PadButton input="attack" controller={controller} className="pad-attack" label="Attack" hotkey="Z">Attack</PadButton>
