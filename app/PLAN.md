@@ -3,7 +3,7 @@
 Static web app for trying on MapleStory Classic World looks (male + female),
 live character rendering, and link sharing with rich iMessage preview.
 
-Live: https://maple-closet.builtby.win
+Live: https://classic-closet.builtby.win
 
 ## Flow
 
@@ -25,8 +25,18 @@ flowchart TD
 - **State** (`Look` in `src/lib/fashion.ts`): sex, skin, hair, hairCol, face, anim,
   frame, items. Persisted to URL query parameters (`?look=...`) on every change (`history.replaceState`) +
   saved in `localStorage` (`mf-look`, `mf-sex`). Shared links restore via `decodeLook`.
-- **Preview**: Client-side HTML5 Canvas compositor (`src/lib/canvas-renderer.ts` + `CharacterCanvas`).
-  Slices and coordinates baked statically into `/sprites/items/` & `/sprites/base/` for 0ms instant updates.
+- **Preview**: Local-only HTML5 Canvas compositor (`src/lib/layered-client-renderer.ts`,
+  `src/lib/layered-renderer.ts` and `LayeredCharacterCanvas`).
+  `/sprites/base.json` selects separate body, arm, hand, head and ear sprites for
+  seven skins and the three frames of `stand1`, `stand2` and `alert`. Source WZ
+  anchors connect body → arm → weapon and body → head → face/hair; the z-map
+  keeps hands and arms above or below weapons as the pose requires. Equipment
+  bounds do not move the centered base character.
+  `pnpm bake-sprites` downloads base layers from the reference renderer's
+  `Character/Character_000.wz` extraction and bakes equipment into
+  `/sprites/items/`. Every catalog face style is expanded across all nine eye
+  colors (currently 270 variants); an incomplete face bake exits nonzero.
+  Picker face icons remain color-collapsed in `/sprites/faces/`.
 - **iMessage / Social Sharing**: Query param `?look=...` is intercepted by Cloudflare Worker
   (`src/worker.ts`) which uses native `HTMLRewriter` to inject
   dynamic `<meta property="og:image">` pointing to the maplestory.io character render.
@@ -53,10 +63,11 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-    subgraph app["projects/maple-closet/app (Astro + React island + Cloudflare Workers)"]
+    subgraph app["projects/classic-closet/app (Astro + React island + Cloudflare Workers)"]
         page["src/pages/index.astro"] --> island["src/components/fashion-island.tsx"]
-        island --> canvas["src/components/character-canvas.tsx"]
-        canvas --> renderer["src/lib/canvas-renderer.ts (Z-map + anchors)"]
+        island --> canvas["src/components/layered-character-canvas.tsx"]
+        canvas --> client["src/lib/layered-client-renderer.ts (local source layers)"]
+        client --> renderer["src/lib/layered-renderer.ts (Z-map + anchors)"]
         island --> lib["src/lib/fashion.ts (URLs, slots, query params, storage)"]
         island --> data["src/data/catalog.json (baked)"]
         island --> css["src/components/fashion.css"]
@@ -65,5 +76,7 @@ flowchart TD
         rotations["data/rotations.json"] --> scripts["scripts/build-catalog.ts"]
         scripts --> data
         bake["scripts/bake-sprites.ts"] --> sprites["public/sprites/ (baked slices)"]
+        baseBake["scripts/bake-base-layers.ts"] --> sprites
+        bake --> baseBake
     end
 ```

@@ -1,5 +1,5 @@
 ---
-import { DEFAULT_LOOK, renderURL } from '../lib/fashion';
+import { OG_DEFAULT_IMAGE, OG_DESCRIPTION, OG_SITE_URL, OG_TITLE_DEFAULT } from '../lib/og';
 
 interface Props {
   title?: string;
@@ -7,11 +7,11 @@ interface Props {
 }
 
 const {
-  title = 'Maple Closet — Classic',
-  description = 'Dress-up preview for MapleStory Classic World. Pick hair, face, and equips, see your character live.',
+  title = OG_TITLE_DEFAULT,
+  description = OG_DESCRIPTION,
 } = Astro.props;
 
-const defaultPreview = renderURL(DEFAULT_LOOK);
+const canonical = `${OG_SITE_URL}/`;
 ---
 
 <!doctype html>
@@ -23,19 +23,25 @@ const defaultPreview = renderURL(DEFAULT_LOOK);
     <title>{title}</title>
     <link rel="preload" href="/fonts/inter-latin-variable.woff2" as="font" type="font/woff2" crossorigin />
 
-    <!-- Open Graph / iMessage / Facebook -->
+    <!-- Open Graph / LINE / iMessage / Facebook (shared looks rewritten by src/worker.ts) -->
     <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Classic Closet" />
+    <meta property="og:url" content={canonical} />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
-    <meta property="og:image" content={defaultPreview} />
-    <meta property="og:image:width" content="180" />
-    <meta property="og:image:height" content="180" />
+    <meta property="og:image" content={OG_DEFAULT_IMAGE} />
+    <meta property="og:image:secure_url" content={OG_DEFAULT_IMAGE} />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Classic Closet character preview" />
 
     <!-- Twitter -->
-    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
-    <meta name="twitter:image" content={defaultPreview} />
+    <meta name="twitter:image" content={OG_DEFAULT_IMAGE} />
+    <meta name="twitter:image:alt" content="Classic Closet character preview" />
 
     <style>
       :root { color-scheme: dark; }

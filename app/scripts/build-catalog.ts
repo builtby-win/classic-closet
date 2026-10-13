@@ -258,15 +258,97 @@ interface GmsItem {
 const GMS_API = 'https://maplestory.io/api/GMS/270';
 let gmsByName = new Map<string, GmsItem>();
 let gmsById = new Map<number, GmsItem>();
+// Retail reuses names across genders/versions (Sailor Outfit m/f, Bunny Ears
+// hat vs non-cash sword), so keep every record for the crate fallback.
+const gmsByNameAll = new Map<string, GmsItem[]>();
 const osmsById = new Map(osmsDump.map(item => [item.id, item]));
 try {
   const gmsCount = await fetch(`${GMS_API}/item/count`).then(r => r.json()) as number;
   const gmsDump = await fetch(`${GMS_API}/item/list?count=${gmsCount}`).then(r => r.json()) as GmsItem[];
   gmsById = new Map(gmsDump.map(item => [item.id, item]));
   gmsByName = new Map(gmsDump.filter((i) => i.name).map((i) => [i.name.toLowerCase(), i]));
+  for (const item of gmsDump) {
+    if (!item.name) continue;
+    const key = item.name.toLowerCase();
+    const list = gmsByNameAll.get(key) ?? [];
+    list.push(item);
+    gmsByNameAll.set(key, list);
+  }
   console.log(`GMS fallback: ${gmsDump.length} items`);
 } catch (e) {
   console.log('GMS fallback failed:', e);
+}
+
+/**
+ * Resolve a crate/stamp rate-table name to catalog records.
+ * Priority: human pin (nexon-overlay.json) > MCW/OSMS Classic > GMS retail.
+ * Same-name GMS records all resolve (gender splits like Sailor Outfit);
+ * non-cash dupes (Bunny Ears sword) lose to cash NX records.
+ * Empty = not in any dataset; caller logs miss with fuzzy suggestions.
+ */
+const overlay: { pins?: Array<{ name: string; id: number; note?: string }> } = JSON.parse(
+  readFileSync(join(ROOT, 'data', 'nexon-overlay.json'), 'utf8'),
+);
+const overlayPins = new Map((overlay.pins ?? []).map((p) => [p.name.toLowerCase(), p.id]));
+const osmsGearById = new Map(osmsDump.map((item) => [item.id, item]));
+
+function pinRecord(id: number): { item: RawItem | GmsItem; src: AssetSource | undefined } | null {
+  const osms = osmsGearById.get(id) ?? osmsById.get(id);
+  if (osms) return { item: osms, src: osms.src };
+  const mcw = mcwById.get(id);
+  if (mcw) return { item: mcw, src: mcw.src };
+  const gms = gmsById.get(id);
+  if (gms) return { item: gms, src: 'GMS' };
+  return null;
+}
+
+function resolveCrateItem(name: string): Array<{ item: RawItem | GmsItem; src: AssetSource | undefined }> {
+  const pin = overlayPins.get(name.toLowerCase());
+  if (pin != null) {
+    const rec = pinRecord(pin);
+    if (!rec) throw new Error(`nexon-overlay pin points nowhere: ${name} -> ${pin}`);
+    return [rec];
+  }
+  const mcw = byName.get(name.toLowerCase());
+  if (mcw && mcw.typeInfo.overallCategory === 'Equip') return [{ item: mcw, src: mcw.src }];
+  const candidates = (gmsByNameAll.get(name.toLowerCase()) ?? [])
+    .filter((g) => g.typeInfo.overallCategory === 'Equip');
+  if (candidates.length) {
+    const cash = candidates.filter((g) => g.isCash);
+    return (cash.length ? cash : candidates).map((g) => ({ item: g, src: 'GMS' as const }));
+  }
+  return [];
+}
+
+/** Token-overlap suggestions for an unresolvable rate-table name. Never auto-applied. */
+function suggestNames(name: string, limit = 3): string[] {
+  const needles = name.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  if (!needles.length) return [];
+  const scored: Array<{ key: string; score: number }> = [];
+  for (const key of new Set([...byName.keys(), ...gmsByNameAll.keys()])) {
+    const hay = key.split(/[^a-z0-9]+/).filter(Boolean);
+    let score = 0;
+    for (const n of needles) {
+      if (hay.includes(n)) score += 2;
+      else if (hay.some((h) => h.includes(n) || n.includes(h))) score += 1;
+    }
+    if (score > 0) scored.push({ key, score });
+  }
+  return scored
+    .sort((a, b) => b.score - a.score || a.key.localeCompare(b.key))
+    .slice(0, limit)
+    .map(({ key }) => {
+      const g = gmsByNameAll.get(key)?.[0];
+      const m = byName.get(key);
+      const rec = (g ?? m) as { id?: number; typeInfo?: { subCategory?: string }; isCash?: boolean } | undefined;
+      return `${key} (id ${rec?.id}, ${rec?.typeInfo?.subCategory}${g ? `, GMS cash=${g.isCash}` : ''})`;
+    });
+}
+
+function logCrateMiss(name: string): void {
+  console.warn(`crate item not in any dataset, skipped: ${name}`);
+  for (const s of suggestNames(name)) console.warn(`  maybe: ${s}`);
+  console.warn(`  pin the verified id in data/nexon-overlay.json -> pins`);
 }
 
 function findItem(name: string, subCategory: string): { item: RawItem | GmsItem; src: AssetSource | undefined } | null {
@@ -495,8 +577,10 @@ for (const banner of rotations.current) {
   // Equips (Founder's Crate)
   if (banner.id === 'founder-crate-oct26') {
     for (const [name, rate] of founderRates) {
-      const hit = byName.get(name.toLowerCase());
-      if (hit && hit.typeInfo.overallCategory === 'Equip') {
+      const resolved = resolveCrateItem(name);
+      if (!resolved.length) logCrateMiss(name);
+      for (const { item: hit, src } of resolved) {
+        if (hit.typeInfo.overallCategory !== 'Equip') continue;
         const sex = sexOf(hit);
         fastCatalog.items[hit.id] = {
           name: hit.name,
@@ -506,7 +590,7 @@ for (const banner of rotations.current) {
           attainable: true,
           group: 'founder-crate',
           rate,
-          src: hit.src,
+          src,
         };
         fastCatalog.indexes.groups['founder-crate'][sex].push(hit.id);
         fastCatalog.indexes.search.push({
@@ -522,8 +606,10 @@ for (const banner of rotations.current) {
   // Equips (Aurora Crate)
   if (banner.id === 'aurora-s1') {
     for (const [name, rate] of auroraRates) {
-      const hit = byName.get(name.toLowerCase());
-      if (hit && hit.typeInfo.overallCategory === 'Equip') {
+      const resolved = resolveCrateItem(name);
+      if (!resolved.length) logCrateMiss(name);
+      for (const { item: hit, src } of resolved) {
+        if (hit.typeInfo.overallCategory !== 'Equip') continue;
         const sex = sexOf(hit);
         fastCatalog.items[hit.id] = {
           name: hit.name,
@@ -533,7 +619,7 @@ for (const banner of rotations.current) {
           attainable: true,
           group: 'aurora-crate',
           rate,
-          src: hit.src,
+          src,
         };
         fastCatalog.indexes.groups['aurora-crate'][sex].push(hit.id);
         fastCatalog.indexes.search.push({

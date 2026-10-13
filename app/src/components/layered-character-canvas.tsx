@@ -4,14 +4,16 @@ import { renderLayeredCharacter } from '../lib/layered-client-renderer';
 
 interface LayeredCharacterCanvasProps {
   look: Look;
-  onRendered?: () => void;
+  onRendered?: (canvas?: HTMLCanvasElement) => void;
 }
 
 /** Canvas view for the independent, local-only layer compositor. */
 export default function LayeredCharacterCanvas({ look, onRendered }: LayeredCharacterCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const callbackRef = useRef(onRendered);
-  callbackRef.current = onRendered;
+  useEffect(() => {
+    callbackRef.current = onRendered;
+  }, [onRendered]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -32,7 +34,7 @@ export default function LayeredCharacterCanvas({ look, onRendered }: LayeredChar
       canvas.dataset.renderState = result.missing.length || result.unresolved.length ? 'partial' : 'ready';
       canvas.dataset.missingAssets = result.missing.join(',');
       canvas.dataset.unresolvedLayers = result.unresolved.join(',');
-      callbackRef.current?.();
+      callbackRef.current?.(canvas);
     }).catch((error: unknown) => {
       if (cancelled) return;
       canvas.dataset.renderState = 'error';

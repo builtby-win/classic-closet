@@ -1,22 +1,22 @@
 /**
- * Bakes sprite frames for Maple Closet items and base bodies into public/sprites/.
- * Slices are stored as static JSON files (/sprites/items/{id}.json) and base PNGs (/sprites/base/...).
+ * Bakes sprite frames for Classic Closet items and base bodies into public/sprites/.
+ * Source layers and coordinates are stored in /sprites/items/ and /sprites/base/.
  * Incremental: skips assets already baked to disk.
  */
 
 import { writeFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { bakeBaseBodies } from './bake-base-layers';
+import { EYE_COLORS, faceVariantId } from '../src/lib/fashion';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const catalogPath = join(ROOT, 'src', 'data', 'catalog.json');
 const catalog = JSON.parse(readFileSync(catalogPath, 'utf8'));
 
-const BASE_DIR = join(ROOT, 'public', 'sprites', 'base');
 const ITEMS_DIR = join(ROOT, 'public', 'sprites', 'items');
 const FACES_DIR = join(ROOT, 'public', 'sprites', 'faces');
 
-mkdirSync(BASE_DIR, { recursive: true });
 mkdirSync(ITEMS_DIR, { recursive: true });
 mkdirSync(FACES_DIR, { recursive: true });
 
@@ -26,85 +26,57 @@ function bakeFaceIcons() {
     if (meta.sub !== 'Face') continue;
     const spritePath = join(ITEMS_DIR, `${id}.json`);
     if (!existsSync(spritePath)) continue;
-    try {
-      const sprite = JSON.parse(readFileSync(spritePath, 'utf8'));
-      const image = sprite.frames?.['default:0']?.[0]?.image;
-      const base64 = typeof image === 'string' ? image.replace(/^data:image\/png;base64,/, '') : '';
-      if (!base64) continue;
-      const iconId = (Number(id) >= 21000 ? 21000 : 20000) + (Number(id) % 100);
-      writeFileSync(join(FACES_DIR, `${iconId}.png`), Buffer.from(base64, 'base64'));
-      count++;
-    } catch { /* skip invalid cached sprite */ }
+    const sprite = JSON.parse(readFileSync(spritePath, 'utf8'));
+    const image = sprite.frames?.['default:0']?.[0]?.image;
+    if (!image) continue;
+    const iconId = (Number(id) >= 21000 ? 21000 : 20000) + (Number(id) % 100);
+    writeFileSync(join(FACES_DIR, `${iconId}.png`), Buffer.from(image.replace(/^data:image\/png;base64,/, ''), 'base64'));
+    count++;
   }
   console.log(`Baked ${count} face icons`);
 }
-
-const SKINS = [2000, 2001, 2002, 2003, 2004, 2005, 2006];
-const POSES = ['stand1', 'stand2', 'alert'];
 
 async function fetchWithTimeout(url: string, ms = 7000): Promise<Response> {
   return fetch(url, { signal: AbortSignal.timeout(ms) });
 }
 
-async function bakeBaseBodies() {
-  console.log('--- Baking Base Bodies ---');
-  for (const skin of SKINS) {
-    for (const anim of POSES) {
-      const dest = join(BASE_DIR, `${skin}_${anim}_0.png`);
-      if (existsSync(dest)) continue;
-      const url = `https://maplestory.io/api/character/%7B%22itemId%22%3A${skin}%2C%22region%22%3A%22MCW%22%2C%22version%22%3A%22CBT2%22%7D%2C%7B%22itemId%22%3A${skin + 10000}%2C%22region%22%3A%22MCW%22%2C%22version%22%3A%22CBT2%22%7D/${anim}/0`;
-      try {
-        const res = await fetchWithTimeout(url, 10000);
-        if (res.ok) {
-          const buf = Buffer.from(await res.arrayBuffer());
-          writeFileSync(dest, buf);
-          console.log(`Saved base body: ${skin}_${anim}_0.png`);
-        }
-      } catch (e) {
-        console.warn(`Failed base body ${skin} ${anim}:`, (e as any)?.message || e);
-      }
-    }
-  }
-}
-
-async function fetchItemData(id: number, src?: 'GMS' | 'OSMS'): Promise<any | null> {
-  // Modern OSMS hair and face cosmetics are served from the GMS data set, just
-  // like the other modern cosmetics selected by assetSource().
-  const preferred = src === 'GMS' || src === 'OSMS'
+async function fetchItemData(id: number, src?: 'GMS' | 'OSMS', sub?: string, tries = 3): Promise<any | null> {
+  // Same numeric ids are different items per region (e.g. GMS 1332001 is
+  // Halfmoon Zamadar, MCW 1332001 is Fruit Knife). OSMS gear lives on the
+  // MCW endpoint, so it MUST bake from MCW first; only modern OSMS hair/face
+  // cosmetics (rendered from GMS, see assetSource) and GMS items prefer GMS.
+  const cosmetic = sub === 'Hair' || sub === 'Face';
+  const gmsFirst = src === 'GMS' || (src === 'OSMS' && cosmetic);
+  const preferred = gmsFirst
     ? 'https://maplestory.io/api/GMS/270'
     : 'https://maplestory.io/api/MCW/CBT2';
-  const fallback = preferred.includes('GMS/270')
+  const fallback = gmsFirst
     ? 'https://maplestory.io/api/MCW/CBT2'
     : 'https://maplestory.io/api/GMS/270';
-  for (const apiBase of [preferred, fallback]) {
-    try {
-      const res = await fetchWithTimeout(`${apiBase}/item/${id}`, 8000);
-      if (!res.ok) continue;
-      const raw = await res.json();
-      if (raw?.frameBooks && Object.keys(raw.frameBooks).length) return raw;
-    } catch {
-      // try the other region
+  for (let attempt = 1; attempt <= tries; attempt++) {
+    for (const apiBase of [preferred, fallback]) {
+      try {
+        const res = await fetchWithTimeout(`${apiBase}/item/${id}`, 12000);
+        if (!res.ok) continue;
+        const raw = await res.json();
+        if (raw?.frameBooks && Object.keys(raw.frameBooks).length) return raw;
+      } catch {
+        // try the other region, then retry with backoff
+      }
     }
+    if (attempt < tries) await new Promise((r) => setTimeout(r, 500 * attempt));
   }
   return null;
 }
 
-async function bakeItem(id: number, meta: any): Promise<boolean> {
-  const dest = join(ITEMS_DIR, `${id}.json`);
-  if (existsSync(dest)) return true;
+const BAKED_ACTIONS = new Set(['stand1', 'stand2', 'alert', 'jump', 'default']);
 
-  const raw = await fetchItemData(id, meta?.src);
-  if (!raw || !raw.frameBooks) return false;
-
+function extractFrames(raw: any): Record<string, any[]> {
   const frames: Record<string, any[]> = {};
-  const vslots: string[] = raw.metaInfo?.vslots ?? [];
-  const islots: string[] = raw.metaInfo?.islots ?? [];
   for (const [actionName, action] of Object.entries<any>(raw.frameBooks)) {
     if (!action?.frames) continue;
     action.frames.forEach((f: any, fIdx: number) => {
-      if (actionName !== 'stand1' && actionName !== 'stand2' && actionName !== 'alert' && actionName !== 'default') {
-        return;
-      }
+      if (!BAKED_ACTIONS.has(actionName)) return;
       const key = `${actionName}:${fIdx}`;
       const effects: any[] = [];
       for (const eff of Object.values<any>(f.effects || {})) {
@@ -126,10 +98,40 @@ async function bakeItem(id: number, meta: any): Promise<boolean> {
     });
   }
 
+  return frames;
+}
+
+async function bakeItem(id: number, meta: any): Promise<boolean> {
+  const dest = join(ITEMS_DIR, `${id}.json`);
+  if (existsSync(dest)) return true;
+
+  const raw = await fetchItemData(id, meta?.src, meta?.sub);
+  if (!raw || !raw.frameBooks) return false;
+
+  const frames = extractFrames(raw);
+  const vslots: string[] = raw.metaInfo?.vslots ?? [];
+  const islots: string[] = raw.metaInfo?.islots ?? [];
+
   if (!Object.keys(frames).length) return false;
 
   writeFileSync(dest, JSON.stringify({ id, frames, vslot: vslots.join(''), islot: islots.join('') }));
   return true;
+}
+
+/** Items baked before `jump` was a baked pose: merge in just the jump frames. */
+async function backfillJump(id: number, meta: any): Promise<void> {
+  const dest = join(ITEMS_DIR, `${id}.json`);
+  if (!existsSync(dest)) return;
+  const baked = JSON.parse(readFileSync(dest, 'utf8'));
+  if (baked.frames['jump:0'] || baked.jumpChecked) return;
+  // Faces carry one expression frame and no pose frames.
+  if (!Object.keys(baked.frames).some((key) => /^(stand1|stand2|alert):/.test(key))) return;
+  const raw = await fetchItemData(id, meta?.src, meta?.sub);
+  const jump = raw?.frameBooks?.jump ? extractFrames({ frameBooks: { jump: raw.frameBooks.jump } }) : {};
+  Object.assign(baked.frames, jump);
+  // Items without a jump book (e.g. some cash weapons) are marked so reruns skip them.
+  if (!Object.keys(jump).length) baked.jumpChecked = true;
+  writeFileSync(dest, JSON.stringify(baked));
 }
 
 // Concurrency pool with progress
@@ -157,6 +159,9 @@ async function main() {
   let count = 0;
   let skipped = 0;
   let success = 0;
+  // Rings ship zero frameBooks (chat/label UI effect, no avatar layers):
+  // expected-unbakeable, warn only. Anything else failing is real.
+  const equipFailed: number[] = [];
 
   await pool(itemEntries, 10, async ([idStr, meta]) => {
     const id = Number(idStr);
@@ -167,15 +172,46 @@ async function main() {
     }
     const ok = await bakeItem(id, meta);
     count++;
-    if (ok) success++;
+    if (ok) {
+      success++;
+    } else if (meta?.sub === 'Ring') {
+      console.warn(`skip unbakeable ring (no avatar frames): ${id}`);
+    } else {
+      equipFailed.push(id);
+    }
     if (count % 50 === 0) {
       console.log(`Progress: ${count} baked (${success} ok, ${skipped} skipped)...`);
     }
   });
+  if (equipFailed.length) {
+    throw new Error(`Could not bake equips (retried): ${equipFailed.sort((a, b) => a - b).join(', ')}`);
+  }
+
+  console.log('--- Baking Face Color Variants ---');
+  const faceJobs = new Map<number, { src?: 'GMS' | 'OSMS' }>();
+  for (const [id, meta] of Object.entries<any>(catalog.items)) {
+    if (meta.sub !== 'Face') continue;
+    const sex = Number(id) >= 21000 ? 'f' : 'm';
+    for (let color = 0; color < EYE_COLORS.length; color++) {
+      faceJobs.set(faceVariantId(sex, Number(id) % 100, color), { src: meta.src });
+    }
+  }
+  const faceFailed: number[] = [];
+  await pool([...faceJobs], 10, async ([id, meta]) => {
+    try {
+      if (!await bakeItem(id, meta)) faceFailed.push(id);
+    } catch {
+      faceFailed.push(id);
+    }
+  });
+  if (faceFailed.length) {
+    throw new Error(`Could not bake face variants: ${faceFailed.sort((a, b) => a - b).join(', ')}`);
+  }
+  console.log(`All ${faceJobs.size} face color variants present.`);
 
   bakeFaceIcons();
-
   console.log('--- Baking Hair Styles ---');
+  const hairFailed: number[] = [];
   const hairStyles = Object.keys(catalog.styles).map(Number);
   const hairIds: number[] = [];
   for (const style of hairStyles) {
@@ -187,10 +223,25 @@ async function main() {
   await pool(hairIds, 10, async (hairId) => {
     const dest = join(ITEMS_DIR, `${hairId}.json`);
     if (existsSync(dest)) return;
-    await bakeItem(hairId, { src: catalog.styles[Math.floor(hairId / 10)]?.src });
+    if (!await bakeItem(hairId, { src: catalog.styles[Math.floor(hairId / 10)]?.src })) {
+      hairFailed.push(hairId);
+    }
   });
+  if (hairFailed.length) {
+    throw new Error(`Could not bake hair variants (retried): ${hairFailed.sort((a, b) => a - b).join(', ')}`);
+  }
+
+  console.log('--- Backfilling jump frames ---');
+  const backfillJobs: [number, any][] = [
+    ...itemEntries.map(([id, meta]): [number, any] => [Number(id), meta]),
+    ...hairIds.map((id): [number, any] => [id, { src: catalog.styles[Math.floor(id / 10)]?.src }]),
+  ];
+  await pool(backfillJobs, 10, ([id, meta]) => backfillJump(id, meta));
 
   console.log(`Done! Total: ${count} baked, ${skipped} already existed.`);
 }
 
-main().catch(console.error);
+main().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

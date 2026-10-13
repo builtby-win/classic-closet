@@ -1,6 +1,7 @@
 {
   "$schema": "./nexon-overlay.schema.json",
-  "_comment": "Hand-tracked Nexon releases (founder shop, patch notes) not yet in MCW/1 data. Applied by pnpm catalog AFTER the maplestory.io fetch, so these entries win.",
+  "_comment": "Hand-verified Nexon name -> item ID pins. Used when a rate-table name has no exact dataset match (Classic-exclusive or renamed retail item). NEVER guess: verify sub/cash/art in game or maplestory.io first. Applied by pnpm catalog with top priority.",
+  "pins": [],
   "items": [],
   "hide": []
 }

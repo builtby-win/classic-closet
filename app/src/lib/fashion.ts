@@ -176,6 +176,23 @@ export function stanceForWeapon(sub: string | undefined, currentAnim: string): {
   return null;
 }
 
+/** Banner/group sort for equip drawers: limited NX first (by urgency), classic last.
+ *  Founder's crate ends Oct 28 → covers end Nov 18 → Aurora stamp ends Jan 13. */
+export const GROUP_RANK: Record<string, number> = {
+  'founder-crate': 0,
+  'cover-10day': 1,
+  'aurora-crate': 2,
+  'style-coupon': 3,
+  'classic-equips': 4,
+};
+
+export function bannerRank(item: ItemMeta | HairStyleMeta | undefined): number {
+  if (!item) return 99;
+  const group = (item as ItemMeta).group;
+  if (group && group in GROUP_RANK) return GROUP_RANK[group]!;
+  return 5;
+}
+
 /** Short group tag for badges */
 export const GROUP_SHORT: Record<string, string> = {
   'founder-crate': 'Founder',
@@ -219,6 +236,7 @@ export function hairBaseName(name: string): string {
 }
 
 export interface Look {
+  name: string;
   sex: Sex;
   skin: number;
   hair: number;
@@ -230,6 +248,7 @@ export interface Look {
 }
 
 export const DEFAULT_LOOK: Look = {
+  name: '',
   sex: 'm',
   skin: 2000,
   hair: 30130, // Antagonist (Black)
@@ -370,12 +389,6 @@ export function applyPick(items: Look['items'], slot: string, id: number | null,
   return next;
 }
 
-function toBase64(str: string): string {
-  if (typeof btoa !== 'undefined') return btoa(str);
-  if (typeof Buffer !== 'undefined') return Buffer.from(str).toString('base64');
-  return '';
-}
-
 function fromBase64(b64: string): string {
   let normalized = b64.replace(/-/g, '+').replace(/_/g, '/');
   while (normalized.length % 4 !== 0) normalized += '=';
@@ -384,9 +397,15 @@ function fromBase64(b64: string): string {
   return '';
 }
 
+export const NAME_MAX = 12;
+export function cleanName(raw: string): string {
+  return raw.replace(/\s+/g, ' ').slice(0, NAME_MAX);
+}
+
 /** Encode the look into readable query params. */
 export function encodeLook(look: Look): string {
   const params = new URLSearchParams();
+  if (look.name) params.set('name', look.name);
   params.set('sex', look.sex);
   params.set('skin', String(look.skin));
   params.set('hair', String(look.hair));
@@ -419,6 +438,7 @@ export function decodeLook(input?: string): Partial<Look> | null {
     // Check individual params fallback
     if (params.has('hair') || params.has('face') || params.has('sex')) {
       const partial: Partial<Look> = {};
+      if (params.has('name')) partial.name = cleanName(params.get('name') ?? '');
       if (params.has('sex')) partial.sex = params.get('sex') === 'f' ? 'f' : 'm';
       if (params.has('skin')) partial.skin = Number(params.get('skin')) || 2000;
       if (params.has('hair')) partial.hair = Number(params.get('hair')) || 30130;
@@ -428,7 +448,7 @@ export function decodeLook(input?: string): Partial<Look> | null {
       if (params.has('frame')) partial.frame = Number(params.get('frame')) || 0;
       // Equip slots (Hat, Top, Bottom, Overall, Shoes, Weapon, …) round-trip as
       // their own params — anything else here is an equip id.
-      const KNOWN: Record<string, true> = { sex: true, skin: true, hair: true, hairCol: true, face: true, anim: true, frame: true, look: true };
+      const KNOWN: Record<string, true> = { name: true, sex: true, skin: true, hair: true, hairCol: true, face: true, anim: true, frame: true, look: true };
       const items: Partial<Record<string, number>> = {};
       for (const [k, v] of params) {
         if (KNOWN[k]) continue;
