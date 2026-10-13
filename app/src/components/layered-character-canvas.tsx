@@ -1,6 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import type { Look } from '../lib/fashion';
 import { renderLayeredCharacter } from '../lib/layered-client-renderer';
+import { getPlayPose, subscribePlayPose } from '../lib/play-controller';
 
 interface LayeredCharacterCanvasProps {
   look: Look;
@@ -8,7 +9,13 @@ interface LayeredCharacterCanvasProps {
 }
 
 /** Canvas view for the independent, local-only layer compositor. */
-export default function LayeredCharacterCanvas({ look, onRendered }: LayeredCharacterCanvasProps) {
+export default function LayeredCharacterCanvas({ look: baseLook, onRendered }: LayeredCharacterCanvasProps) {
+  // Play mode overrides only the pose, and only here, so the saved look is untouched.
+  const playPose = useSyncExternalStore(subscribePlayPose, getPlayPose, () => null);
+  const look = useMemo(
+    () => playPose ? { ...baseLook, anim: playPose.anim, frame: playPose.frame } : baseLook,
+    [baseLook, playPose],
+  );
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const callbackRef = useRef(onRendered);
   useEffect(() => {
@@ -34,7 +41,7 @@ export default function LayeredCharacterCanvas({ look, onRendered }: LayeredChar
       canvas.dataset.renderState = result.missing.length || result.unresolved.length ? 'partial' : 'ready';
       canvas.dataset.missingAssets = result.missing.join(',');
       canvas.dataset.unresolvedLayers = result.unresolved.join(',');
-      callbackRef.current?.(canvas);
+      if (!playPose) callbackRef.current?.(canvas);
     }).catch((error: unknown) => {
       if (cancelled) return;
       canvas.dataset.renderState = 'error';
@@ -43,7 +50,7 @@ export default function LayeredCharacterCanvas({ look, onRendered }: LayeredChar
     });
 
     return () => { cancelled = true; };
-  }, [look]);
+  }, [look, playPose]);
 
   return (
     <div id="preview" role="img" aria-label="Character preview">

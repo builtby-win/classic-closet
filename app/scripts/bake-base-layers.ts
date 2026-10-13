@@ -20,7 +20,11 @@ const REFERENCE_BASE_URL =
 const REFERENCE_ROOT = 'https://javipen.github.io/maplestory-cosmetic-playground/';
 
 const SKIN_IDS = [2000, 2001, 2002, 2003, 2004, 2005, 2006];
-const POSES = ['stand1', 'stand2', 'alert', 'jump'];
+const POSES = [
+  'stand1', 'stand2', 'alert', 'jump',
+  // Play mode: walk, duck, and one attack pose per weapon family.
+  'walk1', 'walk2', 'prone', 'swingO1', 'stabO1', 'swingT1', 'stabT1', 'swingP1', 'shoot1', 'shoot2',
+];
 
 export interface BasePoint {
   x: number;

@@ -124,25 +124,30 @@ const WEAPON_SUBS: Record<string, true> = {
  *  only; 2H melee, spears, polearms and crossbows have stand2 (no stand1);
  *  bows use the regular stand1 idle stance.
  */
-const WEAPON_STANCE: Record<string, { stand: string; walk: string }> = {
-  'One-Handed Sword': { stand: 'stand1', walk: 'walk1' },
-  'One-Handed Axe': { stand: 'stand1', walk: 'walk1' },
-  'One-Handed Blunt Weapon': { stand: 'stand1', walk: 'walk1' },
-  Dagger: { stand: 'stand1', walk: 'walk1' },
-  Claw: { stand: 'stand1', walk: 'walk1' },
-  Wand: { stand: 'stand1', walk: 'walk1' },
-  Staff: { stand: 'stand1', walk: 'walk1' },
-  'Two-Handed Sword': { stand: 'stand2', walk: 'walk1' },
-  'Two-Handed Axe': { stand: 'stand2', walk: 'walk2' },
-  'Two-Handed Blunt': { stand: 'stand2', walk: 'walk2' },
-  Spear: { stand: 'stand2', walk: 'walk2' },
-  'Pole Arm': { stand: 'stand2', walk: 'walk2' },
-  Crossbow: { stand: 'stand2', walk: 'walk2' },
-  Bow: { stand: 'stand1', walk: 'walk1' },
+const WEAPON_STANCE: Record<string, { stand: string; walk: string; attack: string }> = {
+  'One-Handed Sword': { stand: 'stand1', walk: 'walk1', attack: 'swingO1' },
+  'One-Handed Axe': { stand: 'stand1', walk: 'walk1', attack: 'swingO1' },
+  'One-Handed Blunt Weapon': { stand: 'stand1', walk: 'walk1', attack: 'swingO1' },
+  Dagger: { stand: 'stand1', walk: 'walk1', attack: 'stabO1' },
+  Claw: { stand: 'stand1', walk: 'walk1', attack: 'swingO1' },
+  Wand: { stand: 'stand1', walk: 'walk1', attack: 'swingO1' },
+  Staff: { stand: 'stand1', walk: 'walk1', attack: 'swingO1' },
+  'Two-Handed Sword': { stand: 'stand2', walk: 'walk1', attack: 'swingT1' },
+  'Two-Handed Axe': { stand: 'stand2', walk: 'walk2', attack: 'swingT1' },
+  'Two-Handed Blunt': { stand: 'stand2', walk: 'walk2', attack: 'swingT1' },
+  Spear: { stand: 'stand2', walk: 'walk2', attack: 'stabT1' },
+  'Pole Arm': { stand: 'stand2', walk: 'walk2', attack: 'swingP1' },
+  Crossbow: { stand: 'stand2', walk: 'walk2', attack: 'shoot2' },
+  Bow: { stand: 'stand1', walk: 'walk1', attack: 'shoot1' },
   // NX cash weapons only ship stand1 frames (all four baked items include
   // them), so equipping one from a 2H stance steers back to stand1.
-  Cash: { stand: 'stand1', walk: 'walk1' },
+  Cash: { stand: 'stand1', walk: 'walk1', attack: 'swingO1' },
 };
+
+/** Poses play mode uses for the worn weapon; bare hands swing like a 1H weapon. */
+export function weaponMotion(sub: string | undefined): { stand: string; walk: string; attack: string } {
+  return (sub && WEAPON_STANCE[sub]) || WEAPON_STANCE['One-Handed Sword']!;
+}
 
 /** Subs that occupy both hands: wearing one drops the shield, and tapping a
  *  shield while one is worn swaps to a one-handed weapon instead of refusing.
@@ -253,7 +258,7 @@ export const DEFAULT_LOOK: Look = {
   skin: 2000,
   hair: 30130, // Antagonist (Black)
   hairCol: 0,
-  face: 20805, // Alert Face
+  face: 20033, // Innocent Gaze
   anim: 'stand1',
   frame: 0,
   items: { Hat: 1002000, Top: 1040002, Bottom: 1060002, Shoes: 1072000, Glove: 1082000, Weapon: 1302000 },

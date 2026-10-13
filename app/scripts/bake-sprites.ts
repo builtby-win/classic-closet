@@ -70,13 +70,15 @@ async function fetchItemData(id: number, src?: 'GMS' | 'OSMS', sub?: string, tri
 }
 
 const BAKED_ACTIONS = new Set(['stand1', 'stand2', 'alert', 'jump', 'default']);
+/** Play-mode poses live in `<id>.motion.json`, fetched only when the pad opens. */
+const MOTION_ACTIONS = new Set(['walk1', 'walk2', 'prone', 'swingO1', 'stabO1', 'swingT1', 'stabT1', 'swingP1', 'shoot1', 'shoot2']);
 
-function extractFrames(raw: any): Record<string, any[]> {
+function extractFrames(raw: any, actions: Set<string> = BAKED_ACTIONS): Record<string, any[]> {
   const frames: Record<string, any[]> = {};
   for (const [actionName, action] of Object.entries<any>(raw.frameBooks)) {
     if (!action?.frames) continue;
     action.frames.forEach((f: any, fIdx: number) => {
-      if (!BAKED_ACTIONS.has(actionName)) return;
+      if (!actions.has(actionName)) return;
       const key = `${actionName}:${fIdx}`;
       const effects: any[] = [];
       for (const eff of Object.values<any>(f.effects || {})) {
@@ -132,6 +134,16 @@ async function backfillJump(id: number, meta: any): Promise<void> {
   // Items without a jump book (e.g. some cash weapons) are marked so reruns skip them.
   if (!Object.keys(jump).length) baked.jumpChecked = true;
   writeFileSync(dest, JSON.stringify(baked));
+}
+
+/** Walk/duck/attack frames, kept out of the main item file so the editor stays light. */
+async function bakeMotion(id: number, meta: any): Promise<void> {
+  const dest = join(ITEMS_DIR, `${id}.motion.json`);
+  if (existsSync(dest) || !existsSync(join(ITEMS_DIR, `${id}.json`))) return;
+  const raw = await fetchItemData(id, meta?.src, meta?.sub);
+  if (!raw?.frameBooks) return;
+  // Written even when empty so reruns skip items (e.g. cash weapons) with no motion.
+  writeFileSync(dest, JSON.stringify({ id, frames: extractFrames(raw, MOTION_ACTIONS) }));
 }
 
 // Concurrency pool with progress
@@ -237,6 +249,12 @@ async function main() {
     ...hairIds.map((id): [number, any] => [id, { src: catalog.styles[Math.floor(id / 10)]?.src }]),
   ];
   await pool(backfillJobs, 10, ([id, meta]) => backfillJump(id, meta));
+
+  console.log('--- Baking play-mode motion frames ---');
+  await pool([
+    ...itemEntries.filter(([, meta]) => meta?.sub !== 'Face').map(([id, meta]): [number, any] => [Number(id), meta]),
+    ...hairIds.map((id): [number, any] => [id, { src: catalog.styles[Math.floor(id / 10)]?.src }]),
+  ], 10, ([id, meta]) => bakeMotion(id, meta));
 
   console.log(`Done! Total: ${count} baked, ${skipped} already existed.`);
 }

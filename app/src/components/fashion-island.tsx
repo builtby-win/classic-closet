@@ -38,6 +38,9 @@ import {
 } from '../lib/fashion';
 import catalogData from '../data/catalog.json';
 import LayeredCharacterCanvas from './layered-character-canvas';
+import GamePad from './game-pad';
+import { PlayController, PLAY_POSES } from '../lib/play-controller';
+import { warmPoses } from '../lib/layered-client-renderer';
 import './fashion.css';
 
 const CATALOG = catalogData as FastCatalog;
@@ -48,6 +51,9 @@ const MYSTERY_RATE_GROUPS = [
   { title: 'Female faces', rows: CATALOG.indexes.faces.f.active.filter((id) => CATALOG.items[id]?.coupon === 'mystery').map((id) => ({ name: CATALOG.items[id].name, rate: CATALOG.items[id].rate ?? '16.67%' })) },
 ];
 const STARTER_HAIRS: Record<Sex, number[]> = { m: [3000, 3002, 3003], f: [3100, 3104] };
+// Innocent Gaze (m) / Strong Stare (f); Veronica hair for f
+const DEFAULT_FACE: Record<Sex, number> = { m: 20033, f: 21803 };
+const DEFAULT_HAIR_STYLE: Partial<Record<Sex, number>> = { f: 3101 };
 const STARTER_FACES: Record<Sex, number[]> = { m: [20000, 20001, 20002], f: [21000, 21001, 21002] };
 const HAIR_DOTS = ['#23232a', '#a83a32', '#d97b2e', '#e3c46a', '#4a8f4d', '#4a6fa5', '#7a4a8f', '#6e4a2f'];
 const EYE_DOTS = ['#24242b', '#4a82c5', '#c94747', '#4a9459', '#826044', '#48aeb6', '#8050aa', '#8c3440', '#e8e8e8'];
@@ -110,7 +116,8 @@ function loadInitialLook(): Look {
     return normalizeStance({ ...DEFAULT_LOOK, ...fromStorage, sex: (fromStorage.sex as Sex) || savedSex || DEFAULT_LOOK.sex });
   }
 
-  return { ...DEFAULT_LOOK, sex: savedSex || DEFAULT_LOOK.sex };
+  const sex = savedSex || DEFAULT_LOOK.sex;
+  return { ...DEFAULT_LOOK, sex, hair: (DEFAULT_HAIR_STYLE[sex] ?? 3013) * 10, face: DEFAULT_FACE[sex] };
 }
 
 function isFirstVisit(): boolean {
@@ -148,6 +155,10 @@ export default function FashionIsland() {
   const [job, setJob] = useState('All');
   const JOBS = ['All', 'Beginner', 'Warrior', 'Magician', 'Bowman', 'Thief'];
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [controller, setController] = useState<PlayController | null>(null);
+  const lookRef = useRef(look);
+  lookRef.current = look;
+  const swipeStart = useRef<{ y: number; atTop: boolean } | null>(null);
   const [ratesOpen, setRatesOpen] = useState(false);
   // Read before useLook's effect persists the default look.
   const firstVisit = useRef(isFirstVisit());
@@ -225,19 +236,12 @@ export default function FashionIsland() {
     setSettingsOpen(false);
     setLook((l) => {
       const next = { ...l, sex };
-      // Keep the worn style when it exists for the target sex; otherwise fall back
-      // to the first active style of the target sex (catalog is the source of truth,
-      // not hardcoded id ranges).
-      const style = Math.floor(next.hair / 10);
-      const targetHairs = CATALOG.indexes.hairs[sex].active;
-      if (!targetHairs.includes(style)) {
-        const fallback = targetHairs[0] ?? (sex === 'm' ? 3013 : 3115);
-        next.hair = fallback * 10 + next.hairCol;
+      const defaultHair = DEFAULT_HAIR_STYLE[sex];
+      if (defaultHair) next.hair = defaultHair * 10 + next.hairCol;
+      else if (!CATALOG.indexes.hairs[sex].active.includes(Math.floor(next.hair / 10))) {
+        next.hair = (CATALOG.indexes.hairs[sex].active[0] ?? 3013) * 10 + next.hairCol;
       }
-      const targetFaces = CATALOG.indexes.faces[sex].active;
-      const currentFaceName = getItem(CATALOG, next.face)?.name;
-      const targetStyle = targetFaces.find((id) => getItem(CATALOG, id)?.name === currentFaceName);
-      next.face = faceVariantId(sex, faceStyleId(targetStyle ?? targetFaces[0] ?? (sex === 'm' ? 20805 : 21816)), faceColorIndex(next.face));
+      next.face = DEFAULT_FACE[sex];
       return next;
     });
   }, []);
@@ -500,6 +504,36 @@ export default function FashionIsland() {
   }, [railSlots, look.items, look.hair, look.face, mysteryHairs, signatureHairs, starterHairStyles, pastHairStyles, mysteryFaces, signatureFaces, starterFaces, pastFaces, equipSections, job]);
 
 
+  // Play mode: a pad drives the preview with a pose override (see play-controller).
+  const stopPlay = useCallback(() => setController(null), []);
+  const startPlay = useCallback(() => {
+    const element = document.getElementById('preview');
+    if (!element) return;
+    setSettingsOpen(false);
+    setController(new PlayController(element, () => getItem(CATALOG, lookRef.current.items.Weapon)?.sub));
+  }, []);
+  useEffect(() => {
+    if (!controller) return;
+    controller.start();
+    return () => controller.stop();
+  }, [controller]);
+  // Decode the worn look's walk/duck/attack frames up front so the first steps don't stutter.
+  useEffect(() => {
+    if (controller) void warmPoses(look, PLAY_POSES);
+  }, [controller, look]);
+
+  // Swipe down on the sheet (from its scroll top) to put the closet away and show the pad.
+  const onRailTouchStart = (event: React.TouchEvent) => {
+    const scroller = (event.target as HTMLElement).closest('#slot-list, #drawer');
+    swipeStart.current = { y: event.touches[0]!.clientY, atTop: !scroller || scroller.scrollTop <= 0 };
+  };
+  const onRailTouchEnd = (event: React.TouchEvent) => {
+    const start = swipeStart.current;
+    swipeStart.current = null;
+    if (!start?.atTop || welcomeOpen || catSec || searchScope) return;
+    if (event.changedTouches[0]!.clientY - start.y > 70) startPlay();
+  };
+
   const drawerTitle = useMemo(() => {
     if (!catSec) return '';
     return EQUIP_SECTIONS.find((section) => section.id === catSec)?.label ?? (catSec === 'Hair'
@@ -514,16 +548,17 @@ export default function FashionIsland() {
   }, [catSec]);
 
   return (
-    <div className="mf">
+    <div className={'mf' + (controller ? ' playing' : '')}>
       <div id="stage" className={welcomeOpen ? (welcomeLeaving ? 'leaving' : 'welcoming') : undefined}>
         <div id="controls">
           <button id="avatar" onClick={() => setSettingsOpen(v => !v)} aria-label="Edit character" aria-expanded={settingsOpen} aria-controls="settings"><canvas ref={avatarRef} width={AVATAR_PX} height={AVATAR_PX} aria-hidden="true" /></button>
           <div className="controls-right">
             <button id="share" onClick={shareLook} aria-label="Share this look" title={shared ? 'Shared!' : copied ? 'Link copied!' : 'Share this look'}><Icon name={copied || shared ? 'check' : 'share'} /></button>
+            <button id="play" onClick={() => controller ? stopPlay() : startPlay()} aria-label={controller ? 'Back to closet' : 'Move your character'} aria-pressed={!!controller} title="Move your character"><Icon name="play" /></button>
             <button id="shuffle" onClick={() => setLook(randomLook(look.sex, Math.random, excludedSlots, nxOnly, job === 'All' ? 'Beginner' : job))} aria-label="Randomize outfit"><Icon name="shuffle" /></button>
           </div>
         </div>
-        <div id="canvas" onClick={() => setSettingsOpen(true)} title="Edit character" style={{ cursor: 'pointer' }}>
+        <div id="canvas" onClick={() => { if (!controller) setSettingsOpen(true); }} title="Edit character" style={{ cursor: 'pointer' }}>
           <LayeredCharacterCanvas look={look} onRendered={(canvas) => { setRendering(false); drawAvatar(canvas); }} />
           {rendering && <div id="spin" />}
           <div className="name-row">
@@ -537,6 +572,7 @@ export default function FashionIsland() {
           </div>
         </div>
       </div>
+      {controller && <GamePad controller={controller} onExit={stopPlay} />}
       {settingsOpen && (
         <div id="settings">
           <header className="settings-head">
@@ -592,7 +628,8 @@ export default function FashionIsland() {
         </div>
     )}
 
-    <div id="rail" className={welcomeOpen && !welcomeLeaving ? 'welcoming' : undefined}>
+    <div id="rail" className={welcomeOpen && !welcomeLeaving ? 'welcoming' : undefined} onTouchStart={onRailTouchStart} onTouchEnd={onRailTouchEnd}>
+      <div id="rail-grip" aria-hidden="true"><span /></div>
       {welcomeOpen && (
         <section id="welcome" className={welcomeLeaving ? 'leaving' : undefined} role="dialog" aria-labelledby="welcome-title">
           <header>
@@ -1065,7 +1102,7 @@ function CharacterEditor({ look, skins, onName, onSex, onSkin }: {
   );
 }
 
-function Icon({ name }: { name: 'settings' | 'shuffle' | 'search' | 'close' | 'share' | 'check' }) {
+function Icon({ name }: { name: 'settings' | 'shuffle' | 'search' | 'close' | 'share' | 'check' | 'play' }) {
   return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     {name === 'settings' && <><path d="m9 3-.6 2.5-2.2 1.3-2.5-.7-2 3.5 1.9 1.8v2.6l-1.9 1.8 2 3.5 2.5-.7 2.2 1.3L9 22h4l.6-2.6 2.2-1.3 2.5.7 2-3.5-1.9-1.8v-2.6l1.9-1.8-2-3.5-2.5.7-2.2-1.3L13 3Z" /><circle cx="11" cy="12.5" r="3" /></>}
     {name === 'shuffle' && <><rect x="3" y="3" width="18" height="18" rx="4" /><path d="M7 7h.01M17 7h.01M12 12h.01M7 17h.01M17 17h.01" strokeWidth="3" /></>}
@@ -1073,5 +1110,6 @@ function Icon({ name }: { name: 'settings' | 'shuffle' | 'search' | 'close' | 's
     {name === 'close' && <path d="m6 6 12 12M6 18 18 6" />}
     {name === 'share' && <><circle cx="6" cy="12" r="2.5" /><circle cx="18" cy="6" r="2.5" /><circle cx="18" cy="18" r="2.5" /><path d="m8.2 10.8 7.6-3.6M8.2 13.2l7.6 3.6" /></>}
     {name === 'check' && <path d="m4.5 12.5 5 5 10-11" />}
+    {name === 'play' && <><rect x="2.5" y="7" width="19" height="10" rx="5" /><path d="M8 10v4M6 12h4M16 11h.01M18 13h.01" strokeWidth="2" /></>}
   </svg>;
 }

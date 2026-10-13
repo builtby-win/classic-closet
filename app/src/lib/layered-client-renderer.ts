@@ -33,7 +33,11 @@ interface ItemRecord {
   islot?: string;
 }
 
+/** Poses baked into `<id>.motion.json` (play mode) instead of the main item file. */
+export const MOTION_ANIMS = new Set(['walk1', 'walk2', 'prone', 'swingO1', 'stabO1', 'swingT1', 'stabT1', 'swingP1', 'shoot1', 'shoot2']);
+
 const records = new Map<number, Promise<ItemRecord | null>>();
+const motionRecords = new Map<number, Promise<ItemRecord | null>>();
 const images = new Map<string, Promise<HTMLImageElement>>();
 let baseManifest: Promise<BaseManifest | null> | null = null;
 
@@ -44,6 +48,21 @@ function localItem(id: number): Promise<ItemRecord | null> {
     .then((response) => response.ok ? response.json() as Promise<ItemRecord> : null)
     .catch(() => null);
   records.set(id, request);
+  return request;
+}
+
+/** Item record plus its play-mode frames; a missing motion file just means no extra poses. */
+function localMotionItem(id: number): Promise<ItemRecord | null> {
+  let request = motionRecords.get(id);
+  if (!request) {
+    request = Promise.all([
+      localItem(id),
+      fetch(`/sprites/items/${id}.motion.json`)
+        .then((response) => response.ok ? response.json() as Promise<Pick<ItemRecord, 'frames'>> : null)
+        .catch(() => null),
+    ]).then(([record, motion]) => record && motion ? { ...record, frames: { ...record.frames, ...motion.frames } } : record);
+    motionRecords.set(id, request);
+  }
   return request;
 }
 
@@ -116,6 +135,8 @@ export async function renderLayeredCharacter(
   if (!frame) {
     missing.push(look.skin);
   } else {
+    // Start every image request up front; the loops below then await cached promises.
+    for (const layers of [frame.body, frame.head]) for (const effect of layers) localImage(effect.image).catch(() => {});
     for (const layers of [frame.body, frame.head]) {
       for (let index = 0; index < layers.length; index++) {
         const effect = layers[index]!;
@@ -145,7 +166,7 @@ export async function renderLayeredCharacter(
 
   const loaded = await Promise.all(selections.map(async (selection) => ({
     selection,
-    record: await localItem(selection.id),
+    record: await (!selection.face && MOTION_ANIMS.has(look.anim) ? localMotionItem(selection.id) : localItem(selection.id)),
   })));
   for (const { record, selection } of loaded) {
     if (!record) missing.push(selection.id);
@@ -153,6 +174,11 @@ export async function renderLayeredCharacter(
   const hatHasCap = loaded.some(({ selection, record }) => selection.part === 'Hat'
     && Object.values(record?.frames ?? {}).flat().some((effect) =>
       ['cap', 'capAccessory', 'capBelowAccessory'].includes(effect.position ?? '')));
+
+  for (const { selection, record } of loaded) {
+    if (!record) continue;
+    for (const effect of frameEffects(record, look, selection.face ?? false)) localImage(effect.image).catch(() => {});
+  }
 
   for (const { selection, record } of loaded) {
     if (!record) continue;
@@ -180,4 +206,15 @@ export async function renderLayeredCharacter(
   const composition = composeLayers(spriteLayers, CLASSIC_ZMAP_ORDER);
   drawComposition(ctx, composition, width, height);
   return { missing: [...new Set(missing)], unresolved: composition.unresolved };
+}
+
+/** Decode every frame of the given poses ahead of time so play mode never stalls on first use. */
+export async function warmPoses(look: Look, poses: Array<{ anim: string; frames: number }>): Promise<void> {
+  const scratch = document.createElement('canvas').getContext('2d');
+  if (!scratch) return;
+  for (const { anim, frames } of poses) {
+    for (let frame = 0; frame < frames; frame++) {
+      await renderLayeredCharacter(scratch, { ...look, anim, frame }).catch(() => undefined);
+    }
+  }
 }
