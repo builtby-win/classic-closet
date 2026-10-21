@@ -13,6 +13,7 @@
     "bake-sprites": "tsx scripts/bake-sprites.ts",
     "bake-skills": "tsx scripts/bake-skills.ts",
     "update-banners": "tsx scripts/update-banners.ts",
+    "check-hide": "tsx scripts/check-hide.ts",
     "deploy": "pnpm build && CLOUDFLARE_ACCOUNT_ID=58df26bb8dbf15af4045df9c8f1740f1 npx wrangler deploy"
   },
   "dependencies": {

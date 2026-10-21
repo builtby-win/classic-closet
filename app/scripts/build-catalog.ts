@@ -290,7 +290,7 @@ try {
  * non-cash dupes (Bunny Ears sword) lose to cash NX records.
  * Empty = not in any dataset; caller logs miss with fuzzy suggestions.
  */
-const overlay: { pins?: Array<{ name: string; id: number; note?: string; src?: PinSource }>; hide?: Array<{ id: number; note?: string }> } = JSON.parse(
+const overlay: { pins?: Array<{ name: string; id: number; note?: string; src?: PinSource }>; hide?: Array<{ id: number; note?: string; wrongIconMd5?: string }> } = JSON.parse(
   readFileSync(join(ROOT, 'data', 'nexon-overlay.json'), 'utf8'),
 );
 const overlayPins = new Map((overlay.pins ?? []).map((p) => [p.name.toLowerCase(), p]));

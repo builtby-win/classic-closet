@@ -14,6 +14,6 @@
   ],
   "items": [],
   "hide": [
-    { "id": 1057069, "note": "Race Queen Uniform (Mystery Fashion Crate 2.50%): name in MCW CBT2 list but zero avatar frames in MCW detail, GMS 270, and OSMS datamine. Re-check after Grand Launch art lands; then drop this entry and re-run catalog + bake." }
+    { "id": 1057069, "wrongIconMd5": "b03d3124807da61347acad45dd76f6ed", "note": "Race Queen Uniform (Mystery Fashion Crate 2.50%): MCW serves stale retail BLUE art (worn render verified vs red/white Nexon set 2026-10-21); GMS 270 has nothing. True Classic art in no dataset yet. Drop when a source grows the red/white art." }
   ]
 }
