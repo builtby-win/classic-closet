@@ -1,7 +1,12 @@
 {
   "$schema": "./nexon-overlay.schema.json",
   "_comment": "Hand-verified Nexon name -> item ID pins. Used when a rate-table name has no exact dataset match (Classic-exclusive or renamed retail item). NEVER guess: verify sub/cash/art in game or maplestory.io first. Applied by pnpm catalog with top priority.",
-  "pins": [],
+  "pins": [
+    { "name": "Buddy Overall Jeans (Blue)", "id": 1050146, "note": "Gender split: m variant of Buddy Overall Jeans (GMS cash Overall). Blue art verified vs Nexon grand-launch set render (-m-). (Red) = 1051170." },
+    { "name": "Buddy Overall Jeans (Red)", "id": 1051170, "note": "Gender split: f variant of Buddy Overall Jeans (GMS cash Overall). Red art verified vs Nexon grand-launch set render (-f-). (Blue) = 1050146." }
+  ],
   "items": [],
-  "hide": []
+  "hide": [
+    { "id": 1057069, "note": "Race Queen Uniform (Mystery Fashion Crate 2.50%): name in MCW CBT2 list but zero avatar frames in MCW detail, GMS 270, and OSMS datamine. Re-check after Grand Launch art lands; then drop this entry and re-run catalog + bake." }
+  ]
 }

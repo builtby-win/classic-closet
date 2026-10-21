@@ -327,7 +327,7 @@ export default function FashionIsland() {
   );
 
   const equipSections = useMemo(() => {
-    const ids = [...new Set(['founder-crate', 'aurora-crate', 'cover-10day', 'classic-equips'].flatMap(getGroupEquips))]
+    const ids = [...new Set(['founder-crate', 'mystery-crate', 'aurora-crate', 'cover-10day', 'classic-equips'].flatMap(getGroupEquips))]
       .filter((id) => !!CATALOG.items[id]);
     return EQUIP_SECTIONS.map((section) => ({
       ...section,
@@ -402,7 +402,7 @@ export default function FashionIsland() {
       list.push(row);
       buckets.set(group, list);
     }
-    const order = ['founder-crate', 'cover-10day', 'aurora-crate', 'classic-equips'];
+    const order = ['founder-crate', 'mystery-crate', 'cover-10day', 'aurora-crate', 'classic-equips'];
     const groups = order
       .filter((key) => (buckets.get(key)?.length ?? 0) > 0)
       .map((key) => {
@@ -411,6 +411,7 @@ export default function FashionIsland() {
         const banner = getBanner(CATALOG, bannerId);
         const dates = banner?.start && banner?.end ? ` · ${shortDate(banner.start)}–${shortDate(banner.end)}` : '';
         const label = key === 'founder-crate' ? "Founder's Mystery Crate"
+          : key === 'mystery-crate' ? 'Mystery Fashion Crate'
           : key === 'cover-10day' ? '10-Day Covers'
           : key === 'aurora-crate' ? 'Aurora Stamp Shop'
           : 'Job Equips';
@@ -621,6 +622,8 @@ export default function FashionIsland() {
         ? 'Face'
         : catSec === 'founder-crate'
           ? "Founder's Crate"
+          : catSec === 'mystery-crate'
+            ? 'Mystery Crate'
           : catSec === 'aurora-crate'
             ? 'Aurora Crate'
             : '10-Day Covers · 700–1,200 NX');
@@ -1122,7 +1125,7 @@ function Tile(props: {
   const banner = getBanner(CATALOG, props.bannerId);
   // Only choice-based acquisition gets a method badge. Random/mystery is the
   // default and the % badge already signals chance, so no dice badge.
-  const randomOnly = props.coupon === 'mystery' || props.bannerId === 'founder-crate-oct26' || props.bannerId === 'beta-style-sep26';
+  const randomOnly = props.coupon === 'mystery' || props.bannerId === 'founder-crate-oct26' || props.bannerId === 'mystery-crate-nov26' || props.bannerId === 'beta-style-sep26';
   const showSelect = !randomOnly && (props.coupon === 'signature' || !!banner);
   const isCover = props.bannerId === 'covers-10day-nov26';
   const expiration = isCover

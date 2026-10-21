@@ -171,8 +171,9 @@ const rotationsPath = join(ROOT, 'data', 'rotations.json');
 const rotations: RotationsFile = JSON.parse(readFileSync(rotationsPath, 'utf8'));
 
 const founderRates = await rateTable(45538);
+const mysteryRates = await rateTable(46331);
 const auroraRates = await rateTable(45659);
-console.log(`rates fetched: founder=${founderRates.size} aurora=${auroraRates.size}`);
+console.log(`rates fetched: founder=${founderRates.size} mystery=${mysteryRates.size} aurora=${auroraRates.size}`);
 
 const [osmsItemsFile, osmsBeauty, count] = await Promise.all([
   fetch(`${OSMS_DATA}/items.json`).then((r) => {
@@ -286,10 +287,12 @@ try {
  * non-cash dupes (Bunny Ears sword) lose to cash NX records.
  * Empty = not in any dataset; caller logs miss with fuzzy suggestions.
  */
-const overlay: { pins?: Array<{ name: string; id: number; note?: string }> } = JSON.parse(
+const overlay: { pins?: Array<{ name: string; id: number; note?: string }>; hide?: Array<{ id: number; note?: string }> } = JSON.parse(
   readFileSync(join(ROOT, 'data', 'nexon-overlay.json'), 'utf8'),
 );
 const overlayPins = new Map((overlay.pins ?? []).map((p) => [p.name.toLowerCase(), p.id]));
+const hiddenIds = new Map((overlay.hide ?? []).map((h) => [h.id, h.note ?? '']));
+const hiddenNameHits = new Set<string>();
 const osmsGearById = new Map(osmsDump.map((item) => [item.id, item]));
 
 function pinRecord(id: number): { item: RawItem | GmsItem; src: AssetSource | undefined } | null {
@@ -305,14 +308,22 @@ function pinRecord(id: number): { item: RawItem | GmsItem; src: AssetSource | un
 function resolveCrateItem(name: string): Array<{ item: RawItem | GmsItem; src: AssetSource | undefined }> {
   const pin = overlayPins.get(name.toLowerCase());
   if (pin != null) {
+    if (hiddenIds.has(pin)) { console.warn(`crate item hidden: ${name} -> ${pin} (${hiddenIds.get(pin)})`); hiddenNameHits.add(name); return []; }
     const rec = pinRecord(pin);
     if (!rec) throw new Error(`nexon-overlay pin points nowhere: ${name} -> ${pin}`);
     return [rec];
   }
   const mcw = byName.get(name.toLowerCase());
-  if (mcw && mcw.typeInfo.overallCategory === 'Equip') return [{ item: mcw, src: mcw.src }];
+  if (mcw && mcw.typeInfo.overallCategory === 'Equip') {
+    if (hiddenIds.has(mcw.id)) { console.warn(`crate item hidden: ${name} -> ${mcw.id} (${hiddenIds.get(mcw.id)})`); hiddenNameHits.add(name); return []; }
+    return [{ item: mcw, src: mcw.src }];
+  }
   const candidates = (gmsByNameAll.get(name.toLowerCase()) ?? [])
-    .filter((g) => g.typeInfo.overallCategory === 'Equip');
+    .filter((g) => g.typeInfo.overallCategory === 'Equip')
+    .filter((g) => {
+      if (hiddenIds.has(g.id)) { console.warn(`crate item hidden: ${name} -> ${g.id} (${hiddenIds.get(g.id)})`); hiddenNameHits.add(name); return false; }
+      return true;
+    });
   if (candidates.length) {
     const cash = candidates.filter((g) => g.isCash);
     return (cash.length ? cash : candidates).map((g) => ({ item: g, src: 'GMS' as const }));
@@ -346,6 +357,7 @@ function suggestNames(name: string, limit = 3): string[] {
 }
 
 function logCrateMiss(name: string): void {
+  if (hiddenNameHits.has(name)) return; // already reported as hidden above
   console.warn(`crate item not in any dataset, skipped: ${name}`);
   for (const s of suggestNames(name)) console.warn(`  maybe: ${s}`);
   console.warn(`  pin the verified id in data/nexon-overlay.json -> pins`);
@@ -394,6 +406,7 @@ const fastCatalog: FastCatalog = {
     },
     groups: {
       'founder-crate': { m: [], f: [], u: [] },
+      'mystery-crate': { m: [], f: [], u: [] },
       'aurora-crate': { m: [], f: [], u: [] },
       'cover-10day': { m: [], f: [], u: [] },
       'classic-equips': { m: [], f: [], u: [] },
@@ -593,6 +606,35 @@ for (const banner of rotations.current) {
           src,
         };
         fastCatalog.indexes.groups['founder-crate'][sex].push(hit.id);
+        fastCatalog.indexes.search.push({
+          id: hit.id,
+          name: hit.name,
+          sub: hit.typeInfo.subCategory,
+          sex,
+        });
+      }
+    }
+  }
+
+  // Equips (Grand Launch Mystery Crate)
+  if (banner.id === 'mystery-crate-nov26') {
+    for (const [name, rate] of mysteryRates) {
+      const resolved = resolveCrateItem(name);
+      if (!resolved.length) logCrateMiss(name);
+      for (const { item: hit, src } of resolved) {
+        if (hit.typeInfo.overallCategory !== 'Equip') continue;
+        const sex = sexOf(hit);
+        fastCatalog.items[hit.id] = {
+          name: hit.name,
+          sub: hit.typeInfo.subCategory,
+          sex,
+          bannerId: banner.id,
+          attainable: true,
+          group: 'mystery-crate',
+          rate,
+          src,
+        };
+        fastCatalog.indexes.groups['mystery-crate'][sex].push(hit.id);
         fastCatalog.indexes.search.push({
           id: hit.id,
           name: hit.name,

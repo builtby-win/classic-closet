@@ -85,6 +85,7 @@ export type SectionId =
   | 'FacePast'
   | 'FaceSignature'
   | 'founder-crate'
+  | 'mystery-crate'
   | 'aurora-crate'
   | 'cover-10day'
   | 'Shield' | 'Hat' | 'Top' | 'Bottom' | 'Overall' | 'Shoes' | 'Glove' | 'Weapon' | 'Cape' | 'Accessories';
@@ -182,13 +183,14 @@ export function stanceForWeapon(sub: string | undefined, currentAnim: string): {
 }
 
 /** Banner/group sort for equip drawers: limited NX first (by urgency), classic last.
- *  Founder's crate ends Oct 28 → covers end Nov 18 → Aurora stamp ends Jan 13. */
+ *  Founder's crate ends Oct 28 → Mystery crate ends Nov 4 → covers end Nov 18 → Aurora stamp ends Jan 13. */
 export const GROUP_RANK: Record<string, number> = {
   'founder-crate': 0,
-  'cover-10day': 1,
-  'aurora-crate': 2,
-  'style-coupon': 3,
-  'classic-equips': 4,
+  'mystery-crate': 1,
+  'cover-10day': 2,
+  'aurora-crate': 3,
+  'style-coupon': 4,
+  'classic-equips': 5,
 };
 
 export function bannerRank(item: ItemMeta | HairStyleMeta | undefined): number {
@@ -201,6 +203,7 @@ export function bannerRank(item: ItemMeta | HairStyleMeta | undefined): number {
 /** Short group tag for badges */
 export const GROUP_SHORT: Record<string, string> = {
   'founder-crate': 'Founder',
+  'mystery-crate': 'Mystery',
   'aurora-crate': 'Aurora',
   'style-coupon': 'Style',
   'cover-10day': '10-Day',
