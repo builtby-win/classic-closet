@@ -21,7 +21,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const API = 'https://maplestory.io/api/MCW/CBT2';
-const OSMS_REF = '6e4971f1d5f80f7668eb1671834ff23993a5ba24';
+const OSMS_REF = '63db09449642c4bf3414276223e4cb7d72af02d9';
 const OSMS_DATA = `https://raw.githubusercontent.com/ohmi69/osms_datamine_dashboard/${OSMS_REF}/data/current`;
 const CMS = 'https://g.nexonstatic.com/maplestory/cms/v1/general-posts';
 type AssetSource = 'OSMS' | 'GMS' | 'MCW';
