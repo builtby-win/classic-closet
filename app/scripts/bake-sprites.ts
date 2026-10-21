@@ -40,21 +40,25 @@ async function fetchWithTimeout(url: string, ms = 7000): Promise<Response> {
   return fetch(url, { signal: AbortSignal.timeout(ms) });
 }
 
-async function fetchItemData(id: number, src?: 'GMS' | 'OSMS', sub?: string, tries = 3): Promise<any | null> {
+async function fetchItemData(id: number, src?: 'GMS' | 'OSMS' | 'MCW', sub?: string, tries = 3): Promise<any | null> {
   // Same numeric ids are different items per region (e.g. GMS 1332001 is
   // Halfmoon Zamadar, MCW 1332001 is Fruit Knife). OSMS gear lives on the
   // MCW endpoint, so it MUST bake from MCW first; only modern OSMS hair/face
   // cosmetics (rendered from GMS, see assetSource) and GMS items prefer GMS.
+  // src 'MCW' (pin-forced) is strict: MCW frames or throw, never silently
+  // fall back to a same-id different-art GMS record (cf. White Beanie 1007073).
   const cosmetic = sub === 'Hair' || sub === 'Face';
   const gmsFirst = src === 'GMS' || (src === 'OSMS' && cosmetic);
+  const mcwOnly = src === 'MCW';
   const preferred = gmsFirst
     ? 'https://maplestory.io/api/GMS/270'
     : 'https://maplestory.io/api/MCW/CBT2';
   const fallback = gmsFirst
     ? 'https://maplestory.io/api/MCW/CBT2'
     : 'https://maplestory.io/api/GMS/270';
+  const bases = mcwOnly ? [preferred] : [preferred, fallback];
   for (let attempt = 1; attempt <= tries; attempt++) {
-    for (const apiBase of [preferred, fallback]) {
+    for (const apiBase of bases) {
       try {
         const res = await fetchWithTimeout(`${apiBase}/item/${id}`, 12000);
         if (!res.ok) continue;

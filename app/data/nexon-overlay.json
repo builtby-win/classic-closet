@@ -3,7 +3,14 @@
   "_comment": "Hand-verified Nexon name -> item ID pins. Used when a rate-table name has no exact dataset match (Classic-exclusive or renamed retail item). NEVER guess: verify sub/cash/art in game or maplestory.io first. Applied by pnpm catalog with top priority.",
   "pins": [
     { "name": "Buddy Overall Jeans (Blue)", "id": 1050146, "note": "Gender split: m variant of Buddy Overall Jeans (GMS cash Overall). Blue art verified vs Nexon grand-launch set render (-m-). (Red) = 1051170." },
-    { "name": "Buddy Overall Jeans (Red)", "id": 1051170, "note": "Gender split: f variant of Buddy Overall Jeans (GMS cash Overall). Red art verified vs Nexon grand-launch set render (-f-). (Blue) = 1050146." }
+    { "name": "Buddy Overall Jeans (Red)", "id": 1051170, "note": "Gender split: f variant of Buddy Overall Jeans (GMS cash Overall). Red art verified vs Nexon grand-launch set render (-f-). (Blue) = 1050146." },
+    { "name": "Green Camping Hat", "id": 1007002, "src": "MCW", "note": "Same numeric id is a different retail item in GMS 270 (divergent icons); Classic art is MCW. Strict MCW bake." },
+    { "name": "Puffy Brown Hat", "id": 1007004, "src": "MCW", "note": "Same numeric id is a different retail item in GMS 270 (divergent icons); Classic art is MCW. Strict MCW bake." },
+    { "name": "Starred Hunting Hat", "id": 1007056, "src": "MCW", "note": "Same numeric id is a different retail item in GMS 270 (divergent icons); Classic art is MCW. Strict MCW bake." },
+    { "name": "White Beanie", "id": 1007073, "src": "MCW", "note": "Same numeric id is a bonnet in GMS 270 (shipped wrong sprite); Classic white beanie is MCW. Strict MCW bake." },
+    { "name": "Beige Checkered Hat", "id": 1007090, "src": "MCW", "note": "Same numeric id is a different retail item in GMS 270 (divergent icons); Classic art is MCW. Strict MCW bake." },
+    { "name": "Detective Hat", "id": 1007105, "src": "MCW", "note": "Same numeric id is a different retail item in GMS 270 (divergent icons); Classic art is MCW. Strict MCW bake." },
+    { "name": "Race Ace Cap", "id": 1007111, "src": "MCW", "note": "Same numeric id is a different retail item in GMS 270 (divergent icons); Classic art is MCW. Strict MCW bake." }
   ],
   "items": [],
   "hide": [

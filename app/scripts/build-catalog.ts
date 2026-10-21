@@ -24,7 +24,10 @@ const API = 'https://maplestory.io/api/MCW/CBT2';
 const OSMS_REF = '6e4971f1d5f80f7668eb1671834ff23993a5ba24';
 const OSMS_DATA = `https://raw.githubusercontent.com/ohmi69/osms_datamine_dashboard/${OSMS_REF}/data/current`;
 const CMS = 'https://g.nexonstatic.com/maplestory/cms/v1/general-posts';
-type AssetSource = 'OSMS' | 'GMS';
+type AssetSource = 'OSMS' | 'GMS' | 'MCW';
+/** Region a pin forces for baking. 'MCW' is strict: MCW frames or throw, never
+ *  silently fall back to a same-id different-art GMS record (cf. White Beanie). */
+type PinSource = 'MCW' | 'GMS' | 'OSMS';
 
 interface RawItem {
   id: number;
@@ -287,30 +290,35 @@ try {
  * non-cash dupes (Bunny Ears sword) lose to cash NX records.
  * Empty = not in any dataset; caller logs miss with fuzzy suggestions.
  */
-const overlay: { pins?: Array<{ name: string; id: number; note?: string }>; hide?: Array<{ id: number; note?: string }> } = JSON.parse(
+const overlay: { pins?: Array<{ name: string; id: number; note?: string; src?: PinSource }>; hide?: Array<{ id: number; note?: string }> } = JSON.parse(
   readFileSync(join(ROOT, 'data', 'nexon-overlay.json'), 'utf8'),
 );
-const overlayPins = new Map((overlay.pins ?? []).map((p) => [p.name.toLowerCase(), p.id]));
+const overlayPins = new Map((overlay.pins ?? []).map((p) => [p.name.toLowerCase(), p]));
 const hiddenIds = new Map((overlay.hide ?? []).map((h) => [h.id, h.note ?? '']));
 const hiddenNameHits = new Set<string>();
 const osmsGearById = new Map(osmsDump.map((item) => [item.id, item]));
 
-function pinRecord(id: number): { item: RawItem | GmsItem; src: AssetSource | undefined } | null {
+function pinRecord(id: number, forcedSrc?: PinSource): { item: RawItem | GmsItem; src: AssetSource | undefined } | null {
   const osms = osmsGearById.get(id) ?? osmsById.get(id);
-  if (osms) return { item: osms, src: osms.src };
+  if (osms && !forcedSrc) return { item: osms, src: osms.src };
   const mcw = mcwById.get(id);
-  if (mcw) return { item: mcw, src: mcw.src };
+  if (mcw && (!forcedSrc || forcedSrc === 'MCW')) return { item: mcw, src: forcedSrc ?? mcw.src };
   const gms = gmsById.get(id);
-  if (gms) return { item: gms, src: 'GMS' };
+  if (gms && (!forcedSrc || forcedSrc === 'GMS')) return { item: gms, src: forcedSrc ?? 'GMS' };
+  // Forced region without a record there: fall through to any record so the
+  // bake fails loudly on missing frames instead of resolving a wrong item.
+  if (osms) return { item: osms, src: forcedSrc };
+  if (mcw) return { item: mcw, src: forcedSrc };
+  if (gms) return { item: gms, src: forcedSrc };
   return null;
 }
 
 function resolveCrateItem(name: string): Array<{ item: RawItem | GmsItem; src: AssetSource | undefined }> {
   const pin = overlayPins.get(name.toLowerCase());
   if (pin != null) {
-    if (hiddenIds.has(pin)) { console.warn(`crate item hidden: ${name} -> ${pin} (${hiddenIds.get(pin)})`); hiddenNameHits.add(name); return []; }
-    const rec = pinRecord(pin);
-    if (!rec) throw new Error(`nexon-overlay pin points nowhere: ${name} -> ${pin}`);
+    if (hiddenIds.has(pin.id)) { console.warn(`crate item hidden: ${name} -> ${pin.id} (${hiddenIds.get(pin.id)})`); hiddenNameHits.add(name); return []; }
+    const rec = pinRecord(pin.id, pin.src);
+    if (!rec) throw new Error(`nexon-overlay pin points nowhere: ${name} -> ${pin.id}`);
     return [rec];
   }
   const mcw = byName.get(name.toLowerCase());

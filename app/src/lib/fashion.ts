@@ -23,7 +23,7 @@ export interface HairStyleMeta {
   bannerId: string;
   attainable: boolean;
   rate?: string;
-  src?: 'OSMS' | 'GMS';
+  src?: 'OSMS' | 'GMS' | 'MCW';
   history?: string[];
   coupon?: 'mystery' | 'signature';
 }
@@ -38,7 +38,7 @@ export interface ItemMeta {
   attainable: boolean;
   group?: string;
   rate?: string;
-  src?: 'OSMS' | 'GMS';
+  src?: 'OSMS' | 'GMS' | 'MCW';
   history?: string[];
   coupon?: 'mystery' | 'signature';
 }
