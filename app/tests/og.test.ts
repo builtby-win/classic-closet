@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { crawlerRenderURL, ogSourceFor, parseLookParams } from '../src/lib/og';
+import catalogData from '../src/data/catalog.json';
+import { crawlerRenderURL, GMS_EQUIP_IDS, ogSourceFor, parseLookParams } from '../src/lib/og';
 import { encodeLook, faceVariantId, type Look } from '../src/lib/fashion';
-
 function entriesOf(url: string): Array<{ itemId: number; region: string; version: string }> {
   const u = new URL(url);
   assert.ok(u.pathname.startsWith('/api/character/'), `modern endpoint, got ${u.pathname}`);
@@ -91,4 +91,19 @@ test('malicious or out-of-range values fall back safely', () => {
   assert.ok(ids.includes(2000) && ids.includes(20805) && ids.includes(30130));
   assert.ok(ids.includes(1302000));
   assert.ok(url.endsWith('/stand1/0?showears=false&showLefEars=false&showHighLefEars=false&resize=4&flipX=false&renderMode=0&padX=30&padY=50'));
+});
+
+test('og routing mirrors catalog src for every GMS equip', () => {
+  const items = catalogData.items as Record<string, { src?: string }>;
+  const gmsEquips = Object.keys(items).map(Number).filter((id) =>
+    items[String(id)]?.src === 'GMS' && !(id >= 20000 && id < 50000));
+  assert.ok(gmsEquips.length > 0, 'expected GMS-src equips in catalog');
+  for (const id of gmsEquips) {
+    assert.ok(GMS_EQUIP_IDS.has(id), `catalog GMS-src equip ${id} missing from GMS_EQUIP_IDS`);
+    assert.deepEqual(ogSourceFor(id), { region: 'GMS', version: '270' });
+  }
+  // Buddy regression: GMS overalls must never route MCW.
+  for (const id of [1050146, 1051170]) {
+    assert.deepEqual(ogSourceFor(id), { region: 'GMS', version: '270' });
+  }
 });

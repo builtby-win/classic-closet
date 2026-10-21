@@ -1,9 +1,11 @@
 // Worker-safe Open Graph helpers for shared look links.
-// No catalog import: region routing mirrors assetSource() in lib/fashion.ts.
-// All hair (30000-49999) and face (20000-22000) ids render from GMS/270
-// regardless of color variant or OSMS/GMS src; skins and equips render
-// from MCW/CBT2. Verified against src/data/catalog.json (all GMS-src
-// items are faces; all null-src items are equips).
+// No catalog import (worker bundle): region routing mirrors assetSource() in
+// lib/fashion.ts. All hair (30000-49999) and face (20000-22000) ids render
+// from GMS/270 regardless of color variant; skins and most equips render
+// from MCW/CBT2 — EXCEPT the GMS_EQUIP_IDS below, which are catalog items
+// with src GMS (retail-resolved crate cosmetics, e.g. Buddy Overall Jeans).
+// Source of truth for membership: catalog items with src === 'GMS' outside
+// the beauty ranges; tests/og.test.ts fails if the set drifts.
 
 export const OG_SITE_URL = 'https://classic-closet.builtby.win';
 export const OG_DEFAULT_IMAGE = `${OG_SITE_URL}/og-default.png`;
@@ -21,14 +23,32 @@ export interface OgSource {
   version: string;
 }
 
+/** Catalog items with src GMS outside the beauty ranges (retail-resolved
+ *  crate cosmetics). Must render from GMS/270 like the app does — MCW holds
+ *  different items under several of these ids (e.g. MCW 1003050 is a sword,
+ *  not Bunny Ears). */
+export const GMS_EQUIP_IDS: ReadonlySet<number> = new Set([
+  1002501, 1002738, 1002753, 1002943, 1002978, 1003006, 1003050, 1003807,
+  1003998, 1004026, 1004027, 1004028, 1004094, 1012083, 1012374, 1012450,
+  1022188, 1032029, 1032052, 1042066, 1042081, 1042082, 1042086, 1042146,
+  1042150, 1042238, 1042260, 1042270, 1042287, 1050125, 1050146, 1050152,
+  1050158, 1050304, 1051139, 1051170, 1051173, 1051180, 1051372, 1060119,
+  1062171, 1062174, 1062185, 1072200, 1072330, 1072331, 1072332, 1072379,
+  1072529, 1072876, 1072910, 1082171, 1082565, 1082581, 1102005, 1102093,
+  1102137, 1112113, 1112135, 1112238, 1702405, 1702445, 1702468,
+]);
+
 /** Region routing for a single numeric asset id. Handles every hair color
- *  (style * 10 + 0-7), every eye color (base + color * 100 + style),
+ *  variant (style * 10 + 0-7), every eye color (base + color * 100 + style),
  *  GMS-only faces, skins/bodies, and all equip ids. */
 export function ogSourceFor(itemId: number): OgSource {
   if (
     Number.isInteger(itemId) &&
     ((itemId >= 30000 && itemId < 50000) || (itemId >= 20000 && itemId < 22000))
   ) {
+    return { region: 'GMS', version: '270' };
+  }
+  if (GMS_EQUIP_IDS.has(itemId)) {
     return { region: 'GMS', version: '270' };
   }
   return { region: 'MCW', version: 'CBT2' };
