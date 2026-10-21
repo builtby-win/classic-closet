@@ -42,31 +42,23 @@ async function fetchWithTimeout(url: string, ms = 7000): Promise<Response> {
 
 async function fetchItemData(id: number, src?: 'GMS' | 'OSMS' | 'MCW', sub?: string, tries = 3): Promise<any | null> {
   // Same numeric ids are different items per region (e.g. GMS 1332001 is
-  // Halfmoon Zamadar, MCW 1332001 is Fruit Knife). OSMS gear lives on the
-  // MCW endpoint, so it MUST bake from MCW first; only modern OSMS hair/face
-  // cosmetics (rendered from GMS, see assetSource) and GMS items prefer GMS.
-  // src 'MCW' (pin-forced) is strict: MCW frames or throw, never silently
-  // fall back to a same-id different-art GMS record (cf. White Beanie 1007073).
+  // Halfmoon Zamadar, MCW 1332001 is Fruit Knife). Region is the catalog's
+  // per-item src verdict — bake strictly from that region, never silently
+  // fall back to same-id different-art records (cf. White Beanie 1007073).
+  // Transient flakes retry here, then throw loud instead of baking wrong art.
   const cosmetic = sub === 'Hair' || sub === 'Face';
   const gmsFirst = src === 'GMS' || (src === 'OSMS' && cosmetic);
-  const mcwOnly = src === 'MCW';
-  const preferred = gmsFirst
+  const base = gmsFirst
     ? 'https://maplestory.io/api/GMS/270'
     : 'https://maplestory.io/api/MCW/CBT2';
-  const fallback = gmsFirst
-    ? 'https://maplestory.io/api/MCW/CBT2'
-    : 'https://maplestory.io/api/GMS/270';
-  const bases = mcwOnly ? [preferred] : [preferred, fallback];
   for (let attempt = 1; attempt <= tries; attempt++) {
-    for (const apiBase of bases) {
-      try {
-        const res = await fetchWithTimeout(`${apiBase}/item/${id}`, 12000);
-        if (!res.ok) continue;
-        const raw = await res.json();
-        if (raw?.frameBooks && Object.keys(raw.frameBooks).length) return raw;
-      } catch {
-        // try the other region, then retry with backoff
-      }
+    try {
+      const res = await fetchWithTimeout(`${base}/item/${id}`, 12000);
+      if (!res.ok) continue;
+      const raw = await res.json();
+      if (raw?.frameBooks && Object.keys(raw.frameBooks).length) return raw;
+    } catch {
+      // retry with backoff
     }
     if (attempt < tries) await new Promise((r) => setTimeout(r, 500 * attempt));
   }
