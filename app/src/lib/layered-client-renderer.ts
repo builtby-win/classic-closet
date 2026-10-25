@@ -42,12 +42,52 @@ const motionRecords = new Map<number, Promise<ItemRecord | null>>();
 const images = new Map<string, Promise<HTMLImageElement>>();
 let baseManifest: Promise<BaseManifest | null> | null = null;
 
+const BAKED_FALLBACK_ACTIONS = new Set(['stand1', 'stand2', 'alert', 'jump', 'default']);
+
+async function fetchRemoteItem(id: number): Promise<ItemRecord | null> {
+  try {
+    const response = await fetch(`https://maplestory.io/api/GMS/270/item/${id}`);
+    if (!response.ok) return null;
+    const raw = await response.json();
+    if (!raw?.frameBooks) return null;
+    const frames: Record<string, EffectRecord[]> = {};
+    for (const [actionName, action] of Object.entries<any>(raw.frameBooks)) {
+      if (!BAKED_FALLBACK_ACTIONS.has(actionName) || !action?.frames) continue;
+      action.frames.forEach((f: any, fIdx: number) => {
+        const key = `${actionName}:${fIdx}`;
+        const effects: EffectRecord[] = [];
+        for (const eff of Object.values<any>(f.effects || {})) {
+          if (!eff?.image) continue;
+          const mapOffset: Record<string, Point> = {};
+          for (const [name, point] of Object.entries<any>(eff.mapOffset ?? {})) {
+            if (point && typeof point.x === 'number' && typeof point.y === 'number') {
+              mapOffset[name] = { x: point.x, y: point.y };
+            }
+          }
+          effects.push({
+            image: eff.image.startsWith('data:') ? eff.image : `data:image/png;base64,${eff.image}`,
+            origin: { x: eff.origin?.x ?? 0, y: eff.origin?.y ?? 0 },
+            mapOffset,
+            position: eff.position || 'default',
+          });
+        }
+        if (effects.length) frames[key] = effects;
+      });
+    }
+    const vslots: string[] = raw.metaInfo?.vslots ?? [];
+    const islots: string[] = raw.metaInfo?.islots ?? [];
+    return { id, frames, vslot: vslots.join(''), islot: islots.join('') };
+  } catch {
+    return null;
+  }
+}
+
 function localItem(id: number): Promise<ItemRecord | null> {
   const cached = records.get(id);
   if (cached) return cached;
   const request = fetch(`/sprites/items/${id}.json`)
-    .then((response) => response.ok ? response.json() as Promise<ItemRecord> : null)
-    .catch(() => null);
+    .then((response) => response.ok ? response.json() as Promise<ItemRecord> : fetchRemoteItem(id))
+    .catch(() => fetchRemoteItem(id));
   records.set(id, request);
   return request;
 }

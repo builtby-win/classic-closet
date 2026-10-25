@@ -28,6 +28,7 @@ import {
   stanceForWeapon,
   TWO_HAND_SUBS,
   RANDOM_EQUIP_SLOTS,
+  type ItemMeta,
   type RandomEquipSlot,
   type ResolvedItem,
   saveLookToStorage,
@@ -58,6 +59,15 @@ const DEFAULT_HAIR_STYLE: Partial<Record<Sex, number>> = { f: 3101 };
 const STARTER_FACES: Record<Sex, number[]> = { m: [20000, 20001, 20002], f: [21000, 21001, 21002] };
 const HAIR_DOTS = ['#23232a', '#a83a32', '#d97b2e', '#e3c46a', '#4a8f4d', '#4a6fa5', '#7a4a8f', '#6e4a2f'];
 const EYE_DOTS = ['#24242b', '#4a82c5', '#c94747', '#4a9459', '#826044', '#48aeb6', '#8050aa', '#8c3440', '#e8e8e8'];
+
+type ViewTab = 'slots' | 'limited' | 'crates' | 'styles';
+
+const VIEW_OPTIONS: Record<ViewTab, { label: string; shortLabel: string; icon: string; desc: string }> = {
+  slots: { label: 'Closet', shortLabel: 'Closet', icon: '👗', desc: 'Equipped slots & catalog' },
+  limited: { label: 'Limited Shop', shortLabel: 'Limited Shop', icon: '🛍️', desc: 'All limited crates, styles & sales' },
+  crates: { label: 'Mystery Crates', shortLabel: 'Crates', icon: '📦', desc: 'Mystery & Founder’s crates' },
+  styles: { label: 'Style Rotations', shortLabel: 'Styles', icon: '✨', desc: 'Hair & face style coupons' },
+};
 const SKIN_TONES: Record<number, string> = { 2000: '#ffddaa', 2001: '#bb9966', 2002: '#7a4a22', 2003: '#ffeecc', 2004: '#ccccdd', 2005: '#eeeeee', 2006: '#ffdddd' };
 const AVATAR_PX = 44;
 // Head-and-shoulders crop, in the centered 128px box of the sprite canvas.
@@ -146,15 +156,27 @@ function isFirstVisit(): boolean {
 /** Single owner for the selected look: boots from shared link / storage,
  *  mirrors every change back to the URL (shareable) + localStorage. */
 function useLook() {
-  const [look, setLook] = useState<Look>(() => loadInitialLook());
+  const [look, setLook] = useState<Look>(DEFAULT_LOOK);
+  const hydratedRef = useRef(false);
+
   useEffect(() => {
+    hydratedRef.current = true;
+    const initial = loadInitialLook();
+    setLook(initial);
+  }, []);
+
+  useEffect(() => {
+    if (!hydratedRef.current) return;
     const encoded = encodeLook(look);
     const currentUrl = new URL(window.location.href);
+    const viewParam = currentUrl.searchParams.get('view');
     currentUrl.search = encoded ? '?' + encoded : '';
+    if (viewParam) currentUrl.searchParams.set('view', viewParam);
     currentUrl.hash = '';
     history.replaceState(null, '', currentUrl.pathname + currentUrl.search);
     saveLookToStorage(look);
   }, [look]);
+
   return [look, setLook] as const;
 }
 
@@ -166,18 +188,15 @@ export default function FashionIsland() {
   const [excludedSlots, setExcludedSlots] = useState<RandomEquipSlot[]>([]);
   const [nxOnly, setNxOnly] = useState(true);
   // Global class filter: one job for rail rows, all drawers, randomizer.
-  // 'All' disables mismatch greying. A specific job greys out non-matching
-  // classic equips instead of hiding them; tapping a greyed tile equips it
-  // and switches this filter to that item's job.
+  // 'All' shows default catalog order. Selecting a job sorts that class's
+  // equips to the top while keeping other gear accessible below.
   const [job, setJob] = useState('All');
-  const JOBS = ['All', 'Beginner', 'Warrior', 'Magician', 'Bowman', 'Thief'];
+  const JOBS = ['All', 'Warrior', 'Magician', 'Bowman', 'Thief'];
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [controller, setController] = useState<PlayController | null>(null);
   const lookRef = useRef(look);
   lookRef.current = look;
   const [ratesOpen, setRatesOpen] = useState(false);
-  // Read before useLook's effect persists the default look.
-  const firstVisit = useRef(isFirstVisit());
   const [welcomeOpen, setWelcomeOpen] = useState(false);
   const [welcomeLeaving, setWelcomeLeaving] = useState(false);
   // Same sheet: slide it up first, then drop the welcome layer once it has faded.
@@ -199,7 +218,7 @@ export default function FashionIsland() {
         ctx.drawImage(src, AVATAR_CROP.x, AVATAR_CROP.y, AVATAR_CROP.size, AVATAR_CROP.size, 0, 0, AVATAR_PX, AVATAR_PX);
   }, []);
   useEffect(() => { drawAvatar(); }, [settingsOpen, drawAvatar]);
-  useEffect(() => { if (firstVisit.current) setWelcomeOpen(true); }, []);
+  useEffect(() => { if (isFirstVisit()) setWelcomeOpen(true); }, []);
   const [catSec, setCatSec] = useState<SectionId | null>(null);
   const [catQ, setCatQ] = useState('');
   const [expandedCats, setExpandedCats] = useState<Record<string, boolean>>({});
@@ -249,22 +268,15 @@ export default function FashionIsland() {
   const setSex = useCallback((sex: Sex) => {
     localStorage.setItem(STORAGE_SEX_KEY, sex);
     setSettingsOpen(false);
-    setLook((l) => {
-      const next = { ...l, sex };
-      const defaultHair = DEFAULT_HAIR_STYLE[sex];
-      if (defaultHair) next.hair = defaultHair * 10 + next.hairCol;
-      else if (!CATALOG.indexes.hairs[sex].active.includes(Math.floor(next.hair / 10))) {
-        next.hair = (CATALOG.indexes.hairs[sex].active[0] ?? 3013) * 10 + next.hairCol;
-      }
-      next.face = DEFAULT_FACE[sex];
-      return next;
-    });
+    setLook((l) => ({ ...l, sex }));
   }, []);
 
   const wearItemById = useCallback((id: number | null, sub: string) => {
     if (id == null) return;
     const slot = equipSlot(sub);
-    const selectedId = sub === 'Face' ? faceVariantId(look.sex, faceStyleId(id), faceColorIndex(look.face)) : id;
+    const faceItem = sub === 'Face' ? getItem(CATALOG, id) : undefined;
+    const faceSex: Sex = faceItem?.sex === 'f' || (id != null && id >= 21000) ? 'f' : 'm';
+    const selectedId = sub === 'Face' ? faceVariantId(faceSex, faceStyleId(id), faceColorIndex(look.face)) : id;
     const currentId = sub === 'Hair' ? look.hair : sub === 'Face' ? look.face : look.items[slot];
     const cosmetic = sub === 'Hair' || sub === 'Face';
     if (cosmetic && currentId === selectedId) return;
@@ -303,25 +315,72 @@ export default function FashionIsland() {
     }
   }, [look, patch, job]);
 
-  // O(1) Pre-indexed style and item ID arrays for the active sex
-  const activeHairStyles = CATALOG.indexes.hairs[look.sex].active;
-  const pastHairStyles = CATALOG.indexes.hairs[look.sex].past;
-  const activeFaces = CATALOG.indexes.faces[look.sex].active;
-  const pastFaces = CATALOG.indexes.faces[look.sex].past;
-  const starterHairStyles = STARTER_HAIRS[look.sex].filter(id => !!CATALOG.styles[id]);
-  const starterFaces = STARTER_FACES[look.sex].filter(id => !!CATALOG.items[id]);
+  const tryOnCrate = useCallback((items: Array<{ id: number; isHair?: boolean; sub: string; sex?: 'm' | 'f' | 'u' }>) => {
+    const available = items.filter((i) => !i.sex || i.sex === 'u' || i.sex === look.sex);
+    const bySlot: Record<string, number[]> = {};
+    for (const item of available) {
+      if (item.isHair || item.sub === 'Face') continue;
+      const slot = equipSlot(item.sub);
+      if (!bySlot[slot]) bySlot[slot] = [];
+      bySlot[slot].push(item.id);
+    }
+    setLook((prev) => {
+      let nextItems = { ...prev.items };
+      for (const [slot, ids] of Object.entries(bySlot)) {
+        const pickedId = ids[Math.floor(Math.random() * ids.length)]!;
+        const sub = getItem(CATALOG, pickedId)?.sub;
+        nextItems = applyPick(nextItems, slot, pickedId, sub);
+      }
+      return { ...prev, items: nextItems };
+    });
+  }, [look.sex]);
+
+  const otherSex: Sex = look.sex === 'm' ? 'f' : 'm';
+
+  // O(1) Pre-indexed style and item ID arrays: matching sex first, other sex second
+  const activeHairStyles = useMemo(() => [
+    ...CATALOG.indexes.hairs[look.sex].active,
+    ...CATALOG.indexes.hairs[otherSex].active,
+  ], [look.sex, otherSex]);
+
+  const pastHairStyles = useMemo(() => [
+    ...CATALOG.indexes.hairs[look.sex].past,
+    ...CATALOG.indexes.hairs[otherSex].past,
+  ], [look.sex, otherSex]);
+
+  const activeFaces = useMemo(() => [
+    ...CATALOG.indexes.faces[look.sex].active,
+    ...CATALOG.indexes.faces[otherSex].active,
+  ], [look.sex, otherSex]);
+
+  const pastFaces = useMemo(() => [
+    ...CATALOG.indexes.faces[look.sex].past,
+    ...CATALOG.indexes.faces[otherSex].past,
+  ], [look.sex, otherSex]);
+
+  const starterHairStyles = useMemo(() => [
+    ...STARTER_HAIRS[look.sex].filter(id => !!CATALOG.styles[id]),
+    ...STARTER_HAIRS[otherSex].filter(id => !!CATALOG.styles[id]),
+  ], [look.sex, otherSex]);
+
+  const starterFaces = useMemo(() => [
+    ...STARTER_FACES[look.sex].filter(id => !!CATALOG.items[id]),
+    ...STARTER_FACES[otherSex].filter(id => !!CATALOG.items[id]),
+  ], [look.sex, otherSex]);
 
   // Mystery (random) vs Signature (pick) splits by coupon tier
   const mysteryHairs = useMemo(() => activeHairStyles.filter((st) => (getStyle(CATALOG, st)?.coupon ?? 'mystery') === 'mystery'), [activeHairStyles]);
   const signatureHairs = useMemo(() => activeHairStyles.filter((st) => getStyle(CATALOG, st)?.coupon === 'signature'), [activeHairStyles]);
   const mysteryFaces = useMemo(() => activeFaces.filter((fid) => (getItem(CATALOG, fid)?.coupon ?? 'mystery') === 'mystery'), [activeFaces]);
   const signatureFaces = useMemo(() => activeFaces.filter((fid) => getItem(CATALOG, fid)?.coupon === 'signature'), [activeFaces]);
-  // Fixed catalog order everywhere — tapping selects in place, never reorders.
+
+  // Matching sex + unisex first, other sex after
   const getGroupEquips = useCallback(
     (groupKey: string): number[] => {
       const g = CATALOG.indexes.groups[groupKey];
       if (!g) return [];
-      return [...g.u, ...g[look.sex]];
+      const altSex: Sex = look.sex === 'm' ? 'f' : 'm';
+      return [...g.u, ...g[look.sex], ...g[altSex]];
     },
     [look.sex],
   );
@@ -343,9 +402,9 @@ export default function FashionIsland() {
   }, [getGroupEquips]);
 
 
-  type CatRow = { type: 'hair' | 'item'; id: number; mismatch?: boolean };
+  type CatRow = { type: 'hair' | 'item'; id: number; mismatch?: boolean; sexMismatch?: number };
   // (needle filter inlined in catGroups below)
-  // Grouped rows for the merged Hair/Face drawers, fixed catalog order.
+  // Grouped rows for the merged Hair/Face drawers, fixed catalog order with matching sex first.
   const catGroups = useMemo(() => {
     if (catSec !== 'Hair' && catSec !== 'Face') return null;
     const needle = catQ.trim().toLowerCase();
@@ -353,46 +412,87 @@ export default function FashionIsland() {
     const buildHair = (key: string, label: string, ids: number[]) => {
       const rows: CatRow[] = ids
         .filter((st) => matches(CATALOG.styles[st]?.name, st))
-        .map((st) => ({ type: 'hair' as const, id: st }));
+        .map((st) => ({
+          type: 'hair' as const,
+          id: st,
+          sexMismatch: CATALOG.styles[st]?.sex !== look.sex ? 1 : 0,
+        }))
+        .sort((a, b) => (a.sexMismatch ?? 0) - (b.sexMismatch ?? 0));
       return { key, label, rows };
     };
     const buildFace = (key: string, label: string, ids: number[]) => {
       const rows: CatRow[] = ids
         .filter((fid) => matches(CATALOG.items[fid]?.name, fid))
-        .map((fid) => ({ type: 'item' as const, id: fid }));
+        .map((fid) => ({
+          type: 'item' as const,
+          id: fid,
+          sexMismatch: CATALOG.items[fid]?.sex && CATALOG.items[fid].sex !== 'u' && CATALOG.items[fid].sex !== look.sex ? 1 : 0,
+        }))
+        .sort((a, b) => (a.sexMismatch ?? 0) - (b.sexMismatch ?? 0));
       return { key, label, rows };
     };
     const groups = catSec === 'Hair'
-      ? [buildHair('hair:mystery', 'Mystery', mysteryHairs), buildHair('hair:signature', 'Signature', signatureHairs), buildHair('hair:starter', 'Starter', starterHairStyles), buildHair('hair:past', 'Past rotation', pastHairStyles)]
-      : [buildFace('face:mystery', 'Mystery', mysteryFaces), buildFace('face:signature', 'Signature', signatureFaces), buildFace('face:starter', 'Starter', starterFaces), buildFace('face:past', 'Past rotation', pastFaces)];
-    // Empty groups sink to the bottom; the rest stay in canonical
-    // Mystery → Signature → Starter → Past order so tapping never
-    // reorders sections under the finger.
+      ? [
+          buildHair('hair:mystery', 'Mystery', mysteryHairs),
+          buildHair('hair:signature', 'Signature', signatureHairs),
+          buildHair('hair:starter', 'Starter', starterHairStyles),
+          buildHair('hair:past', 'Past rotation', pastHairStyles),
+        ]
+      : [
+          buildFace('face:mystery', 'Mystery', mysteryFaces),
+          buildFace('face:signature', 'Signature', signatureFaces),
+          buildFace('face:starter', 'Starter', starterFaces),
+          buildFace('face:past', 'Past rotation', pastFaces),
+        ];
     return groups.sort((a, b) => Number(a.rows.length === 0) - Number(b.rows.length === 0));
-  }, [catSec, catQ, mysteryHairs, signatureHairs, starterHairStyles, pastHairStyles, mysteryFaces, signatureFaces, starterFaces, pastFaces]);
+  }, [catSec, catQ, mysteryHairs, signatureHairs, starterHairStyles, pastHairStyles, mysteryFaces, signatureFaces, starterFaces, pastFaces, look.sex]);
   // (category expand/collapse inlined at the drawer render below)
+
+  function jobTier(item: ItemMeta | undefined, selectedJob: string): number {
+    if (!item || selectedJob === 'All') return 0;
+    // Tier 0: Specifically requires the selected job (e.g. Warrior gear)
+    if (item.requiredJobs?.includes(selectedJob) && !item.requiredJobs.includes('Beginner')) {
+      return 0;
+    }
+    // Tier 1: Common classic equips wearable by Beginner/All or NX cosmetics
+    if (matchesJob(item, selectedJob)) {
+      return 1;
+    }
+    // Tier 2: Gear for another job (off-job, kept visible but sorted below)
+    return 2;
+  }
 
   const catRows = useMemo(() => {
     if (!catSec) return [];
     const needle = catQ.trim().toLowerCase();
     const r = equipSections.find((section) => section.id === catSec)?.ids ?? getGroupEquips(catSec);
-    // Global job filter greys out instead of hiding: matching gear, then
-    // off-job gear. Banner grouping happens in equipGroups below; inside
-    // each group NX sorts by name, classic by requiredLevel asc then name.
+    // When a job is selected, that job's gear is sorted up to the top
+    // while common and off-job gear remain accessible below.
     const filtered = needle ? r.filter((id) => matchesFuzzy(CATALOG.items[id]?.name, id, needle)) : r;
     const levelOf = (id: number) => CATALOG.items[id]?.requiredLevel ?? -1;
     const nameOf = (id: number) => CATALOG.items[id]?.name ?? '';
     const mismatchOf = (id: number) => !matchesJob(CATALOG.items[id], job);
+    const tierOf = (id: number) => jobTier(CATALOG.items[id], job);
+    const sexMismatchOf = (id: number) => {
+      const s = CATALOG.items[id]?.sex;
+      return s && s !== 'u' && s !== look.sex ? 1 : 0;
+    };
     const rankOf = (id: number) => bannerRank(CATALOG.items[id]);
     return filtered
-      .map((id) => ({ type: 'item' as const, id, mismatch: mismatchOf(id) }))
-      .sort((a, b) => Number(a.mismatch) - Number(b.mismatch) || rankOf(a.id) - rankOf(b.id) || levelOf(a.id) - levelOf(b.id) || nameOf(a.id).localeCompare(nameOf(b.id)));
-  }, [catSec, catQ, getGroupEquips, equipSections, job]);
+      .map((id) => ({ type: 'item' as const, id, mismatch: mismatchOf(id), sexMismatch: sexMismatchOf(id), tier: tierOf(id) }))
+      .sort((a, b) =>
+        a.sexMismatch - b.sexMismatch ||
+        a.tier - b.tier ||
+        (job !== 'All' && a.tier === 0 ? levelOf(a.id) - levelOf(b.id) : rankOf(a.id) - rankOf(b.id)) ||
+        levelOf(a.id) - levelOf(b.id) ||
+        nameOf(a.id).localeCompare(nameOf(b.id))
+      );
+  }, [catSec, catQ, getGroupEquips, equipSections, job, look.sex]);
 
 
   // Equip drawers: partition the flat row list into banner sections so NX
   // sources never intermix — Founder's crate → 10-day covers → Aurora stamp
-  // → classic job equips. Same collapsible section UI as Hair/Face drawers.
+  // → classic job equips. When a specific job is selected, Job Equips prioritizes to the top.
   const equipGroups = useMemo(() => {
     if (catGroups || !catSec || catRows.length === 0) return null;
     const buckets = new Map<string, typeof catRows>();
@@ -402,7 +502,9 @@ export default function FashionIsland() {
       list.push(row);
       buckets.set(group, list);
     }
-    const order = ['founder-crate', 'mystery-crate', 'cover-10day', 'aurora-crate', 'classic-equips'];
+    const order = job !== 'All'
+      ? ['classic-equips', 'founder-crate', 'mystery-crate', 'cover-10day', 'aurora-crate']
+      : ['founder-crate', 'mystery-crate', 'cover-10day', 'aurora-crate', 'classic-equips'];
     const groups = order
       .filter((key) => (buckets.get(key)?.length ?? 0) > 0)
       .map((key) => {
@@ -417,16 +519,376 @@ export default function FashionIsland() {
           : 'Job Equips';
         return { key, label: `${label} · ${rows.length}${dates}`, rows, bannerId };
       });
-    // Sections stay in canonical banner order — tapping selects in place,
-    // never reorders. Worn shows via the checkmark only.
     return groups;
-  }, [catGroups, catSec, catRows]);
+  }, [catGroups, catSec, catRows, job]);
 
   const openCat = useCallback((sec: SectionId) => {
     setSettingsOpen(false);
     setCatSec(sec);
     setCatQ('');
   }, []);
+
+  const [viewTab, setViewTab] = useState<ViewTab>('slots');
+  const viewTabHydrated = useRef(false);
+
+  useEffect(() => {
+    viewTabHydrated.current = true;
+    const params = new URLSearchParams(window.location.search);
+    const v = params.get('view');
+    let target: ViewTab = 'slots';
+    if (v === 'limited' || v === 'all') target = 'limited';
+    else if (v === 'styles' || v === 'banners') target = 'styles';
+    else if (v === 'crates' || v === 'slots') target = v;
+    else {
+      const saved = localStorage.getItem('classic-closet:view');
+      if (saved === 'limited' || saved === 'all') target = 'limited';
+      else if (saved === 'styles' || saved === 'banners') target = 'styles';
+      else if (saved === 'crates' || saved === 'slots') target = saved as ViewTab;
+    }
+    if (target !== 'slots') setViewTab(target);
+  }, []);
+
+  useEffect(() => {
+    if (!viewTabHydrated.current) return;
+    try {
+      localStorage.setItem('classic-closet:view', viewTab);
+      const url = new URL(window.location.href);
+      if (viewTab !== 'slots') {
+        url.searchParams.set('view', viewTab);
+      } else {
+        url.searchParams.delete('view');
+      }
+      history.replaceState(null, '', url.pathname + url.search);
+    } catch {
+      // storage unavailable
+    }
+  }, [viewTab]);
+  const [viewMenuOpen, setViewMenuOpen] = useState(false);
+  const viewMenuRef = useRef<HTMLDivElement>(null);
+  const [bannerSort, setBannerSort] = useState<'date-asc' | 'crates-first' | 'date-desc'>('date-asc');
+  const [crateSlotFilter, setCrateSlotFilter] = useState<Record<string, string[]>>({});
+  const [activeFilterCardId, setActiveFilterCardId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const card = params.get('filterCard');
+    if (card) setActiveFilterCardId(card);
+  }, []);
+  const filterPopRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!viewMenuOpen) return;
+    const onPointerDown = (e: MouseEvent | TouchEvent) => {
+      if (viewMenuRef.current && !viewMenuRef.current.contains(e.target as Node)) {
+        setViewMenuOpen(false);
+      }
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setViewMenuOpen(false);
+    };
+    window.addEventListener('mousedown', onPointerDown);
+    window.addEventListener('touchstart', onPointerDown);
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('mousedown', onPointerDown);
+      window.removeEventListener('touchstart', onPointerDown);
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [viewMenuOpen]);
+
+  useEffect(() => {
+    if (!activeFilterCardId) return;
+    const onPointerDown = (e: MouseEvent | TouchEvent) => {
+      if (filterPopRef.current && !filterPopRef.current.contains(e.target as Node)) {
+        setActiveFilterCardId(null);
+      }
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setActiveFilterCardId(null);
+    };
+    window.addEventListener('mousedown', onPointerDown);
+    window.addEventListener('touchstart', onPointerDown);
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('mousedown', onPointerDown);
+      window.removeEventListener('touchstart', onPointerDown);
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [activeFilterCardId]);
+
+  const toggleCrateSlot = (cardId: string, slot: string, allSlots: string[]) => {
+    setCrateSlotFilter((prev) => {
+      const current = prev[cardId];
+      const active = current ?? allSlots;
+      let next: string[];
+      if (active.includes(slot)) {
+        next = active.filter((s) => s !== slot);
+      } else {
+        next = [...active, slot];
+      }
+      if (next.length === allSlots.length) {
+        const copy = { ...prev };
+        delete copy[cardId];
+        return copy;
+      }
+      return { ...prev, [cardId]: next };
+    });
+  };
+
+  const selectAllCrateSlots = (cardId: string) => {
+    setCrateSlotFilter((prev) => {
+      const copy = { ...prev };
+      delete copy[cardId];
+      return copy;
+    });
+  };
+
+  const clearAllCrateSlots = (cardId: string) => {
+    setCrateSlotFilter((prev) => ({ ...prev, [cardId]: [] }));
+  };
+
+  const bannerCards = useMemo(() => {
+    const list: Array<{
+      id: string;
+      label: string;
+      type: 'crate' | 'style-coupon' | 'shop' | 'covers';
+      typeLabel: string;
+      start: string | null;
+      end: string | null;
+      note?: string;
+      post?: string;
+      rates?: string;
+      daysLeft: number | null;
+      statusText: string;
+      isActive: boolean;
+      items: Array<{ id: number; name: string; sub: string; rate?: string; isHair?: boolean; sex?: 'm' | 'f' | 'u'; sexMismatch?: number }>;
+    }> = [];
+
+    const getDays = (end: string | null) => {
+      if (!end) return null;
+      const now = new Date('2026-10-23T00:00:00Z').getTime();
+      const endTime = new Date(`${end}T23:59:59Z`).getTime();
+      return Math.ceil((endTime - now) / (1000 * 60 * 60 * 24));
+    };
+
+    const crateItems = (groupKey: string) => {
+      const g = CATALOG.indexes.groups[groupKey];
+      if (!g) return [];
+      const matching = [...g.u, ...g[look.sex]];
+      const opposite = g[otherSex] ?? [];
+      const allIds = [...matching, ...opposite];
+      return allIds.map(id => {
+        const m = CATALOG.items[id];
+        return {
+          id,
+          name: m?.name ?? '',
+          sub: m?.sub ?? '',
+          rate: m?.rate,
+          sex: m?.sex,
+          sexMismatch: m?.sex && m.sex !== 'u' && m.sex !== look.sex ? 1 : 0,
+        };
+      }).sort((a, b) => a.sexMismatch - b.sexMismatch);
+    };
+
+    // 1. Mystery Fashion Crate
+    const mc = CATALOG.banners['mystery-crate-nov26'];
+    if (mc) {
+      const days = getDays(mc.end);
+      list.push({
+        id: mc.id,
+        label: mc.label,
+        type: 'crate',
+        typeLabel: 'Mystery Crate',
+        start: mc.start,
+        end: mc.end,
+        note: mc.note,
+        post: mc.post,
+        rates: mc.rates,
+        daysLeft: days,
+        statusText: days != null && days > 0 ? `Active · ${days}d left` : 'Active',
+        isActive: true,
+        items: crateItems('mystery-crate'),
+      });
+    }
+
+    // 2. Founder's Mystery Fashion Crate
+    const fc = CATALOG.banners['founder-crate-oct26'];
+    if (fc) {
+      const days = getDays(fc.end);
+      list.push({
+        id: fc.id,
+        label: fc.label,
+        type: 'crate',
+        typeLabel: "Founder's Crate",
+        start: fc.start,
+        end: fc.end,
+        note: fc.note,
+        post: fc.post,
+        rates: fc.rates,
+        daysLeft: days,
+        statusText: days != null && days > 0 ? `Active · ${days}d left` : 'Active',
+        isActive: true,
+        items: crateItems('founder-crate'),
+      });
+    }
+
+    // 3. Style Coupons
+    const sc = CATALOG.banners['style-oct26'];
+    if (sc) {
+      const days = getDays(sc.end);
+      const items: Array<{ id: number; name: string; sub: string; rate?: string; isHair?: boolean; sex?: 'm' | 'f' | 'u'; sexMismatch?: number }> = [];
+      for (const hId of [...mysteryHairs, ...signatureHairs]) {
+        const meta = getStyle(CATALOG, hId);
+        if (meta) items.push({
+          id: hId,
+          name: meta.name,
+          sub: 'Hair',
+          rate: meta.rate,
+          isHair: true,
+          sex: meta.sex,
+          sexMismatch: meta.sex !== look.sex ? 1 : 0,
+        });
+      }
+      for (const fId of [...mysteryFaces, ...signatureFaces]) {
+        const meta = getItem(CATALOG, fId);
+        if (meta) items.push({
+          id: fId,
+          name: meta.name,
+          sub: 'Face',
+          rate: meta.rate,
+          sex: meta.sex,
+          sexMismatch: meta.sex && meta.sex !== 'u' && meta.sex !== look.sex ? 1 : 0,
+        });
+      }
+      items.sort((a, b) => (a.sexMismatch ?? 0) - (b.sexMismatch ?? 0));
+      list.push({
+        id: sc.id,
+        label: sc.label,
+        type: 'style-coupon',
+        typeLabel: 'Style Coupon',
+        start: sc.start,
+        end: sc.end,
+        note: sc.note,
+        post: sc.post,
+        rates: sc.rates,
+        daysLeft: days,
+        statusText: days != null && days > 0 ? `Active · ${days}d left` : 'Active',
+        isActive: true,
+        items,
+      });
+    }
+
+    // 4. Aurora Stamp Shop
+    const au = CATALOG.banners['aurora-s1'];
+    if (au) {
+      const days = getDays(au.end);
+      list.push({
+        id: au.id,
+        label: au.label,
+        type: 'shop',
+        typeLabel: 'Stamp Shop',
+        start: au.start,
+        end: au.end,
+        note: au.note,
+        post: au.post,
+        rates: au.rates,
+        daysLeft: days,
+        statusText: days != null && days > 0 ? `Active · ${days}d left` : 'Active',
+        isActive: true,
+        items: crateItems('aurora-crate'),
+      });
+    }
+
+    // 5. 10-Day Covers
+    const cv = CATALOG.banners['covers-10day-nov26'];
+    if (cv) {
+      const days = getDays(cv.end);
+      list.push({
+        id: cv.id,
+        label: cv.label,
+        type: 'covers',
+        typeLabel: '10-Day Covers',
+        start: cv.start,
+        end: cv.end,
+        note: cv.note,
+        post: cv.post,
+        daysLeft: days,
+        statusText: days != null && days > 0 ? `Active · ${days}d left` : 'Active',
+        isActive: true,
+        items: crateItems('cover-10day'),
+      });
+    }
+
+    // 6. Past Style Rotation
+    const beta = CATALOG.banners['beta-style-sep26'];
+    if (beta) {
+      const items: Array<{ id: number; name: string; sub: string; rate?: string; isHair?: boolean; sex?: 'm' | 'f' | 'u'; sexMismatch?: number }> = [];
+      for (const hId of pastHairStyles) {
+        const meta = getStyle(CATALOG, hId);
+        if (meta) items.push({
+          id: hId,
+          name: meta.name,
+          sub: 'Hair',
+          rate: meta.rate,
+          isHair: true,
+          sex: meta.sex,
+          sexMismatch: meta.sex !== look.sex ? 1 : 0,
+        });
+      }
+      for (const fId of pastFaces) {
+        const meta = getItem(CATALOG, fId);
+        if (meta) items.push({
+          id: fId,
+          name: meta.name,
+          sub: 'Face',
+          rate: meta.rate,
+          sex: meta.sex,
+          sexMismatch: meta.sex && meta.sex !== 'u' && meta.sex !== look.sex ? 1 : 0,
+        });
+      }
+      items.sort((a, b) => (a.sexMismatch ?? 0) - (b.sexMismatch ?? 0));
+      list.push({
+        id: beta.id,
+        label: beta.label,
+        type: 'style-coupon',
+        typeLabel: 'Past Rotation',
+        start: beta.start,
+        end: beta.end,
+        note: beta.note,
+        daysLeft: -1,
+        statusText: 'Ended',
+        isActive: false,
+        items,
+      });
+    }
+
+    return list.sort((a, b) => {
+      if (bannerSort === 'crates-first') {
+        const isCrateA = a.type === 'crate' ? 0 : 1;
+        const isCrateB = b.type === 'crate' ? 0 : 1;
+        if (isCrateA !== isCrateB) return isCrateA - isCrateB;
+        if (a.isActive !== b.isActive) return Number(b.isActive) - Number(a.isActive);
+        return (a.daysLeft ?? 999) - (b.daysLeft ?? 999);
+      }
+      if (bannerSort === 'date-asc') {
+        if (a.isActive !== b.isActive) return Number(b.isActive) - Number(a.isActive);
+        return (a.daysLeft ?? 999) - (b.daysLeft ?? 999);
+      }
+      if (bannerSort === 'date-desc') {
+        const aStart = a.start ?? '1970-01-01';
+        const bStart = b.start ?? '1970-01-01';
+        return bStart.localeCompare(aStart);
+      }
+      return 0;
+    });
+  }, [look.sex, bannerSort, mysteryHairs, signatureHairs, pastHairStyles, mysteryFaces, signatureFaces, pastFaces]);
+
+  const displayedCards = useMemo(() => {
+    if (viewTab === 'crates') return bannerCards.filter((c) => c.type === 'crate');
+    if (viewTab === 'styles') return bannerCards.filter((c) => c.type === 'style-coupon');
+    if (viewTab === 'limited') return bannerCards;
+    return [];
+  }, [viewTab, bannerCards]);
 
   // Light-dismiss the character panel: taps outside it (backdropped by the
   // scrim below) and the Escape key close it, not just the × button.
@@ -497,39 +959,40 @@ export default function FashionIsland() {
   }, [equipSections]);
   // Items shown as mini-tiles in each rail slot row.
   // Hair/Face: all styles (mystery + signature + starter + past).
-  // Equip slots: all items for the slot, Lv-sorted, off-job greyed.
+  // Equip slots: items for the slot; matching job gear sorted to the front.
   const railItems = useMemo(() => {
-    // Quick tiles pin the worn pick first so the applied style is always
-    // visible; everything else holds the fixed set order. Drawers stay
-    // fully static (select in place).
-    const isWorn = (slotId: string, row: CatRow): boolean => {
-      if (slotId === 'Hair' && row.type === 'hair') return row.id === Math.floor(look.hair / 10);
-      if (slotId === 'Face' && row.type === 'item') return faceStyleId(look.face) === faceStyleId(row.id);
-      if (row.type === 'item') return Object.values(look.items).includes(row.id);
-      return false;
-    };
     const levelOf = (row: CatRow) => row.type === 'hair' ? -1 : (CATALOG.items[row.id]?.requiredLevel ?? -1);
     const nameOf = (row: CatRow) => row.type === 'hair' ? (CATALOG.styles[row.id]?.name ?? '') : (CATALOG.items[row.id]?.name ?? '');
     const mismatchOf = (row: CatRow) => row.type === 'item' && !matchesJob(CATALOG.items[row.id], job) ? true : false;
+    const tierOf = (row: CatRow) => row.type === 'item' ? jobTier(CATALOG.items[row.id], job) : 0;
+    const sexMismatchOf = (row: CatRow) => {
+      const sex = row.type === 'hair' ? CATALOG.styles[row.id]?.sex : CATALOG.items[row.id]?.sex;
+      return sex && sex !== 'u' && sex !== look.sex ? 1 : 0;
+    };
     const rankOf = (row: CatRow) => row.type === 'hair' ? -1 : bannerRank(CATALOG.items[row.id]);
-    const restSort = (a: CatRow & { mismatch?: boolean }, b: CatRow & { mismatch?: boolean }) => Number(a.mismatch ?? false) - Number(b.mismatch ?? false) || rankOf(a) - rankOf(b) || levelOf(a) - levelOf(b) || nameOf(a).localeCompare(nameOf(b));
-    const sortRows = (slotId: string, rows: CatRow[]) => {
-      const flagged = rows.map((row) => ({ ...row, mismatch: mismatchOf(row) }));
-      return [...flagged.filter((row) => isWorn(slotId, row)), ...flagged.filter((row) => !isWorn(slotId, row)).sort(restSort)];
+    const restSort = (a: CatRow & { mismatch?: boolean; sexMismatch?: number; tier?: number }, b: CatRow & { mismatch?: boolean; sexMismatch?: number; tier?: number }) =>
+      (a.sexMismatch ?? 0) - (b.sexMismatch ?? 0) ||
+      (a.tier ?? 0) - (b.tier ?? 0) ||
+      (job !== 'All' && (a.tier ?? 0) === 0 ? levelOf(a) - levelOf(b) : rankOf(a) - rankOf(b)) ||
+      levelOf(a) - levelOf(b) ||
+      nameOf(a).localeCompare(nameOf(b));
+    const sortRows = (rows: CatRow[]) => {
+      const flagged = rows.map((row) => ({ ...row, mismatch: mismatchOf(row), sexMismatch: sexMismatchOf(row), tier: tierOf(row) }));
+      return flagged.sort(restSort);
     };
     const result: Record<string, CatRow[]> = {};
     for (const slot of railSlots) {
       if (slot.id === 'Hair') {
-        result[slot.id] = sortRows(slot.id, [...mysteryHairs, ...signatureHairs, ...starterHairStyles, ...pastHairStyles].map((id) => ({ type: 'hair' as const, id })));
+        result[slot.id] = sortRows([...mysteryHairs, ...signatureHairs, ...starterHairStyles, ...pastHairStyles].map((id) => ({ type: 'hair' as const, id })));
       } else if (slot.id === 'Face') {
-        result[slot.id] = sortRows(slot.id, [...mysteryFaces, ...signatureFaces, ...starterFaces, ...pastFaces].map((id) => ({ type: 'item' as const, id })));
+        result[slot.id] = sortRows([...mysteryFaces, ...signatureFaces, ...starterFaces, ...pastFaces].map((id) => ({ type: 'item' as const, id })));
       } else {
         const ids = equipSections.find((s) => s.id === slot.id)?.ids ?? [];
-        result[slot.id] = sortRows(slot.id, ids.map((id) => ({ type: 'item' as const, id })));
+        result[slot.id] = sortRows(ids.map((id) => ({ type: 'item' as const, id })));
       }
     }
     return result;
-  }, [railSlots, look.items, look.hair, look.face, mysteryHairs, signatureHairs, starterHairStyles, pastHairStyles, mysteryFaces, signatureFaces, starterFaces, pastFaces, equipSections, job]);
+  }, [railSlots, mysteryHairs, signatureHairs, starterHairStyles, pastHairStyles, mysteryFaces, signatureFaces, starterFaces, pastFaces, equipSections, job, look.sex]);
 
 
   // Play mode: a pad drives the preview with a pose override (see play-controller).
@@ -635,6 +1098,28 @@ export default function FashionIsland() {
         <div id="controls">
           <button id="avatar" onClick={() => setSettingsOpen(v => !v)} aria-label="Edit character" aria-expanded={settingsOpen} aria-controls="settings"><canvas ref={avatarRef} width={AVATAR_PX} height={AVATAR_PX} aria-hidden="true" /></button>
           <div className="controls-right">
+            <div id="gender-toggle" className="gender-toggle" role="group" aria-label="Character gender">
+              <button
+                type="button"
+                className={`gender-toggle-btn m ${look.sex === 'm' ? 'active' : ''}`}
+                onClick={() => setSex('m')}
+                aria-pressed={look.sex === 'm'}
+                title="Switch to Male character and items"
+              >
+                <span className="gender-sym">♂</span>
+                <span className="gender-label">Male</span>
+              </button>
+              <button
+                type="button"
+                className={`gender-toggle-btn f ${look.sex === 'f' ? 'active' : ''}`}
+                onClick={() => setSex('f')}
+                aria-pressed={look.sex === 'f'}
+                title="Switch to Female character and items"
+              >
+                <span className="gender-sym">♀</span>
+                <span className="gender-label">Female</span>
+              </button>
+            </div>
             <button id="share" onClick={shareLook} aria-label="Share this look" title={shared ? 'Shared!' : copied ? 'Link copied!' : 'Share this look'}><Icon name={copied || shared ? 'check' : 'share'} /></button>
             <button id="play" onClick={() => controller ? stopPlay() : startPlay()} aria-label={controller ? 'Back to closet' : 'Move your character'} aria-pressed={!!controller} title="Move your character"><Icon name="play" /></button>
             <button id="shuffle" onClick={() => setLook(randomLook(look.sex, Math.random, excludedSlots, nxOnly, job === 'All' ? 'Beginner' : job))} aria-label="Randomize outfit"><Icon name="shuffle" /></button>
@@ -733,97 +1218,378 @@ export default function FashionIsland() {
             </div>
           ) : (
             <>
-              <img className="brand-leaf" src="/leaf.png" alt="" width="22" height="22" />
-              <h1 id="brand">Classic Closet</h1>
-              <a className="site-credit" href="https://builtby.win/ston" target="_blank" rel="noopener noreferrer">by ston</a>
-              <button className="search-toggle" aria-label="Search items" aria-expanded={false} aria-controls="item-search" onClick={() => { setCatSec(null); setCatQ(''); setSearchScope('all'); setQ(''); }}><Icon name="search" /></button>
+              <div className="rail-head-brand">
+                <img className="brand-leaf" src="/leaf.png" alt="" width="22" height="22" />
+                <h1 id="brand">Classic Closet</h1>
+                <a className="site-credit" href="https://builtby.win/ston" target="_blank" rel="noopener noreferrer">by ston</a>
+              </div>
+              <div className="rail-head-actions">
+                <div className="view-menu-wrap" ref={viewMenuRef}>
+                  <button
+                    type="button"
+                    className="rail-head-btn view-btn"
+                    onClick={() => setViewMenuOpen((v) => !v)}
+                    aria-expanded={viewMenuOpen}
+                    aria-haspopup="menu"
+                    aria-label={`View: ${VIEW_OPTIONS[viewTab].label}. Tap to switch.`}
+                    title="Switch view: Closet, Limited Shop, Crates, Styles"
+                  >
+                    <span className="view-btn-icon">{VIEW_OPTIONS[viewTab].icon}</span>
+                    <span className="view-btn-label">{VIEW_OPTIONS[viewTab].shortLabel}</span>
+                    <svg className="view-btn-caret" viewBox="0 0 12 12" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                      <path d="m2.5 4.5 3.5 3.5 3.5-3.5" />
+                    </svg>
+                  </button>
+                  {viewMenuOpen && (
+                    <div className="view-menu-dropdown" role="menu">
+                      {(Object.keys(VIEW_OPTIONS) as ViewTab[]).map((tab) => {
+                        const opt = VIEW_OPTIONS[tab];
+                        const isSelected = viewTab === tab;
+                        return (
+                          <button
+                            key={tab}
+                            type="button"
+                            role="menuitem"
+                            className={`view-menu-option ${isSelected ? 'selected' : ''}`}
+                            onClick={() => {
+                              setViewTab(tab);
+                              setViewMenuOpen(false);
+                            }}
+                          >
+                            <span className="view-menu-icon">{opt.icon}</span>
+                            <div className="view-menu-info">
+                              <span className="view-menu-title">{opt.label}</span>
+                              <span className="view-menu-desc">{opt.desc}</span>
+                            </div>
+                            {isSelected && (
+                              <svg className="view-menu-check" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                <path d="m3.5 8.5 3 3 6-7" />
+                              </svg>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+                {viewTab !== 'slots' && (
+                  <button
+                    type="button"
+                    className={`rail-head-btn sort-btn ${bannerSort}`}
+                    onClick={() => setBannerSort((s) => s === 'date-asc' ? 'crates-first' : s === 'crates-first' ? 'date-desc' : 'date-asc')}
+                    aria-label={`Sort: ${bannerSort === 'crates-first' ? 'Crates first' : bannerSort === 'date-asc' ? 'Expiring soonest' : 'Newest'}. Tap to cycle.`}
+                    title={`Sort: ${bannerSort === 'crates-first' ? 'Crates first' : bannerSort === 'date-asc' ? 'Expiring soonest' : 'Newest'} (click to cycle)`}
+                  >
+                    <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M4.5 3v10M4.5 3 2 5.5M4.5 3 7 5.5M11.5 13V3M11.5 13 9 10.5M11.5 13 14 10.5" />
+                    </svg>
+                    <span className="sort-btn-label">{bannerSort === 'crates-first' ? 'Crates 1st' : bannerSort === 'date-asc' ? 'Expiring' : 'Newest'}</span>
+                  </button>
+                )}
+                <button className="search-toggle" aria-label="Search items" aria-expanded={false} aria-controls="item-search" onClick={() => { setCatSec(null); setCatQ(''); setSearchScope('all'); setQ(''); }}><Icon name="search" /></button>
+              </div>
             </>
           )}
         </div>
-        <div id="job-bar" role="group" aria-label="Filter by class">
-          {JOBS.map((j) => (
-            <button key={j} type="button" className={'job-pill' + (job === j ? ' on' : '')} aria-pressed={job === j} onClick={() => setJob(j)} title={j === 'All' ? 'Show all classes' : j === 'Beginner' ? 'Beginner-wearable only' : `Grey out non-${j} gear`}>
-              {j === 'All' ? 'All' : j}
-            </button>
-          ))}
-        </div>
-        <div id="slot-list" role="list" aria-label="Equipped items, head to feet">
-          {railSlots.map((slot) => {
-            const items = (railItems[slot.id] ?? []).filter(row => matchesFuzzy(row.type === 'hair' ? CATALOG.styles[row.id]?.name : CATALOG.items[row.id]?.name, row.id, q.trim().toLowerCase()));
-            if (q.trim() && !items.length) return null;
-            // Faces match by style (color variants share one tile) — first
-            // match wins so at most one tile ever shows selected.
-            const wornFaceRow = slot.id === 'Face'
-              ? items.find((row) => row.type === 'item' && faceStyleId(look.face) === faceStyleId(row.id))?.id
-              : undefined;
-            const featuredExpiryBanner = items.slice(0, 6).map((row) => {
-              const bannerId = row.type === 'hair' ? CATALOG.styles[row.id]?.bannerId : CATALOG.items[row.id]?.bannerId;
-              return bannerId ? getBanner(CATALOG, bannerId) : null;
-            }).find((b) => b?.end);
-            const expiryDays = featuredExpiryBanner?.end ? daysUntil(featuredExpiryBanner.end) : null;
-            const expiryLabel = expiryDays !== null && expiryDays >= 0
-              ? (expiryDays === 0 ? 'ends today' : `${expiryDays}d left`)
-              : null;
-            return (
-              <div
-                key={slot.id}
-                role="listitem"
-                className={'slot-row' + (catSec === slot.id ? ' on' : '')}
-              >
-                <div className="slot-head">
-                  <div className="slot-title-wrap">
-                    <span className="slot-label">{slot.label}</span>
-                    {expiryLabel && <span className="slot-expiry">· 🕒 {expiryLabel}</span>}
+
+        {viewTab === 'slots' ? (
+          <>
+            <div id="job-bar" role="group" aria-label="Filter by class">
+              {JOBS.map((j) => (
+                <button key={j} type="button" className={'job-pill' + (job === j ? ' on' : '')} aria-pressed={job === j} onClick={() => setJob(j)} title={j === 'All' ? 'Show all classes' : `Sort ${j} equips to top`}>
+                  {j === 'All' ? 'All' : j}
+                </button>
+              ))}
+            </div>
+            <div id="slot-list" role="list" aria-label="Equipped items, head to feet">
+              {railSlots.map((slot) => {
+                const items = (railItems[slot.id] ?? []).filter(row => matchesFuzzy(row.type === 'hair' ? CATALOG.styles[row.id]?.name : CATALOG.items[row.id]?.name, row.id, q.trim().toLowerCase()));
+                if (q.trim() && !items.length) return null;
+                // Faces match by style (color variants share one tile) — first
+                // match wins so at most one tile ever shows selected.
+                const wornFaceRow = slot.id === 'Face'
+                  ? items.find((row) => row.type === 'item' && faceStyleId(look.face) === faceStyleId(row.id) && ((look.face >= 21000) === (row.id >= 21000)))?.id
+                  : undefined;
+                const featuredExpiryBanner = items.slice(0, 6).map((row) => {
+                  const bannerId = row.type === 'hair' ? CATALOG.styles[row.id]?.bannerId : CATALOG.items[row.id]?.bannerId;
+                  return bannerId ? getBanner(CATALOG, bannerId) : null;
+                }).find((b) => b?.end);
+                const expiryDays = featuredExpiryBanner?.end ? daysUntil(featuredExpiryBanner.end) : null;
+                const expiryLabel = expiryDays !== null && expiryDays >= 0
+                  ? (expiryDays === 0 ? 'ends today' : `${expiryDays}d left`)
+                  : null;
+                return (
+                  <div
+                    key={slot.id}
+                    role="listitem"
+                    className={'slot-row' + (catSec === slot.id ? ' on' : '')}
+                  >
+                    <div className="slot-head">
+                      <div className="slot-title-wrap">
+                        <span className="slot-label">{slot.label}</span>
+                        {expiryLabel && <span suppressHydrationWarning className="slot-expiry">· 🕒 {expiryLabel}</span>}
+                      </div>
+                      <button className="slot-seeall" aria-label={`See all ${slot.label}`} onClick={() => { openCat(slot.id); setCatQ(q); }}>See all →</button>
+                    </div>
+                    {(slot.id === 'Hair' || slot.id === 'Face') && <div className="rail-colors" role="group" aria-label={slot.id === 'Hair' ? 'Hair color' : 'Eye color'}>
+                      {(slot.id === 'Hair' ? HAIR_COLORS : EYE_COLORS).map((color, i) => <ColorSwatch key={color} color={color} dot={(slot.id === 'Hair' ? HAIR_DOTS : EYE_DOTS)[i]} selected={(slot.id === 'Hair' ? look.hairCol : faceColorIndex(look.face)) === i} onClick={() => slot.id === 'Hair' ? patch({ hair: Math.floor(look.hair / 10) * 10 + i, hairCol: i }) : patch({ face: faceVariantId(look.face >= 21000 ? 'f' : 'm', faceStyleId(look.face), i) })} />)}
+                    </div>}
+                    <div className="slot-tiles">
+                      {items.slice(0, 6).map((row) => {
+                        if (row.type === 'hair') {
+                          const meta = getStyle(CATALOG, row.id);
+                          if (!meta) return null;
+                          return (
+                            <Tile
+                              key={row.id}
+                              mini
+                              on={Math.floor(look.hair / 10) === row.id}
+                              img={iconURL(row.id * 10 + look.hairCol)}
+                              label={meta.name}
+                              coupon={meta.coupon}
+                              bannerId={meta.bannerId}
+                              attainable={meta.attainable}
+                              gender={meta.sex}
+                              onClick={() => wearItemById(row.id * 10 + look.hairCol, 'Hair')}
+                            />
+                          );
+                        }
+                        const item = getItem(CATALOG, row.id);
+                        if (!item) return null;
+                        const faceSex: Sex = item.sex === 'f' || row.id >= 21000 ? 'f' : 'm';
+                        const faceId = item.sub === 'Face' ? faceVariantId(faceSex, faceStyleId(row.id), faceColorIndex(look.face)) : row.id;
+                        const worn = item.sub === 'Face' ? row.id === wornFaceRow : Object.values(look.items).includes(row.id);
+                        return (
+                          <Tile
+                            key={row.id}
+                            mini
+                            on={worn}
+                            img={iconURL(faceId)}
+                            label={item.name}
+                            coupon={item.coupon}
+                            bannerId={item.bannerId}
+                            attainable={item.attainable}
+                            gender={item.sex}
+                            mismatched={row.mismatch}
+                            mismatchJob={row.mismatch ? item.requiredJobs?.find((j) => j !== 'Beginner') : undefined}
+                            onClick={() => wearItemById(row.id, item.sub)}
+                          />
+                        );
+                      })}
+                    </div>
                   </div>
-                  <button className="slot-seeall" aria-label={`See all ${slot.label}`} onClick={() => { openCat(slot.id); setCatQ(q); }}>See all →</button>
-                </div>
-                {(slot.id === 'Hair' || slot.id === 'Face') && <div className="rail-colors" role="group" aria-label={slot.id === 'Hair' ? 'Hair color' : 'Eye color'}>
-                  {(slot.id === 'Hair' ? HAIR_COLORS : EYE_COLORS).map((color, i) => <ColorSwatch key={color} color={color} dot={(slot.id === 'Hair' ? HAIR_DOTS : EYE_DOTS)[i]} selected={(slot.id === 'Hair' ? look.hairCol : faceColorIndex(look.face)) === i} onClick={() => slot.id === 'Hair' ? patch({ hair: Math.floor(look.hair / 10) * 10 + i, hairCol: i }) : patch({ face: faceVariantId(look.sex, faceStyleId(look.face), i) })} />)}
-                </div>}
-                <div className="slot-tiles">
-                  {items.slice(0, 6).map((row) => {
-                    if (row.type === 'hair') {
-                      const meta = getStyle(CATALOG, row.id);
-                      if (!meta) return null;
+                );
+              })}
+            </div>
+          </>
+        ) : (
+          <div id="banner-list" role="list" aria-label="Limited shop and mystery crates">
+            {displayedCards.map((card) => {
+              const availableSlots = [...new Set(card.items.map((i) => (i.isHair ? 'Hair' : equipSlot(i.sub))))];
+              const selectedSlots = crateSlotFilter[card.id];
+              const isFiltered = Array.isArray(selectedSlots) && selectedSlots.length < availableSlots.length;
+              const filteredItems = Array.isArray(selectedSlots)
+                ? card.items.filter((i) => selectedSlots.includes(i.isHair ? 'Hair' : equipSlot(i.sub)))
+                : card.items;
+              const searchFiltered = q.trim()
+                ? filteredItems.filter((i) => matchesFuzzy(i.name, i.id, q.trim().toLowerCase()))
+                : filteredItems;
+              if (q.trim() && !searchFiltered.length) return null;
+
+              let filterButtonLabel = 'Slots: All';
+              if (isFiltered) {
+                if (!selectedSlots || selectedSlots.length === 0) {
+                  filterButtonLabel = 'Slots: None';
+                } else if (selectedSlots.length === 1) {
+                  filterButtonLabel = `Slot: ${selectedSlots[0]}`;
+                } else if (selectedSlots.length === 2) {
+                  filterButtonLabel = `${selectedSlots[0]}, ${selectedSlots[1]}`;
+                } else {
+                  filterButtonLabel = `Slots: ${selectedSlots.length}/${availableSlots.length}`;
+                }
+              }
+
+              return (
+                <section key={card.id} className="banner-card" aria-labelledby={`banner-title-${card.id}`}>
+                  <div className="banner-card-head">
+                    <div className="banner-head-main">
+                      <div className="banner-badge-row">
+                        <span className={`banner-type-badge ${card.type}`}>{card.typeLabel}</span>
+                        <span className={`banner-status-badge ${card.isActive ? 'active' : 'ended'}`}>
+                          {card.statusText}
+                        </span>
+                        {card.start && card.end && (
+                          <span className="banner-dates">🕒 {shortDate(card.start)} – {shortDate(card.end)}</span>
+                        )}
+                      </div>
+                      <div className="banner-card-actions">
+                        {card.type === 'crate' && (
+                          <button
+                            type="button"
+                            className="banner-tryon-btn"
+                            onClick={() => tryOnCrate(card.items)}
+                            title="Try on a random coordinated outfit from this crate"
+                          >
+                            🎲 Try Crate Look
+                          </button>
+                        )}
+                        {card.rates && (
+                          <button
+                            type="button"
+                            className="banner-rates-btn"
+                            onClick={() => setRatesOpen(true)}
+                            title="View official drop rates"
+                          >
+                            Rates ↗
+                          </button>
+                        )}
+                        {card.post && (
+                          <a
+                            href={card.post}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="banner-link-btn"
+                            title="View Cash Shop update announcement"
+                          >
+                            Post ↗
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                    <div className="banner-card-title-row">
+                      <h3 id={`banner-title-${card.id}`} className="banner-card-title">{card.label}</h3>
+                      {availableSlots.length > 1 && (
+                        <div
+                          className="crate-filter-wrap"
+                          ref={activeFilterCardId === card.id ? filterPopRef : null}
+                        >
+                          <button
+                            type="button"
+                            className={`crate-filter-btn ${isFiltered ? 'active' : ''}`}
+                            onClick={() => setActiveFilterCardId(activeFilterCardId === card.id ? null : card.id)}
+                            aria-expanded={activeFilterCardId === card.id}
+                            aria-haspopup="dialog"
+                            title={`Filter items by slot: ${filterButtonLabel}`}
+                          >
+                            <svg className="crate-filter-icon" viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                              <polygon points="2 3 14 3 9.5 8.5 9.5 13 6.5 14.5 6.5 8.5 2 3" />
+                            </svg>
+                            <span className="crate-filter-label">{filterButtonLabel}</span>
+                            <span className="crate-filter-caret" aria-hidden="true">▾</span>
+                          </button>
+
+                          {activeFilterCardId === card.id && (
+                            <div className="crate-filter-popover" role="dialog" aria-label="Filter crate by slot">
+                              <div className="crate-filter-popover-head">
+                                <span className="crate-filter-popover-title">Filter by slot</span>
+                                <div className="crate-filter-popover-actions">
+                                  <button
+                                    type="button"
+                                    className="crate-filter-action-btn"
+                                    onClick={() => selectAllCrateSlots(card.id)}
+                                  >
+                                    All
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="crate-filter-action-btn"
+                                    onClick={() => clearAllCrateSlots(card.id)}
+                                  >
+                                    Clear
+                                  </button>
+                                </div>
+                              </div>
+                              <div className="crate-filter-options" role="group">
+                                {availableSlots.map((slot) => {
+                                  const count = card.items.filter((i) => (i.isHair ? 'Hair' : equipSlot(i.sub)) === slot).length;
+                                  const isChecked = selectedSlots ? selectedSlots.includes(slot) : true;
+                                  return (
+                                    <label key={slot} className={`crate-filter-option ${isChecked ? 'checked' : ''}`}>
+                                      <input
+                                        type="checkbox"
+                                        className="crate-filter-checkbox"
+                                        checked={isChecked}
+                                        onChange={() => toggleCrateSlot(card.id, slot, availableSlots)}
+                                      />
+                                      <span className="crate-filter-slot-name">{slot}</span>
+                                      <span className="crate-filter-count">{count}</span>
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                              <div className="crate-filter-popover-foot">
+                                <span className="crate-filter-count-summary">{filteredItems.length} items</span>
+                                <button
+                                  type="button"
+                                  className="crate-filter-done-btn"
+                                  onClick={() => setActiveFilterCardId(null)}
+                                >
+                                  Done
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    {card.note && <p className="banner-card-note">{card.note}</p>}
+                  </div>
+
+                  <div className="banner-card-grid">
+                    {searchFiltered.length === 0 ? (
+                      <div className="banner-empty-filter">
+                        <p>No items match the selected slots.</p>
+                        <button
+                          type="button"
+                          className="banner-reset-filter-btn"
+                          onClick={() => selectAllCrateSlots(card.id)}
+                        >
+                          Show all in crate ({card.items.length})
+                        </button>
+                      </div>
+                    ) : (
+                      searchFiltered.map((item) => {
+                      const isHair = item.isHair;
+                      const isFace = item.sub === 'Face';
+                      const faceItem = isFace ? getItem(CATALOG, item.id) : undefined;
+                      const faceSex: Sex = faceItem?.sex === 'f' || item.id >= 21000 ? 'f' : 'm';
+                      const worn = isHair
+                        ? Math.floor(look.hair / 10) === item.id
+                        : isFace
+                          ? faceStyleId(look.face) === faceStyleId(item.id) && ((look.face >= 21000) === (faceSex === 'f'))
+                          : Object.values(look.items).includes(item.id);
+                      const img = isHair
+                        ? iconURL(item.id * 10 + look.hairCol)
+                        : isFace
+                          ? iconURL(faceVariantId(faceSex, faceStyleId(item.id), faceColorIndex(look.face)))
+                          : iconURL(item.id);
+                      const slotTag = isHair ? 'Hair' : equipSlot(item.sub);
+                      const itemSex = isHair ? getStyle(CATALOG, item.id)?.sex : (item.sex ?? getItem(CATALOG, item.id)?.sex);
                       return (
                         <Tile
-                          key={row.id}
-                          mini
-                          on={Math.floor(look.hair / 10) === row.id}
-                          img={iconURL(row.id * 10 + look.hairCol)}
-                          label={meta.name}
-                          coupon={meta.coupon}
-                          bannerId={meta.bannerId}
-                          attainable={meta.attainable}
-                          onClick={() => wearItemById(row.id * 10 + look.hairCol, 'Hair')}
+                          key={item.id}
+                          on={worn}
+                          img={img}
+                          label={item.name}
+                          rate={item.rate?.includes('%') ? undefined : item.rate}
+                          rateBadge={item.rate?.includes('%') ? item.rate : undefined}
+                          bannerId={card.id}
+                          slotTag={slotTag}
+                          gender={itemSex}
+                          onClick={() => {
+                            if (isHair) wearItemById(item.id * 10 + look.hairCol, 'Hair');
+                            else wearItemById(item.id, item.sub);
+                          }}
                         />
                       );
-                    }
-                    const item = getItem(CATALOG, row.id);
-                    if (!item) return null;
-                    const faceId = item.sub === 'Face' ? faceVariantId(look.sex, faceStyleId(row.id), faceColorIndex(look.face)) : row.id;
-                    const worn = item.sub === 'Face' ? row.id === wornFaceRow : Object.values(look.items).includes(row.id);
-                    return (
-                      <Tile
-                        key={row.id}
-                        mini
-                        on={worn}
-                        img={iconURL(faceId)}
-                        label={item.name}
-                        coupon={item.coupon}
-                        bannerId={item.bannerId}
-                        attainable={item.attainable}
-                        mismatched={row.mismatch}
-                        mismatchJob={row.mismatch ? item.requiredJobs?.find((j) => j !== 'Beginner') : undefined}
-                        onClick={() => wearItemById(row.id, item.sub)}
-                      />
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+                    })
+                  )}
+                  </div>
+                </section>
+              );
+            })}
+          </div>
+        )}
 
         {catSec && (
           <div id="drawer" className="open">
@@ -850,7 +1616,7 @@ export default function FashionIsland() {
             {EQUIP_SECTIONS.some((section) => section.id === catSec) && (
               <div id="drawer-filter" role="group" aria-label="Filter by class">
                 {JOBS.map((j) => (
-                  <button key={j} type="button" className={'job-pill' + (job === j ? ' on' : '')} aria-pressed={job === j} onClick={() => setJob(j)}>
+                  <button key={j} type="button" className={'job-pill' + (job === j ? ' on' : '')} aria-pressed={job === j} onClick={() => setJob(j)} title={j === 'All' ? 'Show all classes' : `Sort ${j} equips to top`}>
                     {j === 'All' ? 'All' : j}
                   </button>
                 ))}
@@ -868,7 +1634,7 @@ export default function FashionIsland() {
               <div id="drawer-color">
                 <span id="drawer-color-label">Eye color · {EYE_COLORS[faceColorIndex(look.face)]}</span>
                 <div id="drawer-color-band" role="group" aria-label="Eye color">
-                  {EYE_COLORS.map((color, i) => <ColorSwatch key={color} color={color} dot={EYE_DOTS[i]} selected={faceColorIndex(look.face) === i} onClick={() => patch({ face: faceVariantId(look.sex, faceStyleId(look.face), i) })} />)}
+                  {EYE_COLORS.map((color, i) => <ColorSwatch key={color} color={color} dot={EYE_DOTS[i]} selected={faceColorIndex(look.face) === i} onClick={() => patch({ face: faceVariantId(look.face >= 21000 ? 'f' : 'm', faceStyleId(look.face), i) })} />)}
                 </div>
               </div>
             )}
@@ -912,6 +1678,7 @@ export default function FashionIsland() {
                               rateBadge={styleMeta.rate?.includes('%') ? styleMeta.rate : undefined}
                               bannerId={styleMeta.bannerId}
                               coupon={styleMeta.coupon}
+                              gender={styleMeta.sex}
                               lastText={lastText}
                               onClick={() => wearItemById(row.id * 10 + look.hairCol, 'Hair')}
                             />
@@ -919,8 +1686,11 @@ export default function FashionIsland() {
                         }
                         const item = getItem(CATALOG, row.id);
                         if (!item) return null;
-                        const faceId = item.sub === 'Face' ? faceVariantId(look.sex, faceStyleId(row.id), faceColorIndex(look.face)) : row.id;
-                        const worn = item.sub === 'Face' ? faceStyleId(look.face) === faceStyleId(row.id) : Object.values(look.items).includes(row.id);
+                        const faceSex: Sex = item.sex === 'f' || row.id >= 21000 ? 'f' : 'm';
+                        const faceId = item.sub === 'Face' ? faceVariantId(faceSex, faceStyleId(row.id), faceColorIndex(look.face)) : row.id;
+                        const worn = item.sub === 'Face'
+                          ? faceStyleId(look.face) === faceStyleId(row.id) && ((look.face >= 21000) === (faceSex === 'f'))
+                          : Object.values(look.items).includes(row.id);
                         const banner = getBanner(CATALOG, item.bannerId);
                         const lastText = !item.attainable && banner?.start && banner?.end ? `${banner.start.slice(5)} – ${banner.end.slice(5)}` : undefined;
                         return (
@@ -933,6 +1703,7 @@ export default function FashionIsland() {
                             rateBadge={item.rate?.includes('%') ? item.rate : undefined}
                             bannerId={item.bannerId}
                             coupon={item.coupon}
+                            gender={item.sex}
                             lastText={lastText}
                             onClick={() => wearItemById(row.id, item.sub)}
                           />
@@ -977,6 +1748,7 @@ export default function FashionIsland() {
                             img={iconURL(row.id)}
                             label={item.name}
                             attainable={item.attainable}
+                            gender={item.sex}
                             mismatched={row.mismatch}
                             mismatchJob={row.mismatch ? item.requiredJobs?.find((j) => j !== 'Beginner') : undefined}
                             rateBadge={item.rate?.includes('%') ? item.rate : undefined}
@@ -997,8 +1769,11 @@ export default function FashionIsland() {
                 {catRows.map((row) => {
                   const item = getItem(CATALOG, row.id);
                   if (!item) return null;
-                  const faceId = item.sub === 'Face' ? faceVariantId(look.sex, faceStyleId(row.id), faceColorIndex(look.face)) : row.id;
-                  const worn = item.sub === 'Face' ? faceStyleId(look.face) === faceStyleId(row.id) : Object.values(look.items).includes(row.id);
+                  const faceSex: Sex = item.sex === 'f' || row.id >= 21000 ? 'f' : 'm';
+                  const faceId = item.sub === 'Face' ? faceVariantId(faceSex, faceStyleId(row.id), faceColorIndex(look.face)) : row.id;
+                  const worn = item.sub === 'Face'
+                    ? faceStyleId(look.face) === faceStyleId(row.id) && ((look.face >= 21000) === (faceSex === 'f'))
+                    : Object.values(look.items).includes(row.id);
                   const banner = getBanner(CATALOG, item.bannerId);
                   const lastText = !item.attainable && banner?.start && banner?.end ? `${banner.start.slice(5)} – ${banner.end.slice(5)}` : undefined;
                   return (
@@ -1008,6 +1783,7 @@ export default function FashionIsland() {
                       img={iconURL(faceId)}
                       label={item.name}
                       attainable={item.attainable}
+                      gender={item.sex}
                       mismatched={row.mismatch}
                       mismatchJob={row.mismatch ? item.requiredJobs?.find((j) => j !== 'Beginner') : undefined}
                       rate={item.rate}
@@ -1118,6 +1894,8 @@ function Tile(props: {
   /** Compact % overlay for grouped equip tiles — chance lives in the badge,
    *  banner dates live in the group header, so no text rows under the tile. */
   rateBadge?: string;
+  slotTag?: string;
+  gender?: 'm' | 'f' | 'u';
   onClick: () => void;
 }) {
   const jobLabel = props.equipInfo;
@@ -1134,40 +1912,73 @@ function Tile(props: {
       ? `${notAttainable ? 'Expired' : 'Available until'} ${banner.end}`
       : notAttainable ? 'Not currently attainable' : undefined;
   const countdown = formatCountdown(banner?.end, props.attainable);
+  const hasBadges = Boolean(expiration || (props.gender && props.gender !== 'u') || showSelect);
+
   return (
-    <button type="button" aria-pressed={props.on} aria-label={props.mismatched && props.mismatchJob ? `${props.label} (switches class to ${props.mismatchJob})` : props.label || undefined} title={props.mismatched && props.mismatchJob ? `Off-job · tap switches class to ${props.mismatchJob}` : undefined} className={'tile' + (props.mini ? ' mini' : '') + (props.on ? ' on' : '') + (notAttainable ? ' not-attainable' : '') + (props.mismatched ? ' mismatch' : '')} onClick={props.onClick}>
+    <button
+      type="button"
+      aria-pressed={props.on}
+      aria-label={
+        props.mismatched && props.mismatchJob
+          ? `${props.label} (switches class to ${props.mismatchJob})`
+          : props.label || undefined
+      }
+      title={
+        props.mismatched && props.mismatchJob
+          ? `Off-job · tap switches class to ${props.mismatchJob}`
+          : props.gender === 'm'
+            ? `${props.label} · ♂ Male`
+            : props.gender === 'f'
+              ? `${props.label} · ♀ Female`
+              : undefined
+      }
+      className={'tile' + (props.mini ? ' mini' : '') + (props.on ? ' on' : '') + (notAttainable ? ' not-attainable' : '') + (props.mismatched ? ' mismatch' : '')}
+      onClick={props.onClick}
+    >
       <div className="tile-preview">
-      {expiration && (
-        <div className="tile-badges">
-          <div className="tile-methods">
-            {showSelect && (
-              <span className="tile-badge" role="img" aria-label="Select your choice" title="Select your choice">
-                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-                  <path d="m3 2 10 6-5 1-2 5-3-12Z" strokeLinejoin="round" />
-                </svg>
+        {hasBadges && (
+          <div className="tile-badges">
+            <div className="tile-methods">
+              {showSelect && (
+                <span className="tile-badge" role="img" aria-label="Select your choice" title="Select your choice">
+                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+                    <path d="m3 2 10 6-5 1-2 5-3-12Z" strokeLinejoin="round" />
+                  </svg>
+                </span>
+              )}
+              {props.gender && props.gender !== 'u' && (
+                <span
+                  className={`tile-gender-tag ${props.gender}`}
+                  role="img"
+                  aria-label={props.gender === 'm' ? 'Male (♂)' : 'Female (♀)'}
+                  title={props.gender === 'm' ? 'Male equip (♂)' : 'Female equip (♀)'}
+                >
+                  {props.gender === 'm' ? '♂' : '♀'}
+                </span>
+              )}
+            </div>
+            {expiration && (
+              <span suppressHydrationWarning className={'tile-badge tile-expiration' + (notAttainable ? ' expired' : '')} role="img" aria-label={expiration} title={[expiration, props.lastText].filter(Boolean).join(' · ')}>
+                {notAttainable || !countdown ? (
+                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="8" cy="8" r="6" /><path d="M8 4v4l3 2" strokeLinecap="round" /></svg>
+                ) : (
+                  countdown
+                )}
               </span>
             )}
           </div>
-          <span className={'tile-badge tile-expiration' + (notAttainable ? ' expired' : '')} role="img" aria-label={expiration} title={[expiration, props.lastText].filter(Boolean).join(' · ')}>
-            {notAttainable || !countdown ? (
-              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="8" cy="8" r="6" /><path d="M8 4v4l3 2" strokeLinecap="round" /></svg>
-            ) : (
-              countdown
-            )}
-          </span>
-        </div>
-      )}
-      {props.img ? (
-        <img decoding="async" draggable={false} src={props.img} alt="" />
-      ) : (
-        <span style={{ fontSize: 18 }}>{props.big}</span>
-      )}
-      {props.rateBadge && <span className="tile-rate-badge" role="img" aria-label={`Chance ${props.rateBadge}`} title={`Chance ${props.rateBadge}`}>{shortRate(props.rateBadge)}</span>}
+        )}
+        {props.img ? (
+          <img decoding="async" draggable={false} src={props.img} alt="" />
+        ) : (
+          <span style={{ fontSize: 18 }}>{props.big}</span>
+        )}
+        {props.rateBadge && <span className="tile-rate-badge" role="img" aria-label={`Chance ${props.rateBadge}`} title={`Chance ${props.rateBadge}`}>{shortRate(props.rateBadge)}</span>}
       </div>
+      {props.slotTag && !props.mini && <span className="tile-slot-tag">{props.slotTag}</span>}
       {props.label && !props.mini && <span className="tile-label">{props.label}</span>}
       {jobLabel && !props.mini && <em className="rate">{jobLabel}</em>}
-      {props.rate && !props.mini && <em className="rate">{props.rate}</em>}
-
+      {props.rate && !props.rateBadge && !props.mini && <em className="rate">{props.rate}</em>}
     </button>
   );
 }

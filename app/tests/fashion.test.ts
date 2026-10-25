@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { DEFAULT_LOOK, EYE_COLORS, faceColorIndex, faceStyleId, fuzzyScore, matchesFuzzy, renderURL, iconURL, matchesJob, randomLook, equipSlot, type Sex, applyPick, stanceForWeapon, TWO_HAND_SUBS, RANDOM_EQUIP_SLOTS } from '../src/lib/fashion';
+import { DEFAULT_LOOK, EYE_COLORS, faceColorIndex, faceStyleId, formatAttainableInfo, fuzzyScore, matchesFuzzy, renderURL, iconURL, matchesJob, randomLook, equipSlot, type Sex, applyPick, stanceForWeapon, TWO_HAND_SUBS, RANDOM_EQUIP_SLOTS } from '../src/lib/fashion';
 import catalog from '../src/data/catalog.json';
 
 test('mixed render preserves Classic body and equips with retail cosmetics', () => {
@@ -142,5 +142,56 @@ test('fuzzy search matches substrings, typos, and ids', () => {
   assert.ok(!matchesFuzzy('Antagonist', 30130, 'zephyr'));
   assert.ok(matchesFuzzy(undefined, 30130, '3013'));
   assert.ok(matchesFuzzy('Antagonist', 30130, ''));
+});
+
+test('Alert Face is active, attainable, and properly resolved across eye colors', () => {
+  const alertFace = catalog.items[20805 as unknown as keyof typeof catalog.items];
+  assert.ok(alertFace, '20805 Alert Face must be present in catalog');
+  assert.equal(alertFace.name, 'Alert Face');
+  assert.equal(alertFace.sex, 'm');
+  assert.equal(alertFace.bannerId, 'style-oct26');
+  assert.equal(alertFace.attainable, true);
+  assert.equal(alertFace.coupon, 'mystery');
+  assert.equal(alertFace.rate, '16.67%');
+
+  // Must be in active male faces index
+  assert.ok(catalog.indexes.faces.m.active.includes(20805));
+
+  // Resolved across eye colors (e.g. 20005 black eyes)
+  const infoBlack = formatAttainableInfo(catalog as any, 20005);
+  assert.equal(infoBlack.isAttainable, true);
+  assert.equal(infoBlack.bannerLabel, 'Mystery & Signature Style Coupons');
+
+  const infoViolet = formatAttainableInfo(catalog as any, 20805);
+  assert.equal(infoViolet.isAttainable, true);
+  assert.equal(infoViolet.bannerLabel, 'Mystery & Signature Style Coupons');
+});
+
+test('both male and female items are accessible and sort matching sex first', () => {
+  const crateGroup = catalog.indexes.groups['mystery-crate'];
+  assert.ok(crateGroup.m.length > 0);
+  assert.ok(crateGroup.f.length > 0);
+  assert.ok(crateGroup.u.length > 0);
+
+  // When current character is male ('m')
+  const maleLookSex: Sex = 'm';
+  const otherSex: Sex = 'f';
+  const allCrateItems = [...crateGroup.u, ...crateGroup[maleLookSex], ...crateGroup[otherSex]];
+  assert.equal(new Set(allCrateItems).size, allCrateItems.length);
+
+  // Matching items (u and m) sort before opposite sex (f)
+  const sexMismatch = (id: number) => {
+    const s = catalog.items[id as keyof typeof catalog.items]?.sex;
+    return s && s !== 'u' && s !== maleLookSex ? 1 : 0;
+  };
+  const sorted = [...allCrateItems].sort((a, b) => sexMismatch(a) - sexMismatch(b));
+
+  const firstOppositeIdx = sorted.findIndex(id => catalog.items[id as keyof typeof catalog.items]?.sex === 'f');
+  assert.ok(firstOppositeIdx >= 0);
+  // All items before firstOppositeIdx must be 'u' or 'm'
+  for (let i = 0; i < firstOppositeIdx; i++) {
+    const s = catalog.items[sorted[i]! as keyof typeof catalog.items]?.sex;
+    assert.ok(s === 'u' || s === 'm');
+  }
 });
 
