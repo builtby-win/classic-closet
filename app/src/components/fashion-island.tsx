@@ -10,6 +10,8 @@ import {
   applyPick,
   bannerRank,
   decodeLook,
+  defaultFaceForSex,
+  defaultHairForSex,
   encodeLook,
   equipSlot,
   faceColorIndex,
@@ -19,10 +21,13 @@ import {
   getBanner,
   getItem,
   getStyle,
+  hasStoredLook,
   iconURL,
+  loadLookForSex,
   loadLookFromStorage,
   matchesFuzzy,
   matchesJob,
+  mirrorStyleForSex,
   randomClassicWeapon,
   randomLook,
   stanceForWeapon,
@@ -53,15 +58,11 @@ const MYSTERY_RATE_GROUPS = [
   { title: 'Female faces', rows: CATALOG.indexes.faces.f.active.filter((id) => CATALOG.items[id]?.coupon === 'mystery').map((id) => ({ name: CATALOG.items[id].name, rate: CATALOG.items[id].rate ?? '16.67%' })) },
 ];
 const STARTER_HAIRS: Record<Sex, number[]> = { m: [3000, 3002, 3003], f: [3100, 3104] };
-// Innocent Gaze (m) / Strong Stare (f); Veronica hair for f
-const DEFAULT_FACE: Record<Sex, number> = { m: 20033, f: 21803 };
-const DEFAULT_HAIR_STYLE: Partial<Record<Sex, number>> = { f: 3101 };
 const STARTER_FACES: Record<Sex, number[]> = { m: [20000, 20001, 20002], f: [21000, 21001, 21002] };
 const HAIR_DOTS = ['#23232a', '#a83a32', '#d97b2e', '#e3c46a', '#4a8f4d', '#4a6fa5', '#7a4a8f', '#6e4a2f'];
 const EYE_DOTS = ['#24242b', '#4a82c5', '#c94747', '#4a9459', '#826044', '#48aeb6', '#8050aa', '#8c3440', '#e8e8e8'];
 
 type ViewTab = 'slots' | 'limited' | 'crates' | 'styles';
-
 const VIEW_OPTIONS: Record<ViewTab, { label: string; shortLabel: string; icon: string; desc: string }> = {
   slots: { label: 'Closet', shortLabel: 'Closet', icon: '👗', desc: 'Equipped slots & catalog' },
   limited: { label: 'Limited Shop', shortLabel: 'Limited Shop', icon: '🛍️', desc: 'All limited crates, styles & sales' },
@@ -137,20 +138,21 @@ function loadInitialLook(): Look {
   const fromHash = decodeLook(window.location.hash);
   if (fromHash) return normalizeStance({ ...DEFAULT_LOOK, ...fromHash, sex: (fromHash.sex as Sex) || DEFAULT_LOOK.sex });
 
-  const fromStorage = loadLookFromStorage();
   const savedSex = (localStorage.getItem(STORAGE_SEX_KEY) as Sex) || null;
+  // Prefer the active gender's saved character; fall back to any saved look.
+  const fromStorage = (savedSex && loadLookForSex(savedSex)) || loadLookFromStorage();
   if (fromStorage) {
     return normalizeStance({ ...DEFAULT_LOOK, ...fromStorage, sex: (fromStorage.sex as Sex) || savedSex || DEFAULT_LOOK.sex });
   }
 
   const sex = savedSex || DEFAULT_LOOK.sex;
-  return { ...DEFAULT_LOOK, sex, hair: (DEFAULT_HAIR_STYLE[sex] ?? 3013) * 10, face: DEFAULT_FACE[sex] };
+  return { ...DEFAULT_LOOK, sex, hair: defaultHairForSex(sex), face: defaultFaceForSex(sex) };
 }
 
 function isFirstVisit(): boolean {
   if (typeof window === 'undefined') return false;
   if (decodeLook(window.location.search) || decodeLook(window.location.hash)) return false;
-  return !loadLookFromStorage() && !localStorage.getItem(STORAGE_SEX_KEY);
+  return !hasStoredLook();
 }
 
 /** Single owner for the selected look: boots from shared link / storage,
@@ -268,7 +270,24 @@ export default function FashionIsland() {
   const setSex = useCallback((sex: Sex) => {
     localStorage.setItem(STORAGE_SEX_KEY, sex);
     setSettingsOpen(false);
-    setLook((l) => ({ ...l, sex }));
+    setLook((l) => {
+      if (l.sex === sex) return l;
+      // Restore that gender's saved character; otherwise mirror the worn
+      // styles across to the live banner lineup (same tier, same slot),
+      // keeping dye and eye colors.
+      const saved = loadLookForSex(sex);
+      if (saved) return normalizeStance({ ...DEFAULT_LOOK, ...saved, sex });
+      const hairStyle = Math.floor(l.hair / 10);
+      const hairSex = CATALOG.styles[hairStyle]?.sex;
+      const hair = hairSex === sex
+        ? l.hair
+        : mirrorStyleForSex('hair', l.sex, sex, hairStyle) * 10 + l.hairCol;
+      const fromFaceSex: Sex = l.face >= 21000 ? 'f' : 'm';
+      const face = fromFaceSex === sex
+        ? l.face
+        : faceVariantId(sex, mirrorStyleForSex('face', l.sex, sex, faceStyleId(l.face)), faceColorIndex(l.face));
+      return { ...l, sex, hair, face };
+    });
   }, []);
 
   const wearItemById = useCallback((id: number | null, sub: string) => {
@@ -348,6 +367,11 @@ export default function FashionIsland() {
     ...CATALOG.indexes.hairs[otherSex].past,
   ], [look.sex, otherSex]);
 
+  const unreleasedHairStyles = useMemo(() => [
+    ...CATALOG.indexes.hairs[look.sex].unreleased,
+    ...CATALOG.indexes.hairs[otherSex].unreleased,
+  ], [look.sex, otherSex]);
+
   const activeFaces = useMemo(() => [
     ...CATALOG.indexes.faces[look.sex].active,
     ...CATALOG.indexes.faces[otherSex].active,
@@ -356,6 +380,11 @@ export default function FashionIsland() {
   const pastFaces = useMemo(() => [
     ...CATALOG.indexes.faces[look.sex].past,
     ...CATALOG.indexes.faces[otherSex].past,
+  ], [look.sex, otherSex]);
+
+  const unreleasedFaces = useMemo(() => [
+    ...CATALOG.indexes.faces[look.sex].unreleased,
+    ...CATALOG.indexes.faces[otherSex].unreleased,
   ], [look.sex, otherSex]);
 
   const starterHairStyles = useMemo(() => [
@@ -433,19 +462,21 @@ export default function FashionIsland() {
     };
     const groups = catSec === 'Hair'
       ? [
-          buildHair('hair:mystery', 'Mystery', mysteryHairs),
           buildHair('hair:signature', 'Signature', signatureHairs),
+          buildHair('hair:mystery', 'Mystery', mysteryHairs),
           buildHair('hair:starter', 'Starter', starterHairStyles),
           buildHair('hair:past', 'Past rotation', pastHairStyles),
+          buildHair('hair:unreleased', 'Not released yet', unreleasedHairStyles),
         ]
       : [
-          buildFace('face:mystery', 'Mystery', mysteryFaces),
           buildFace('face:signature', 'Signature', signatureFaces),
+          buildFace('face:mystery', 'Mystery', mysteryFaces),
           buildFace('face:starter', 'Starter', starterFaces),
           buildFace('face:past', 'Past rotation', pastFaces),
+          buildFace('face:unreleased', 'Not released yet', unreleasedFaces),
         ];
     return groups.sort((a, b) => Number(a.rows.length === 0) - Number(b.rows.length === 0));
-  }, [catSec, catQ, mysteryHairs, signatureHairs, starterHairStyles, pastHairStyles, mysteryFaces, signatureFaces, starterFaces, pastFaces, look.sex]);
+  }, [catSec, catQ, mysteryHairs, signatureHairs, starterHairStyles, pastHairStyles, unreleasedHairStyles, mysteryFaces, signatureFaces, starterFaces, pastFaces, unreleasedFaces, look.sex]);
   // (category expand/collapse inlined at the drawer render below)
 
   function jobTier(item: ItemMeta | undefined, selectedJob: string): number {
@@ -492,18 +523,22 @@ export default function FashionIsland() {
 
   // Equip drawers: partition the flat row list into banner sections so NX
   // sources never intermix — Founder's crate → 10-day covers → Aurora stamp
-  // → classic job equips. When a specific job is selected, Job Equips prioritizes to the top.
+  // → classic job equips. When a specific job is selected, Job Equips prioritizes
+  // to the top and off-job gear trails at the bottom, below NX cosmetics.
   const equipGroups = useMemo(() => {
     if (catGroups || !catSec || catRows.length === 0) return null;
     const buckets = new Map<string, typeof catRows>();
     for (const row of catRows) {
       const group = CATALOG.items[row.id]?.group ?? 'classic-equips';
-      const list = buckets.get(group) ?? [];
+      // When a job is selected, off-job gear drops into its own trailing
+      // bucket so NX cosmetics always sort above filtered-out items.
+      const key = group === 'classic-equips' && job !== 'All' && row.tier === 2 ? 'off-job' : group;
+      const list = buckets.get(key) ?? [];
       list.push(row);
-      buckets.set(group, list);
+      buckets.set(key, list);
     }
     const order = job !== 'All'
-      ? ['classic-equips', 'founder-crate', 'mystery-crate', 'cover-10day', 'aurora-crate']
+      ? ['classic-equips', 'founder-crate', 'mystery-crate', 'cover-10day', 'aurora-crate', 'off-job']
       : ['founder-crate', 'mystery-crate', 'cover-10day', 'aurora-crate', 'classic-equips'];
     const groups = order
       .filter((key) => (buckets.get(key)?.length ?? 0) > 0)
@@ -516,7 +551,7 @@ export default function FashionIsland() {
           : key === 'mystery-crate' ? 'Mystery Fashion Crate'
           : key === 'cover-10day' ? '10-Day Covers'
           : key === 'aurora-crate' ? 'Aurora Stamp Shop'
-          : 'Job Equips';
+          : key === 'off-job' ? `Off-job · ${job}` : 'Job Equips';
         return { key, label: `${label} · ${rows.length}${dates}`, rows, bannerId };
       });
     return groups;
@@ -676,8 +711,7 @@ export default function FashionIsland() {
       if (!g) return [];
       const matching = [...g.u, ...g[look.sex]];
       const opposite = g[otherSex] ?? [];
-      const allIds = [...matching, ...opposite];
-      return allIds.map(id => {
+      const rows = [...matching, ...opposite].map(id => {
         const m = CATALOG.items[id];
         return {
           id,
@@ -688,8 +722,20 @@ export default function FashionIsland() {
           sexMismatch: m?.sex && m.sex !== 'u' && m.sex !== look.sex ? 1 : 0,
         };
       }).sort((a, b) => a.sexMismatch - b.sexMismatch);
+      // Pair opposite-sex counterparts (e.g. Sailor Outfit ♂/♀) adjacently:
+      // same-name items for the other sex slot in right after their match
+      // instead of sinking to the bottom of a long crate list.
+      const paired = rows.filter((r) => r.sexMismatch === 0);
+      for (const r of rows) {
+        if (r.sexMismatch === 0) continue;
+        let idx = -1;
+        for (let i = paired.length - 1; i >= 0; i--) {
+          if (paired[i]!.sexMismatch === 0 && paired[i]!.name === r.name) { idx = i; break; }
+        }
+        if (idx === -1) paired.push(r); else paired.splice(idx + 1, 0, r);
+      }
+      return paired;
     };
-
     // 1. Mystery Fashion Crate
     const mc = CATALOG.banners['mystery-crate-nov26'];
     if (mc) {
@@ -1303,7 +1349,18 @@ export default function FashionIsland() {
             </div>
             <div id="slot-list" role="list" aria-label="Equipped items, head to feet">
               {railSlots.map((slot) => {
-                const items = (railItems[slot.id] ?? []).filter(row => matchesFuzzy(row.type === 'hair' ? CATALOG.styles[row.id]?.name : CATALOG.items[row.id]?.name, row.id, q.trim().toLowerCase()));
+                // Unreleased styles live outside railItems (drawer group only),
+                // so fold them into the pool when searching.
+                const pool = q.trim() && (slot.id === 'Hair' || slot.id === 'Face')
+                  ? [...(railItems[slot.id] ?? []),
+                      ...(slot.id === 'Hair' ? unreleasedHairStyles : unreleasedFaces).map((id): CatRow => ({
+                        type: slot.id === 'Hair' ? 'hair' : 'item',
+                        id,
+                        sexMismatch: ((slot.id === 'Hair' ? CATALOG.styles[id]?.sex : CATALOG.items[id]?.sex) ?? look.sex) !== 'u'
+                          && (slot.id === 'Hair' ? CATALOG.styles[id]?.sex : CATALOG.items[id]?.sex) !== look.sex ? 1 : 0,
+                      }))]
+                  : (railItems[slot.id] ?? []);
+                const items = pool.filter(row => matchesFuzzy(row.type === 'hair' ? CATALOG.styles[row.id]?.name : CATALOG.items[row.id]?.name, row.id, q.trim().toLowerCase()));
                 if (q.trim() && !items.length) return null;
                 // Faces match by style (color variants share one tile) — first
                 // match wins so at most one tile ever shows selected.
@@ -1335,47 +1392,56 @@ export default function FashionIsland() {
                       {(slot.id === 'Hair' ? HAIR_COLORS : EYE_COLORS).map((color, i) => <ColorSwatch key={color} color={color} dot={(slot.id === 'Hair' ? HAIR_DOTS : EYE_DOTS)[i]} selected={(slot.id === 'Hair' ? look.hairCol : faceColorIndex(look.face)) === i} onClick={() => slot.id === 'Hair' ? patch({ hair: Math.floor(look.hair / 10) * 10 + i, hairCol: i }) : patch({ face: faceVariantId(look.face >= 21000 ? 'f' : 'm', faceStyleId(look.face), i) })} />)}
                     </div>}
                     <div className="slot-tiles">
-                      {items.slice(0, 6).map((row) => {
-                        if (row.type === 'hair') {
-                          const meta = getStyle(CATALOG, row.id);
-                          if (!meta) return null;
+                      {(() => {
+                        // Pin the worn tile into the featured six so the saved
+                        // style is always visible, not cut off down the list.
+                        const featured = items.slice(0, 6);
+                        const wornIdx = items.findIndex((row) => row.type === 'hair'
+                          ? Math.floor(look.hair / 10) === row.id
+                          : row.id === wornFaceRow || Object.values(look.items).includes(row.id));
+                        if (wornIdx > 5) featured[5] = items[wornIdx]!;
+                        return featured.map((row) => {
+                          if (row.type === 'hair') {
+                            const meta = getStyle(CATALOG, row.id);
+                            if (!meta) return null;
+                            return (
+                              <Tile
+                                key={row.id}
+                                mini
+                                on={Math.floor(look.hair / 10) === row.id}
+                                img={iconURL(row.id * 10 + look.hairCol)}
+                                label={meta.name}
+                                coupon={meta.coupon}
+                                bannerId={meta.bannerId}
+                                attainable={meta.attainable}
+                                gender={meta.sex}
+                                onClick={() => wearItemById(row.id * 10 + look.hairCol, 'Hair')}
+                              />
+                            );
+                          }
+                          const item = getItem(CATALOG, row.id);
+                          if (!item) return null;
+                          const faceSex: Sex = item.sex === 'f' || row.id >= 21000 ? 'f' : 'm';
+                          const faceId = item.sub === 'Face' ? faceVariantId(faceSex, faceStyleId(row.id), faceColorIndex(look.face)) : row.id;
+                          const worn = item.sub === 'Face' ? row.id === wornFaceRow : Object.values(look.items).includes(row.id);
                           return (
                             <Tile
                               key={row.id}
                               mini
-                              on={Math.floor(look.hair / 10) === row.id}
-                              img={iconURL(row.id * 10 + look.hairCol)}
-                              label={meta.name}
-                              coupon={meta.coupon}
-                              bannerId={meta.bannerId}
-                              attainable={meta.attainable}
-                              gender={meta.sex}
-                              onClick={() => wearItemById(row.id * 10 + look.hairCol, 'Hair')}
+                              on={worn}
+                              img={iconURL(faceId)}
+                              label={item.name}
+                              coupon={item.coupon}
+                              bannerId={item.bannerId}
+                              attainable={item.attainable}
+                              gender={item.sex}
+                              mismatched={row.mismatch}
+                              mismatchJob={row.mismatch ? item.requiredJobs?.find((j) => j !== 'Beginner') : undefined}
+                              onClick={() => wearItemById(row.id, item.sub)}
                             />
                           );
-                        }
-                        const item = getItem(CATALOG, row.id);
-                        if (!item) return null;
-                        const faceSex: Sex = item.sex === 'f' || row.id >= 21000 ? 'f' : 'm';
-                        const faceId = item.sub === 'Face' ? faceVariantId(faceSex, faceStyleId(row.id), faceColorIndex(look.face)) : row.id;
-                        const worn = item.sub === 'Face' ? row.id === wornFaceRow : Object.values(look.items).includes(row.id);
-                        return (
-                          <Tile
-                            key={row.id}
-                            mini
-                            on={worn}
-                            img={iconURL(faceId)}
-                            label={item.name}
-                            coupon={item.coupon}
-                            bannerId={item.bannerId}
-                            attainable={item.attainable}
-                            gender={item.sex}
-                            mismatched={row.mismatch}
-                            mismatchJob={row.mismatch ? item.requiredJobs?.find((j) => j !== 'Beginner') : undefined}
-                            onClick={() => wearItemById(row.id, item.sub)}
-                          />
-                        );
-                      })}
+                        });
+                      })()}
                     </div>
                   </div>
                 );
@@ -1639,7 +1705,8 @@ export default function FashionIsland() {
               </div>
             )}
             {catGroups && catGroups.some((g) => g.rows.length > 0) && catGroups.filter((g) => g.rows.length > 0).map((group) => {
-              const open = expandedCats[group.key] !== false;
+              // The unreleased group is large and preview-only: start collapsed.
+              const open = group.key.endsWith(':unreleased') ? expandedCats[group.key] === true : expandedCats[group.key] !== false;
               const bannerIds = [...new Set(group.rows.map(row => row.type === 'hair' ? CATALOG.styles[row.id]?.bannerId : CATALOG.items[row.id]?.bannerId))];
               const headBanner = getBanner(CATALOG, bannerIds[0]);
               const headDates = headBanner?.start && headBanner?.end ? `${shortDate(headBanner.start)}–${shortDate(headBanner.end)}` : null;
@@ -1848,6 +1915,7 @@ function BannerDetails({ id, coupon }: { id?: string; coupon?: string }) {
         {coupon === 'mystery' && <p>One random style per coupon. Each tile shows its chance.</p>}
         {coupon === 'signature' && <p>Choose your style from this rotation.</p>}
         {coupon === 'past' && <p>Past rotation: preview only; unavailable from current coupons.</p>}
+        {coupon === 'unreleased' && <p>Hasn&apos;t been released yet. Preview only.</p>}
         {banner.note && <p>{banner.note}</p>}
         {banner.rates && <a href={banner.rates} target="_blank" rel="noreferrer">Official rates ↗</a>}
       </div>
@@ -1901,6 +1969,7 @@ function Tile(props: {
   const jobLabel = props.equipInfo;
   const notAttainable = props.attainable === false;
   const banner = getBanner(CATALOG, props.bannerId);
+  const isUnreleased = props.bannerId === 'unreleased';
   // Only choice-based acquisition gets a method badge. Random/mystery is the
   // default and the % badge already signals chance, so no dice badge.
   const randomOnly = props.coupon === 'mystery' || props.bannerId === 'founder-crate-oct26' || props.bannerId === 'mystery-crate-nov26' || props.bannerId === 'beta-style-sep26';
@@ -1927,9 +1996,9 @@ function Tile(props: {
         props.mismatched && props.mismatchJob
           ? `Off-job · tap switches class to ${props.mismatchJob}`
           : props.gender === 'm'
-            ? `${props.label} · ♂ Male`
+            ? `${props.label} · Male`
             : props.gender === 'f'
-              ? `${props.label} · ♀ Female`
+              ? `${props.label} · Female`
               : undefined
       }
       className={'tile' + (props.mini ? ' mini' : '') + (props.on ? ' on' : '') + (notAttainable ? ' not-attainable' : '') + (props.mismatched ? ' mismatch' : '')}
@@ -1950,14 +2019,22 @@ function Tile(props: {
                 <span
                   className={`tile-gender-tag ${props.gender}`}
                   role="img"
-                  aria-label={props.gender === 'm' ? 'Male (♂)' : 'Female (♀)'}
-                  title={props.gender === 'm' ? 'Male equip (♂)' : 'Female equip (♀)'}
+                  aria-label={props.gender === 'm' ? 'Male' : 'Female'}
+                  title={props.gender === 'm' ? 'Male equip' : 'Female equip'}
                 >
-                  {props.gender === 'm' ? '♂' : '♀'}
+                  {props.gender === 'm' ? (
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle cx="6.5" cy="9.5" r="4" /><path d="M9.5 6.5 14 2M11 2h3v3" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                  ) : (
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle cx="8" cy="6" r="3.6" /><path d="M8 9.6V15M5.4 12.8h5.2" strokeLinecap="round" /></svg>
+                  )}
                 </span>
               )}
             </div>
-            {expiration && (
+            {isUnreleased ? (
+              <span className="tile-badge tile-unreleased" role="img" aria-label="Not released yet" title="Not released yet">
+                UNRELEASED
+              </span>
+            ) : expiration && (
               <span suppressHydrationWarning className={'tile-badge tile-expiration' + (notAttainable ? ' expired' : '')} role="img" aria-label={expiration} title={[expiration, props.lastText].filter(Boolean).join(' · ')}>
                 {notAttainable || !countdown ? (
                   <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="8" cy="8" r="6" /><path d="M8 4v4l3 2" strokeLinecap="round" /></svg>

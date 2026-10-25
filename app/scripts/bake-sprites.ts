@@ -36,8 +36,10 @@ function bakeFaceIcons() {
   console.log(`Baked ${count} face icons`);
 }
 
+const UA = { 'User-Agent': 'Mozilla/5.0 (compatible; classic-closet/1.0)' };
+
 async function fetchWithTimeout(url: string, ms = 7000): Promise<Response> {
-  return fetch(url, { signal: AbortSignal.timeout(ms) });
+  return fetch(url, { headers: UA, signal: AbortSignal.timeout(ms) });
 }
 
 async function fetchItemData(id: number, src?: 'GMS' | 'OSMS' | 'MCW', sub?: string, tries = 3): Promise<any | null> {
@@ -177,6 +179,7 @@ async function main() {
   // Rings ship zero frameBooks (chat/label UI effect, no avatar layers):
   // expected-unbakeable, warn only. Anything else failing is real.
   const equipFailed: number[] = [];
+  const unreleasedItemFailed: number[] = [];
 
   await pool(itemEntries, 10, async ([idStr, meta]) => {
     const id = Number(idStr);
@@ -191,6 +194,9 @@ async function main() {
       success++;
     } else if (meta?.sub === 'Ring') {
       console.warn(`skip unbakeable ring (no avatar frames): ${id}`);
+    } else if (meta?.bannerId === 'unreleased') {
+      // Datamined faces may lack art in every dataset: warn-only, pruned below.
+      unreleasedItemFailed.push(id);
     } else {
       equipFailed.push(id);
     }
@@ -200,6 +206,9 @@ async function main() {
   });
   if (equipFailed.length) {
     throw new Error(`Could not bake equips (retried): ${equipFailed.sort((a, b) => a - b).join(', ')}`);
+  }
+  if (unreleasedItemFailed.length) {
+    console.warn(`skip ${unreleasedItemFailed.length} unreleased items with no bakeable art (pruned below): ${unreleasedItemFailed.sort((a, b) => a - b).join(', ')}`);
   }
 
   console.log('--- Baking Face Color Variants ---');
@@ -211,6 +220,15 @@ async function main() {
       faceJobs.set(faceVariantId(sex, Number(id) % 100, color), { src: meta.src });
     }
   }
+  // Unreleased families may lack art in every dataset: warn-only, pruned below.
+  const unreleasedFaceFamilies = new Set<number>();
+  for (const [id, meta] of Object.entries<any>(catalog.items)) {
+    if (meta?.sub === 'Face' && meta?.bannerId === 'unreleased') {
+      const n = Number(id);
+      unreleasedFaceFamilies.add((n >= 21000 ? 21000 : 20000) + (n % 100));
+    }
+  }
+  const faceFamilyOf = (v: number) => (v >= 21000 ? 21000 : 20000) + (v % 100);
   const faceFailed: number[] = [];
   await pool([...faceJobs], 10, async ([id, meta]) => {
     try {
@@ -219,8 +237,13 @@ async function main() {
       faceFailed.push(id);
     }
   });
-  if (faceFailed.length) {
-    throw new Error(`Could not bake face variants: ${faceFailed.sort((a, b) => a - b).join(', ')}`);
+  const unreleasedFaceFailed = faceFailed.filter((id) => unreleasedFaceFamilies.has(faceFamilyOf(id)));
+  const realFaceFailed = faceFailed.filter((id) => !unreleasedFaceFamilies.has(faceFamilyOf(id)));
+  if (unreleasedFaceFailed.length) {
+    console.warn(`skip ${unreleasedFaceFailed.length} unreleased face variants with no bakeable art (pruned below)`);
+  }
+  if (realFaceFailed.length) {
+    throw new Error(`Could not bake face variants: ${realFaceFailed.sort((a, b) => a - b).join(', ')}`);
   }
   console.log(`All ${faceJobs.size} face color variants present.`);
 
@@ -243,7 +266,14 @@ async function main() {
     }
   });
   if (hairFailed.length) {
-    throw new Error(`Could not bake hair variants (retried): ${hairFailed.sort((a, b) => a - b).join(', ')}`);
+    const unreleasedHairFailed = hairFailed.filter((id) => catalog.styles[Math.floor(id / 10)]?.bannerId === 'unreleased');
+    const realHairFailed = hairFailed.filter((id) => catalog.styles[Math.floor(id / 10)]?.bannerId !== 'unreleased');
+    if (unreleasedHairFailed.length) {
+      console.warn(`skip ${unreleasedHairFailed.length} unreleased hair variants with no bakeable art (pruned below)`);
+    }
+    if (realHairFailed.length) {
+      throw new Error(`Could not bake hair variants (retried): ${realHairFailed.sort((a, b) => a - b).join(', ')}`);
+    }
   }
 
   console.log('--- Backfilling jump frames ---');
@@ -259,6 +289,46 @@ async function main() {
     ...hairIds.map((id): [number, any] => [id, { src: catalog.styles[Math.floor(id / 10)]?.src }]),
   ], 10, ([id, meta]) => bakeMotion(id, meta));
 
+  console.log('--- Pruning unbaked unreleased entries ---');
+  let prunedStyles = 0;
+  let prunedFaces = 0;
+  for (const [styleStr, meta] of Object.entries<any>(catalog.styles)) {
+    if (meta?.bannerId !== 'unreleased') continue;
+    const style = Number(styleStr);
+    let complete = true;
+    for (let c = 0; c < 8; c++) {
+      if (!existsSync(join(ITEMS_DIR, `${style * 10 + c}.json`))) { complete = false; break; }
+    }
+    if (!complete) {
+      delete catalog.styles[styleStr];
+      for (const sex of ['m', 'f'] as const) {
+        const arr: number[] | undefined = catalog.indexes.hairs[sex]?.unreleased;
+        const i = arr?.indexOf(style) ?? -1;
+        if (i >= 0) arr!.splice(i, 1);
+      }
+      prunedStyles++;
+    }
+  }
+  for (const [idStr, meta] of Object.entries<any>(catalog.items)) {
+    if (meta?.sub !== 'Face' || meta?.bannerId !== 'unreleased') continue;
+    const id = Number(idStr);
+    const sex = id >= 21000 ? 'f' : 'm';
+    let complete = true;
+    for (let color = 0; color < EYE_COLORS.length; color++) {
+      if (!existsSync(join(ITEMS_DIR, `${faceVariantId(sex, id % 100, color)}.json`))) { complete = false; break; }
+    }
+    if (!complete) {
+      delete catalog.items[idStr];
+      const arr: number[] | undefined = catalog.indexes.faces[meta.sex]?.unreleased;
+      const i = arr?.indexOf(id) ?? -1;
+      if (i >= 0) arr!.splice(i, 1);
+      prunedFaces++;
+    }
+  }
+  if (prunedStyles || prunedFaces) {
+    writeFileSync(catalogPath, JSON.stringify(catalog));
+  }
+  console.log(`Pruned ${prunedStyles} unreleased styles and ${prunedFaces} unreleased faces with incomplete art.`);
   console.log(`Done! Total: ${count} baked, ${skipped} already existed.`);
 }
 

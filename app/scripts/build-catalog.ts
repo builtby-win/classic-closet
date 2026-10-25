@@ -129,12 +129,12 @@ export interface FastCatalog {
   items: Record<number, ItemMeta>;
   indexes: {
     hairs: {
-      m: { active: number[]; past: number[] };
-      f: { active: number[]; past: number[] };
+      m: { active: number[]; past: number[]; unreleased: number[] };
+      f: { active: number[]; past: number[]; unreleased: number[] };
     };
     faces: {
-      m: { active: number[]; past: number[] };
-      f: { active: number[]; past: number[] };
+      m: { active: number[]; past: number[]; unreleased: number[] };
+      f: { active: number[]; past: number[]; unreleased: number[] };
     };
     groups: Record<string, {
       m: number[];
@@ -267,8 +267,9 @@ let gmsById = new Map<number, GmsItem>();
 const gmsByNameAll = new Map<string, GmsItem[]>();
 const osmsById = new Map(osmsDump.map(item => [item.id, item]));
 try {
-  const gmsCount = await fetch(`${GMS_API}/item/count`).then(r => r.json()) as number;
-  const gmsDump = await fetch(`${GMS_API}/item/list?count=${gmsCount}`).then(r => r.json()) as GmsItem[];
+  const UA = { 'User-Agent': 'Mozilla/5.0 (compatible; classic-closet/1.0)' };
+  const gmsCount = await fetch(`${GMS_API}/item/count`, { headers: UA }).then(r => r.json()) as number;
+  const gmsDump = await fetch(`${GMS_API}/item/list?count=${gmsCount}`, { headers: UA }).then(r => r.json()) as GmsItem[];
   gmsById = new Map(gmsDump.map(item => [item.id, item]));
   gmsByName = new Map(gmsDump.filter((i) => i.name).map((i) => [i.name.toLowerCase(), i]));
   for (const item of gmsDump) {
@@ -405,12 +406,12 @@ const fastCatalog: FastCatalog = {
   items: {},
   indexes: {
     hairs: {
-      m: { active: [], past: [] },
-      f: { active: [], past: [] },
+      m: { active: [], past: [], unreleased: [] },
+      f: { active: [], past: [], unreleased: [] },
     },
     faces: {
-      m: { active: [], past: [] },
-      f: { active: [], past: [] },
+      m: { active: [], past: [], unreleased: [] },
+      f: { active: [], past: [], unreleased: [] },
     },
     groups: {
       'founder-crate': { m: [], f: [], u: [] },
@@ -846,19 +847,68 @@ for (const sex of ['m', 'f'] as const) {
   }
 }
 
+// 4. Unreleased database entries: beauty records on no sale post.
+// Previewable in theory, never attainable; listed in search so global search finds them.
+fastCatalog.banners['unreleased'] = {
+  id: 'unreleased',
+  label: 'Not released yet',
+  start: null,
+  end: null,
+};
+let unreleasedSkipped = 0;
+// Face records are per-variant ids but the catalog is per-family
+// (getItem virtualizes eye colors): a variant whose family is already listed
+// must not become its own record.
+const unreleasedFaceFamilyOf = (v: number) => (v >= 21000 ? 21000 : 20000) + (v % 100);
+const knownFaceFamilies = new Set<number>();
+for (const [id, meta] of Object.entries(fastCatalog.items)) {
+  if ((meta as { sub: string }).sub === 'Face') knownFaceFamilies.add(unreleasedFaceFamilyOf(Number(id)));
+}
+for (const item of dump) {
+  if (item.typeInfo.overallCategory !== 'Beauty') continue;
+  const sub = item.typeInfo.subCategory;
+  if (sub === 'Hair') {
+    const style = Math.floor(item.id / 10);
+    if (fastCatalog.styles[style]) continue;
+    const src = cosmeticSource(style * 10, 'Hair');
+    if (src === null) { unreleasedSkipped++; continue; }
+    const sex = sexOf(item);
+    if (sex === 'u') { unreleasedSkipped++; continue; }
+    fastCatalog.styles[style] = { name: item.name, sex, bannerId: 'unreleased', attainable: false, src };
+    fastCatalog.indexes.hairs[sex].unreleased.push(style);
+    fastCatalog.indexes.search.push({ id: style, name: item.name, sub: 'Hair', sex, isStyle: true });
+  } else if (sub === 'Face') {
+    const family = unreleasedFaceFamilyOf(item.id);
+    if (knownFaceFamilies.has(family)) continue;
+    const src = cosmeticSource(item.id, 'Face');
+    if (src === null) { unreleasedSkipped++; continue; }
+    const sex = sexOf(item);
+    if (sex === 'u') { unreleasedSkipped++; continue; }
+    fastCatalog.items[item.id] = { name: item.name, sub: 'Face', sex, bannerId: 'unreleased', attainable: false, group: 'unreleased', src };
+    fastCatalog.indexes.faces[sex].unreleased.push(item.id);
+    fastCatalog.indexes.search.push({ id: item.id, name: item.name, sub: 'Face', sex });
+    knownFaceFamilies.add(family);
+  }
+}
+if (unreleasedSkipped) console.log(`Skipped ${unreleasedSkipped} unreleased beauty records with no sprite source`);
+
 // Sort index arrays alphabetically by entity name
 const sortHairs = (a: number, b: number) => fastCatalog.styles[a].name.localeCompare(fastCatalog.styles[b].name);
 const sortItems = (a: number, b: number) => fastCatalog.items[a].name.localeCompare(fastCatalog.items[b].name);
 
 fastCatalog.indexes.hairs.m.active.sort(sortHairs);
 fastCatalog.indexes.hairs.m.past.sort(sortHairs);
+fastCatalog.indexes.hairs.m.unreleased.sort(sortHairs);
 fastCatalog.indexes.hairs.f.active.sort(sortHairs);
 fastCatalog.indexes.hairs.f.past.sort(sortHairs);
+fastCatalog.indexes.hairs.f.unreleased.sort(sortHairs);
 
 fastCatalog.indexes.faces.m.active.sort(sortItems);
 fastCatalog.indexes.faces.m.past.sort(sortItems);
+fastCatalog.indexes.faces.m.unreleased.sort(sortItems);
 fastCatalog.indexes.faces.f.active.sort(sortItems);
 fastCatalog.indexes.faces.f.past.sort(sortItems);
+fastCatalog.indexes.faces.f.unreleased.sort(sortItems);
 
 for (const grp of Object.values(fastCatalog.indexes.groups)) {
   grp.m.sort(sortItems);

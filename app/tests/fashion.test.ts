@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { DEFAULT_LOOK, EYE_COLORS, faceColorIndex, faceStyleId, formatAttainableInfo, fuzzyScore, matchesFuzzy, renderURL, iconURL, matchesJob, randomLook, equipSlot, type Sex, applyPick, stanceForWeapon, TWO_HAND_SUBS, RANDOM_EQUIP_SLOTS } from '../src/lib/fashion';
+import { DEFAULT_LOOK, EYE_COLORS, faceColorIndex, faceStyleId, formatAttainableInfo, fuzzyScore, matchesFuzzy, renderURL, iconURL, matchesJob, randomLook, equipSlot, type Sex, applyPick, stanceForWeapon, TWO_HAND_SUBS, RANDOM_EQUIP_SLOTS, saveLookToStorage, loadLookForSex, mirrorStyleForSex, firstBannerStyle, defaultHairForSex, defaultFaceForSex } from '../src/lib/fashion';
 import catalog from '../src/data/catalog.json';
 
 test('mixed render preserves Classic body and equips with retail cosmetics', () => {
@@ -133,6 +133,18 @@ test('z-index ordering preserves proper back-to-front layer stacking', async () 
 });
 
 
+test('unreleased styles are searchable in the search index', () => {
+  const searchIds = new Set(catalog.indexes.search.map(entry => entry.id));
+  for (const sex of ['m', 'f'] as const) {
+    for (const style of catalog.indexes.hairs[sex].unreleased) {
+      assert.ok(searchIds.has(style), `unreleased hair style ${style} must be in indexes.search`);
+    }
+    for (const id of catalog.indexes.faces[sex].unreleased) {
+      assert.ok(searchIds.has(id), `unreleased face ${id} must be in indexes.search`);
+    }
+  }
+});
+
 test('fuzzy search matches substrings, typos, and ids', () => {
   assert.ok((fuzzyScore('antag', 'Antagonist') ?? -1) > (fuzzyScore('antag', 'Zephyr') ?? 1));
   assert.ok(fuzzyScore('antgnst', 'Antagonist') != null);
@@ -192,6 +204,47 @@ test('both male and female items are accessible and sort matching sex first', ()
   for (let i = 0; i < firstOppositeIdx; i++) {
     const s = catalog.items[sorted[i]! as keyof typeof catalog.items]?.sex;
     assert.ok(s === 'u' || s === 'm');
+  }
+});
+
+test('male and female looks persist in separate storage slots', () => {
+  const store = new Map<string, string>();
+  (globalThis as unknown as { localStorage: unknown }).localStorage = {
+    getItem: (k: string) => store.get(k) ?? null,
+    setItem: (k: string, v: string) => { store.set(k, v); },
+    removeItem: (k: string) => { store.delete(k); },
+  };
+  try {
+    saveLookToStorage({ ...DEFAULT_LOOK, sex: 'm', hair: 30130 });
+    saveLookToStorage({ ...DEFAULT_LOOK, sex: 'f', hair: 31010 });
+    assert.equal(loadLookForSex('m')?.hair, 30130);
+    assert.equal(loadLookForSex('f')?.hair, 31010);
+  } finally {
+    delete (globalThis as unknown as { localStorage?: unknown }).localStorage;
+  }
+});
+
+test('gender swap mirrors hair/face within the live banner lineup', () => {
+  for (const sex of ['m', 'f'] as Sex[]) {
+    const other = sex === 'm' ? 'f' : 'm';
+    // Fresh defaults are attainable banner styles.
+    const hairStyle = Math.floor(defaultHairForSex(sex) / 10);
+    assert.ok(catalog.indexes.hairs[sex].active.includes(hairStyle));
+    assert.ok(catalog.styles[hairStyle as keyof typeof catalog.styles].attainable);
+    assert.ok(catalog.indexes.faces[sex].active.some((id) => faceStyleId(id) === faceStyleId(defaultFaceForSex(sex))));
+    // Mirroring keeps coupon tier and lineup slot, and round-trips.
+    for (const coupon of ['mystery', 'signature'] as const) {
+      const fromStyles = catalog.indexes.hairs[sex].active.filter((id) => catalog.styles[id].coupon === coupon);
+      if (!fromStyles.length) continue;
+      const at = Math.min(2, fromStyles.length - 1);
+      const style = fromStyles[at]!;
+      const mirrored = mirrorStyleForSex('hair', sex, other, style);
+      const toStyles = catalog.indexes.hairs[other].active.filter((id) => catalog.styles[id].coupon === coupon);
+      assert.equal(mirrored, toStyles[at % toStyles.length]);
+      assert.equal(mirrorStyleForSex('hair', other, sex, mirrored), style);
+    }
+    // Mystery leads the banner-first pick.
+    assert.equal(catalog.styles[firstBannerStyle(sex, 'hair')].coupon, 'mystery');
   }
 });
 

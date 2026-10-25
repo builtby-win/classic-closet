@@ -57,12 +57,12 @@ export interface FastCatalog {
   items: Record<number, ItemMeta>;
   indexes: {
     hairs: {
-      m: { active: number[]; past: number[] };
-      f: { active: number[]; past: number[] };
+      m: { active: number[]; past: number[]; unreleased: number[] };
+      f: { active: number[]; past: number[]; unreleased: number[] };
     };
     faces: {
-      m: { active: number[]; past: number[] };
-      f: { active: number[]; past: number[] };
+      m: { active: number[]; past: number[]; unreleased: number[] };
+      f: { active: number[]; past: number[]; unreleased: number[] };
     };
     groups: Record<string, {
       m: number[];
@@ -328,6 +328,80 @@ export function randomLook(sex: Sex, random: () => number = Math.random, exclude
   };
 }
 
+type BannerKind = 'hair' | 'face';
+
+function bannerStyleOf(kind: BannerKind, id: number): number {
+  return kind === 'hair' ? id : faceStyleId(id);
+}
+
+function bannerCouponOf(kind: BannerKind, id: number): 'mystery' | 'signature' | undefined {
+  return kind === 'hair' ? CATALOG.styles[id]?.coupon : CATALOG.items[id]?.coupon;
+}
+
+function bannerAttainable(kind: BannerKind, id: number): boolean {
+  return kind === 'hair' ? !!CATALOG.styles[id]?.attainable : !!CATALOG.items[id]?.attainable;
+}
+
+/** Live banner lineup for a sex (unique styles, catalog order), optionally one coupon tier. */
+function bannerLineup(sex: Sex, kind: BannerKind, coupon?: 'mystery' | 'signature'): number[] {
+  const ids = (kind === 'hair' ? CATALOG.indexes.hairs[sex].active : CATALOG.indexes.faces[sex].active)
+    .filter((id) => bannerAttainable(kind, id));
+  const pool = coupon ? ids.filter((id) => bannerCouponOf(kind, id) === coupon) : ids;
+  const source = pool.length ? pool : ids;
+  const seen = new Set<number>();
+  const styles: number[] = [];
+  for (const id of source) {
+    const style = bannerStyleOf(kind, id);
+    if (!seen.has(style)) { seen.add(style); styles.push(style); }
+  }
+  return styles;
+}
+
+/**
+ * First style of the live banner lineup: mystery tier first (the gacha hype),
+ * else the first active style. Fresh defaults follow the rotation this way
+ * instead of going stale.
+ */
+export function firstBannerStyle(sex: Sex, kind: BannerKind): number {
+  const mystery = bannerLineup(sex, kind, 'mystery');
+  if (mystery.length) return mystery[0]!;
+  return bannerLineup(sex, kind)[0] ?? (kind === 'hair' ? (sex === 'f' ? 3101 : 3013) : (sex === 'f' ? 3 : 33));
+}
+
+/**
+ * Mirror a hair/face style across genders within the live rotation: same
+ * coupon tier, same slot in that tier's lineup. Toggling ♂/♀ lands on the
+ * equivalent hype style, and every pick is attainable by construction.
+ */
+export function mirrorStyleForSex(kind: BannerKind, fromSex: Sex, toSex: Sex, fromStyle: number): number {
+  const fromIds = kind === 'hair' ? CATALOG.indexes.hairs[fromSex].active : CATALOG.indexes.faces[fromSex].active;
+  const coupon = bannerCouponOf(kind, fromIds.find((id) => bannerStyleOf(kind, id) === fromStyle) ?? -1);
+  const fromLineup = bannerLineup(fromSex, kind, coupon);
+  const index = fromLineup.indexOf(fromStyle);
+  const toLineup = bannerLineup(toSex, kind, coupon);
+  if (!toLineup.length) return fromStyle;
+  return toLineup[(index >= 0 ? index : 0) % toLineup.length]!;
+}
+
+// Iconic fresh defaults while they are still in rotation (Antagonist,
+// Innocent Gaze, Veronica, Strong Stare); banner lead once they rotate out.
+const CURATED_HAIR_STYLE: Record<Sex, number> = { m: 3013, f: 3101 };
+const CURATED_FACE_ID: Record<Sex, number> = { m: 20033, f: 21803 };
+
+/** Fresh hair id for a sex: curated pick while attainable, else the banner lead. */
+export function defaultHairForSex(sex: Sex, hairCol = 0): number {
+  const curated = CURATED_HAIR_STYLE[sex];
+  const style = CATALOG.styles[curated]?.attainable ? curated : firstBannerStyle(sex, 'hair');
+  return style * 10 + hairCol;
+}
+
+/** Fresh face id for a sex: curated pick while attainable, else the banner lead. */
+export function defaultFaceForSex(sex: Sex, eyeColor = 0): number {
+  const curated = CURATED_FACE_ID[sex];
+  if (CATALOG.items[curated]?.attainable) return curated;
+  return faceVariantId(sex, firstBannerStyle(sex, 'face'), eyeColor);
+}
+
 /** Resolve each asset independently; same-number equips are not interchangeable. */
 export function assetSource(itemId: number): { region: string; version: string } {
   const meta = getItem(CATALOG, itemId);
@@ -483,20 +557,58 @@ export function decodeLook(input?: string): Partial<Look> | null {
 export const STORAGE_LOOK_KEY = 'mf-look';
 export const STORAGE_SEX_KEY = 'mf-sex';
 
+/** Per-sex storage key: each gender keeps its own saved character. */
+export function storageKeyForSex(sex: Sex): string {
+  return `${STORAGE_LOOK_KEY}-${sex}`;
+}
+
 export function saveLookToStorage(look: Look): void {
   try {
     if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(STORAGE_LOOK_KEY, JSON.stringify(look));
+      localStorage.setItem(storageKeyForSex(look.sex), JSON.stringify(look));
       localStorage.setItem(STORAGE_SEX_KEY, look.sex);
+      // Drop the pre-per-sex single slot so it can't shadow the sex slots.
+      localStorage.removeItem(STORAGE_LOOK_KEY);
     }
   } catch {
     // ignore
   }
 }
 
+/** Saved character for one gender, with fallback to the pre-per-sex single slot. */
+export function loadLookForSex(sex: Sex): Partial<Look> | null {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const raw = localStorage.getItem(storageKeyForSex(sex));
+      if (raw) {
+        const parsed: unknown = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') return parsed as Partial<Look>;
+      }
+      const legacy = localStorage.getItem(STORAGE_LOOK_KEY);
+      if (legacy) {
+        const parsed: unknown = JSON.parse(legacy);
+        if (parsed && typeof parsed === 'object') {
+          const look = parsed as Partial<Look>;
+          if ((look.sex as Sex) === sex) return look;
+        }
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
 export function loadLookFromStorage(): Partial<Look> | null {
   try {
     if (typeof localStorage !== 'undefined') {
+      for (const sex of ['m', 'f'] as Sex[]) {
+        const raw = localStorage.getItem(storageKeyForSex(sex));
+        if (raw) {
+          const parsed: unknown = JSON.parse(raw);
+          if (parsed && typeof parsed === 'object') return parsed as Partial<Look>;
+        }
+      }
       const raw = localStorage.getItem(STORAGE_LOOK_KEY);
       if (raw) {
         const parsed: unknown = JSON.parse(raw);
@@ -507,6 +619,19 @@ export function loadLookFromStorage(): Partial<Look> | null {
     // ignore
   }
   return null;
+}
+
+/** True once any character (either gender, current or legacy slot) is saved. */
+export function hasStoredLook(): boolean {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      if (localStorage.getItem(STORAGE_SEX_KEY)) return true;
+      if (loadLookFromStorage()) return true;
+    }
+  } catch {
+    // ignore
+  }
+  return false;
 }
 
 /** Item resolved through color virtualization (hair styles expand to per-color ids). */
@@ -586,6 +711,9 @@ export function formatAttainableInfo(
   }
   if (item.group === 'classic-equips') {
     return { isAttainable: true, statusText: 'Non-NX equip' };
+  }
+  if (item.bannerId === 'unreleased') {
+    return { isAttainable: false, statusText: 'Not released yet', bannerLabel: 'Not released yet' };
   }
   const banner = getBanner(catalog, item.bannerId);
   if (item.attainable) {

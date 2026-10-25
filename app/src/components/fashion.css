@@ -1491,6 +1491,8 @@
   line-height: 1;
   pointer-events: none;
 }
+.tile-gender-tag svg { width: 11px; height: 11px; flex: none; }
+.tile.mini .tile-gender-tag svg { width: 9px; height: 9px; }
 .tile-gender-tag.m {
   background: rgba(41, 128, 185, 0.45);
   color: #74b9ff;
