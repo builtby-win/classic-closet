@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { DEFAULT_LOOK, EYE_COLORS, faceColorIndex, faceStyleId, formatAttainableInfo, fuzzyScore, matchesFuzzy, renderURL, iconURL, matchesJob, randomLook, equipSlot, type Sex, applyPick, stanceForWeapon, TWO_HAND_SUBS, RANDOM_EQUIP_SLOTS, saveLookToStorage, loadLookForSex, mirrorStyleForSex, firstBannerStyle, defaultHairForSex, defaultFaceForSex } from '../src/lib/fashion';
+import { DEFAULT_LOOK, EYE_COLORS, faceColorIndex, faceStyleId, formatAttainableInfo, fuzzyScore, matchesFuzzy, renderURL, iconURL, matchesJob, randomLook, equipSlot, type Sex, applyPick, stanceForWeapon, weaponSubOf, iconFallbackURL, TWO_HAND_SUBS, RANDOM_EQUIP_SLOTS, saveLookToStorage, loadLookForSex, mirrorStyleForSex, firstBannerStyle, defaultHairForSex, defaultFaceForSex } from '../src/lib/fashion';
 import catalog from '../src/data/catalog.json';
 
 test('mixed render preserves Classic body and equips with retail cosmetics', () => {
@@ -117,6 +117,25 @@ test('each weapon family steers to a stance with renderer frames', () => {
   assert.deepEqual(stanceForWeapon('Cash', 'stand1'), null);
   assert.deepEqual(stanceForWeapon('Cash', 'stand2'), { anim: 'stand1', frame: 0 });
   assert.deepEqual(stanceForWeapon('Two-Handed Sword', 'alert'), null);
+});
+
+test('single-family cash weapons behave as that weapon', () => {
+  const items = catalog.items as Record<string, { sub: string; wsub?: string }>;
+  // Plastic Slingshot is a bow, Toy Rifle a crossbow; the Aurora scepters fit every weapon so stay generic.
+  assert.equal(weaponSubOf(items[1702003]), 'Bow');
+  assert.equal(weaponSubOf(items[1702014]), 'Crossbow');
+  assert.equal(weaponSubOf(items[1702445]), 'Cash');
+  assert.deepEqual(stanceForWeapon(weaponSubOf(items[1702014]), 'stand1'), { anim: 'stand2', frame: 0 });
+  assert.equal(applyPick({ Shield: 1092000 }, 'Weapon', 1702003, 'Cash').Shield, undefined);
+  assert.equal(applyPick({ Weapon: 1702003 }, 'Shield', 1092000, 'Shield').Weapon !== 1702003, true);
+});
+
+test('icons fall back through older maplestory.io versions that still ship them', () => {
+  assert.equal(iconURL(1702445), 'https://maplestory.io/api/GMS/270/item/1702445/icon');
+  assert.equal(iconFallbackURL('https://maplestory.io/api/MCW/CBT2/item/1002994/icon'), 'https://maplestory.io/api/GMS/270/item/1002994/icon');
+  assert.equal(iconFallbackURL('https://maplestory.io/api/GMS/270/item/1702445/icon'), 'https://maplestory.io/api/GMS/255/item/1702445/icon');
+  assert.equal(iconFallbackURL('https://maplestory.io/api/GMS/255/item/1702445/icon'), null);
+  assert.equal(iconFallbackURL('/sprites/faces/20003.png'), null);
 });
 
 test('the initial preview is dressed before the randomized render loads', () => {
@@ -248,3 +267,15 @@ test('gender swap mirrors hair/face within the live banner lineup', () => {
   }
 });
 
+
+test('unreleased cash equips are preview-only and searchable', () => {
+  const searchIds = new Set(catalog.indexes.search.map(entry => entry.id));
+  for (const sex of ['m', 'f', 'u'] as const) {
+    for (const id of catalog.indexes.groups['unreleased']?.[sex] ?? []) {
+      const item = catalog.items[id as unknown as keyof typeof catalog.items] as any;
+      assert.equal(item.attainable, false, `unreleased equip ${id} must not be attainable`);
+      assert.equal(item.bannerId, 'unreleased');
+      assert.ok(searchIds.has(id), `unreleased equip ${id} must be in indexes.search`);
+    }
+  }
+});

@@ -74,18 +74,52 @@ export const CLASSIC_ZMAP_ORDER = [
   'weaponWristOverGlove', 'characterStart',
 ] as const;
 
+/**
+ * Hair-coverage slots per z-name, ported from the reference engine's
+ * `smaps.classic` table: a hair layer is hidden when any of its slots is
+ * claimed by a worn hat's vslot (e.g. `CpH1H5` covers `hairOverHead` via H1
+ * but leaves the `hair` side fringe via H2). Full-coverage hats
+ * (`CpHdH1H2H3…`) hide every strand so nothing pokes out from under them.
+ */
+const HAIR_COVERAGE_SLOTS: Record<string, readonly string[]> = {
+  hairOverHead: ['H1'],
+  hair: ['H2'],
+  hairShade: ['Hs'],
+  hairBelowBody: ['Hb'],
+  backHair: ['H1'],
+  backHairBelowHead: ['Hf'],
+  backHairBelowCap: ['H6'],
+  backHairBelowCapWide: ['H4'],
+  backHairBelowCapNarrow: ['H5'],
+};
+
+/** Two-character equipment slots (`Cp`, `H1`, …) claimed by a vslot string. */
+function vslotsOf(vslot: string | undefined): string[] {
+  return vslot?.match(/[A-Z][a-z0-9]/g) ?? [];
+}
 /** Remove layers covered by another item's vslot claims. */
 function visibleLayers(layers: SourceLayer[]): SourceLayer[] {
   const claims: Record<string, string> = {};
   for (const layer of layers) {
-    for (const slot of layer.vslot?.match(/[A-Z][a-z0-9]/g) ?? []) claims[slot] = layer.itemKey;
+    for (const slot of vslotsOf(layer.vslot)) claims[slot] = layer.itemKey;
+  }
+
+ 
+  // Hats hide individual hair strands through vslot coverage: any Hat-part
+  // layer claiming a slot also claimed by a hat is dropped, so a tight cap
+  // covers the fringe while a standard CpH1H5 hat keeps the side hair.
+  const hatSlots = new Set<string>();
+  for (const layer of layers) {
+    if (layer.part === 'Hat') for (const slot of vslotsOf(layer.vslot)) hatSlots.add(slot);
   }
 
   return layers.filter((layer) => {
-    const slots = layer.islot?.match(/[A-Z][a-z0-9]/g) ?? [];
+    const coverage = HAIR_COVERAGE_SLOTS[layer.z];
+    if (coverage && layer.part === 'Hair' && coverage.some((slot) => hatSlots.has(slot))) return false;
+    const slots = vslotsOf(layer.islot);
     return slots.length === 0 || slots.every((slot) => !(slot in claims) || claims[slot] === layer.itemKey);
   });
-}
+ }
 
 /**
  * Resolve each sprite against the shared anchor table published by the root

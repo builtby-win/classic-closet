@@ -419,6 +419,7 @@ const fastCatalog: FastCatalog = {
       'aurora-crate': { m: [], f: [], u: [] },
       'cover-10day': { m: [], f: [], u: [] },
       'classic-equips': { m: [], f: [], u: [] },
+      'unreleased': { m: [], f: [], u: [] },
     },
     search: [],
   },
@@ -745,6 +746,26 @@ for (const item of dump) {
     src: item.src,
   };
   fastCatalog.indexes.groups['classic-equips'][sex].push(item.id);
+  fastCatalog.indexes.search.push({ id: item.id, name: item.name, sub: item.typeInfo.subCategory, sex });
+}
+
+// Cash equips in the Classic data that no sale post has sold yet.
+// Preview-only like unreleased hair/faces: attainable false, UNRELEASED badge,
+// pruned by bake-sprites when no dataset has art for them.
+for (const item of dump) {
+  if (item.isCash !== true || item.typeInfo.overallCategory !== 'Equip' || item.id < 1000000) continue;
+  if (fastCatalog.items[item.id]) continue;
+  const sex = sexOf(item);
+  fastCatalog.items[item.id] = {
+    name: item.name,
+    sub: item.typeInfo.subCategory,
+    sex,
+    bannerId: 'unreleased',
+    attainable: false,
+    group: 'unreleased',
+    src: item.src,
+  };
+  fastCatalog.indexes.groups['unreleased'][sex].push(item.id);
   fastCatalog.indexes.search.push({ id: item.id, name: item.name, sub: item.typeInfo.subCategory, sex });
 }
 

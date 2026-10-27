@@ -21,7 +21,7 @@ import {
   getBanner,
   getItem,
   getStyle,
-  hasStoredLook,
+  iconFallbackURL,
   iconURL,
   loadLookForSex,
   loadLookFromStorage,
@@ -32,6 +32,7 @@ import {
   randomLook,
   stanceForWeapon,
   TWO_HAND_SUBS,
+  weaponSubOf,
   RANDOM_EQUIP_SLOTS,
   type ItemMeta,
   type RandomEquipSlot,
@@ -125,7 +126,7 @@ function normalizeStance(look: Look): Look {
   // pose round-trips as its own param). Steer stand/walk poses to the worn
   // weapon's frames; action poses carry their own frames and are left alone.
   if (look.anim !== 'stand1' && look.anim !== 'stand2' && look.anim !== 'walk1' && look.anim !== 'walk2') return look;
-  const sub = getItem(CATALOG, look.items.Weapon)?.sub;
+  const sub = weaponSubOf(getItem(CATALOG, look.items.Weapon));
   const stance = stanceForWeapon(sub ?? 'One-Handed Sword', look.anim);
   return stance ? { ...look, anim: stance.anim, frame: stance.frame } : look;
 }
@@ -149,11 +150,6 @@ function loadInitialLook(): Look {
   return { ...DEFAULT_LOOK, sex, hair: defaultHairForSex(sex), face: defaultFaceForSex(sex) };
 }
 
-function isFirstVisit(): boolean {
-  if (typeof window === 'undefined') return false;
-  if (decodeLook(window.location.search) || decodeLook(window.location.hash)) return false;
-  return !hasStoredLook();
-}
 
 /** Single owner for the selected look: boots from shared link / storage,
  *  mirrors every change back to the URL (shareable) + localStorage. */
@@ -199,15 +195,6 @@ export default function FashionIsland() {
   const lookRef = useRef(look);
   lookRef.current = look;
   const [ratesOpen, setRatesOpen] = useState(false);
-  const [welcomeOpen, setWelcomeOpen] = useState(false);
-  const [welcomeLeaving, setWelcomeLeaving] = useState(false);
-  // Same sheet: slide it up first, then drop the welcome layer once it has faded.
-  const finishWelcome = () => {
-    const { anim, frame } = look;
-    setWelcomeLeaving(true);
-    patch({ anim: 'jump', frame: 0 });
-    setTimeout(() => { setWelcomeOpen(false); setWelcomeLeaving(false); patch({ anim, frame }); }, 450);
-  };
   const avatarRef = useRef<HTMLCanvasElement>(null);
   const lastRender = useRef<HTMLCanvasElement | undefined>(undefined);
   const drawAvatar = useCallback((source?: HTMLCanvasElement) => {
@@ -220,7 +207,6 @@ export default function FashionIsland() {
         ctx.drawImage(src, AVATAR_CROP.x, AVATAR_CROP.y, AVATAR_CROP.size, AVATAR_CROP.size, 0, 0, AVATAR_PX, AVATAR_PX);
   }, []);
   useEffect(() => { drawAvatar(); }, [settingsOpen, drawAvatar]);
-  useEffect(() => { if (isFirstVisit()) setWelcomeOpen(true); }, []);
   const [catSec, setCatSec] = useState<SectionId | null>(null);
   const [catQ, setCatQ] = useState('');
   const [expandedCats, setExpandedCats] = useState<Record<string, boolean>>({});
@@ -260,7 +246,7 @@ export default function FashionIsland() {
     const weapon = randomClassicWeapon(look.sex, next === 'All' ? 'Beginner' : next);
     if (weapon == null) return;
     setLook(current => {
-      const sub = getItem(CATALOG, weapon)?.sub;
+      const sub = weaponSubOf(getItem(CATALOG, weapon));
       const items = applyPick(current.items, 'Weapon', weapon, sub);
       const stance = stanceForWeapon(sub, current.anim);
       return stance ? { ...current, items, anim: stance.anim, frame: stance.frame } : { ...current, items };
@@ -322,8 +308,8 @@ export default function FashionIsland() {
       const weaponSub = unequipping && slot === 'Weapon'
         ? undefined
         : sub === 'Shield'
-          ? getItem(CATALOG, nextItems.Weapon)?.sub
-          : sub;
+          ? weaponSubOf(getItem(CATALOG, nextItems.Weapon))
+          : slot === 'Weapon' ? weaponSubOf(getItem(CATALOG, id)) ?? sub : sub;
       // Tapping the worn weapon off falls back to bare hands; stand2/walk2
       // have no unarmed frames, so steer back to stand1/walk1.
       const bareHands = unequipping && slot === 'Weapon' && (look.anim === 'stand2' || look.anim === 'walk2')
@@ -415,7 +401,7 @@ export default function FashionIsland() {
   );
 
   const equipSections = useMemo(() => {
-    const ids = [...new Set(['founder-crate', 'mystery-crate', 'aurora-crate', 'cover-10day', 'classic-equips'].flatMap(getGroupEquips))]
+    const ids = [...new Set(['founder-crate', 'mystery-crate', 'aurora-crate', 'cover-10day', 'classic-equips', 'unreleased'].flatMap(getGroupEquips))]
       .filter((id) => !!CATALOG.items[id]);
     return EQUIP_SECTIONS.map((section) => ({
       ...section,
@@ -538,8 +524,8 @@ export default function FashionIsland() {
       buckets.set(key, list);
     }
     const order = job !== 'All'
-      ? ['classic-equips', 'founder-crate', 'mystery-crate', 'cover-10day', 'aurora-crate', 'off-job']
-      : ['founder-crate', 'mystery-crate', 'cover-10day', 'aurora-crate', 'classic-equips'];
+      ? ['classic-equips', 'founder-crate', 'mystery-crate', 'cover-10day', 'aurora-crate', 'unreleased', 'off-job']
+      : ['founder-crate', 'mystery-crate', 'cover-10day', 'aurora-crate', 'classic-equips', 'unreleased'];
     const groups = order
       .filter((key) => (buckets.get(key)?.length ?? 0) > 0)
       .map((key) => {
@@ -551,7 +537,7 @@ export default function FashionIsland() {
           : key === 'mystery-crate' ? 'Mystery Fashion Crate'
           : key === 'cover-10day' ? '10-Day Covers'
           : key === 'aurora-crate' ? 'Aurora Stamp Shop'
-          : key === 'off-job' ? `Off-job · ${job}` : 'Job Equips';
+          : key === 'off-job' ? `Off-job · ${job}` : key === 'unreleased' ? 'Not released yet' : 'Job Equips';
         return { key, label: `${label} · ${rows.length}${dates}`, rows, bannerId };
       });
     return groups;
@@ -701,9 +687,7 @@ export default function FashionIsland() {
 
     const getDays = (end: string | null) => {
       if (!end) return null;
-      const now = new Date('2026-10-23T00:00:00Z').getTime();
-      const endTime = new Date(`${end}T23:59:59Z`).getTime();
-      return Math.ceil((endTime - now) / (1000 * 60 * 60 * 24));
+      return daysUntil(end);
     };
 
     const crateItems = (groupKey: string) => {
@@ -751,8 +735,8 @@ export default function FashionIsland() {
         post: mc.post,
         rates: mc.rates,
         daysLeft: days,
-        statusText: days != null && days > 0 ? `Active · ${days}d left` : 'Active',
-        isActive: true,
+        statusText: days != null && days > 0 ? `Active · ${days}d left` : days === 0 ? 'Ends today' : 'Ended',
+        isActive: days != null && days >= 0,
         items: crateItems('mystery-crate'),
       });
     }
@@ -772,8 +756,8 @@ export default function FashionIsland() {
         post: fc.post,
         rates: fc.rates,
         daysLeft: days,
-        statusText: days != null && days > 0 ? `Active · ${days}d left` : 'Active',
-        isActive: true,
+        statusText: days != null && days > 0 ? `Active · ${days}d left` : days === 0 ? 'Ends today' : 'Ended',
+        isActive: days != null && days >= 0,
         items: crateItems('founder-crate'),
       });
     }
@@ -818,8 +802,8 @@ export default function FashionIsland() {
         post: sc.post,
         rates: sc.rates,
         daysLeft: days,
-        statusText: days != null && days > 0 ? `Active · ${days}d left` : 'Active',
-        isActive: true,
+        statusText: days != null && days > 0 ? `Active · ${days}d left` : days === 0 ? 'Ends today' : 'Ended',
+        isActive: days != null && days >= 0,
         items,
       });
     }
@@ -839,8 +823,8 @@ export default function FashionIsland() {
         post: au.post,
         rates: au.rates,
         daysLeft: days,
-        statusText: days != null && days > 0 ? `Active · ${days}d left` : 'Active',
-        isActive: true,
+        statusText: days != null && days > 0 ? `Active · ${days}d left` : days === 0 ? 'Ends today' : 'Ended',
+        isActive: days != null && days >= 0,
         items: crateItems('aurora-crate'),
       });
     }
@@ -859,8 +843,8 @@ export default function FashionIsland() {
         note: cv.note,
         post: cv.post,
         daysLeft: days,
-        statusText: days != null && days > 0 ? `Active · ${days}d left` : 'Active',
-        isActive: true,
+        statusText: days != null && days > 0 ? `Active · ${days}d left` : days === 0 ? 'Ends today' : 'Ended',
+        isActive: days != null && days >= 0,
         items: crateItems('cover-10day'),
       });
     }
@@ -946,6 +930,16 @@ export default function FashionIsland() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [settingsOpen]);
+
+  const [undoLook, setUndoLook] = useState<Look | null>(null);
+  const lookSnapshotRef = useRef<Look>(look);
+  const saveUndo = useCallback(() => setUndoLook(lookSnapshotRef.current), []);
+  useEffect(() => { lookSnapshotRef.current = look; }, [look]);
+  useEffect(() => {
+    if (!undoLook) return;
+    const t = window.setTimeout(() => setUndoLook(null), 8000);
+    return () => window.clearTimeout(t);
+  }, [undoLook]);
 
   const shareLook = useCallback(async () => {
     const targetUrl = new URL(window.location.href);
@@ -1034,7 +1028,7 @@ export default function FashionIsland() {
         result[slot.id] = sortRows([...mysteryFaces, ...signatureFaces, ...starterFaces, ...pastFaces].map((id) => ({ type: 'item' as const, id })));
       } else {
         const ids = equipSections.find((s) => s.id === slot.id)?.ids ?? [];
-        result[slot.id] = sortRows(ids.map((id) => ({ type: 'item' as const, id })));
+        result[slot.id] = sortRows(ids.filter((id) => CATALOG.items[id]?.bannerId !== 'unreleased').map((id) => ({ type: 'item' as const, id })));
       }
     }
     return result;
@@ -1043,14 +1037,42 @@ export default function FashionIsland() {
 
   // Play mode: a pad drives the preview with a pose override (see play-controller).
   const stopPlay = useCallback(() => setController(null), []);
-  const startPlay = useCallback(() => {
+  const startPlay = useCallback((): PlayController | null => {
     const element = document.getElementById('preview');
-    if (!element) return;
+    if (!element) return null;
     setSettingsOpen(false);
-    setController(new PlayController(element, () => {
+    const next = new PlayController(element, () => {
       const weapon = getItem(CATALOG, lookRef.current.items.Weapon);
-      return { id: lookRef.current.items.Weapon ?? undefined, sub: weapon?.sub, level: autoSwipeLevel(weapon?.requiredLevel) };
-    }));
+      return { id: lookRef.current.items.Weapon ?? undefined, sub: weaponSubOf(weapon), level: autoSwipeLevel(weapon?.requiredLevel) };
+    });
+    setController(next);
+    return next;
+  }, []);
+  // Desktop: WASD / arrows start play mode straight away (like the cash shop preview);
+  // the pressed key is carried into the new controller so the first step isn't lost.
+  const idleKeys = useRef({ blocked: false, start: startPlay });
+  idleKeys.current = { blocked: !!controller || settingsOpen || ratesOpen, start: startPlay };
+  useEffect(() => {
+    const desktop = window.matchMedia('(min-width: 900px)');
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (idleKeys.current.blocked || !desktop.matches || event.metaKey || event.ctrlKey || event.altKey) return;
+      const target = event.target;
+      if (target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|SELECT|TEXTAREA)$/.test(target.tagName))) return;
+      const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+      const input = key === 'ArrowLeft' || key === 'a' ? 'left' : key === 'ArrowRight' || key === 'd' ? 'right' : key === 'ArrowDown' || key === 's' ? 'down' : key === 'ArrowUp' || key === 'w' ? 'jump' : null;
+      if (!input) return;
+      const started = idleKeys.current.start();
+      if (!started) return;
+      idleKeys.current.blocked = true;
+      event.preventDefault();
+      started.set(input, true);
+      // GamePad's own keyup listener isn't mounted yet; release this first key ourselves.
+      window.addEventListener('keyup', (up) => {
+        if ((up.key.length === 1 ? up.key.toLowerCase() : up.key) === key) started.set(input, false);
+      }, { once: true });
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
   useEffect(() => {
     if (!controller) return;
@@ -1067,7 +1089,7 @@ export default function FashionIsland() {
   const rootRef = useRef<HTMLDivElement>(null);
   const railRef = useRef<HTMLDivElement>(null);
   const dragGate = useRef({ locked: false, start: startPlay });
-  dragGate.current = { locked: welcomeOpen || !!controller, start: startPlay };
+  dragGate.current = { locked: !!controller, start: startPlay };
   useEffect(() => {
     const root = rootRef.current;
     const rail = railRef.current;
@@ -1140,7 +1162,7 @@ export default function FashionIsland() {
 
   return (
     <div ref={rootRef} className={'mf' + (controller ? ' playing' : '')}>
-      <div id="stage" className={welcomeOpen ? (welcomeLeaving ? 'leaving' : 'welcoming') : undefined}>
+      <div id="stage">
         <div id="controls">
           <button id="avatar" onClick={() => setSettingsOpen(v => !v)} aria-label="Edit character" aria-expanded={settingsOpen} aria-controls="settings"><canvas ref={avatarRef} width={AVATAR_PX} height={AVATAR_PX} aria-hidden="true" /></button>
           <div className="controls-right">
@@ -1166,26 +1188,26 @@ export default function FashionIsland() {
                 <span className="gender-label">Female</span>
               </button>
             </div>
-            <button id="share" onClick={shareLook} aria-label="Share this look" title={shared ? 'Shared!' : copied ? 'Link copied!' : 'Share this look'}><Icon name={copied || shared ? 'check' : 'share'} /></button>
-            <button id="play" onClick={() => controller ? stopPlay() : startPlay()} aria-label={controller ? 'Back to closet' : 'Move your character'} aria-pressed={!!controller} title="Move your character"><Icon name="play" /></button>
-            <button id="shuffle" onClick={() => setLook(randomLook(look.sex, Math.random, excludedSlots, nxOnly, job === 'All' ? 'Beginner' : job))} aria-label="Randomize outfit"><Icon name="shuffle" /></button>
+            <button id="share" className="labeled-btn" onClick={shareLook} aria-label="Share this look" title={shared ? 'Shared!' : copied ? 'Link copied!' : 'Share this look'}><Icon name={copied || shared ? 'check' : 'share'} /><span>{copied || shared ? 'Copied' : 'Share'}</span></button>
+            <button id="play" className="labeled-btn" onClick={() => controller ? stopPlay() : startPlay()} aria-label={controller ? 'Back to closet' : 'Move your character'} aria-pressed={!!controller} title="Move your character"><Icon name="play" /><span>{controller ? 'Closet' : 'Play'}</span></button>
+            <button id="shuffle" className="labeled-btn" onClick={() => { saveUndo(); setLook(randomLook(look.sex, Math.random, excludedSlots, nxOnly, job === 'All' ? 'Beginner' : job)); }} aria-label="Randomize outfit"><Icon name="shuffle" /><span>Random</span></button>
           </div>
         </div>
-        <div id="canvas" onClick={() => { if (!controller) setSettingsOpen(true); }} title="Edit character" style={{ cursor: 'pointer' }}>
+        <div id="canvas">
           <LayeredCharacterCanvas look={look} onRendered={(canvas) => { setRendering(false); drawAvatar(canvas); }} />
           {rendering && <div id="spin" />}
           <div className="name-row">
             <span className={'name-tag' + (look.name ? '' : ' empty')}>{look.name ? String(look.name) : 'Your name'}</span>
           </div>
+          {undoLook && <div className="undo-bar" role="status"><span>Outfit changed</span><button type="button" onClick={(e) => { e.stopPropagation(); setLook(undoLook); setUndoLook(null); }}>Undo</button><button type="button" aria-label="Dismiss" onClick={(e) => { e.stopPropagation(); setUndoLook(null); }}>×</button></div>}
           <div className="equip-toast-slot" role="status" aria-live="polite" aria-atomic="true">
             {equipToast && <div className="equip-toast" key={equipToast.sequence}>
-              <img src={iconURL(equipToast.id)} alt="" />
+              <img src={iconURL(equipToast.id)} alt="" onError={(e) => { const next = iconFallbackURL(e.currentTarget.src); if (next) e.currentTarget.src = next; }} />
               <div><span>{equipToast.action} {equipToast.name}</span>{equipToast.replaced && <small>{equipToast.replaced}</small>}</div>
             </div>}
           </div>
         </div>
-        {!controller && !welcomeOpen && <button type="button" id="play-pill" onClick={(event) => { event.stopPropagation(); startPlay(); }}><Icon name="play" />Play</button>}
-      </div>
+        </div>
       {controller && <GamePad controller={controller} onExit={stopPlay} />}
       {settingsOpen && (
         <div className="settings-scrim" aria-hidden="true" onClick={() => setSettingsOpen(false)} />
@@ -1215,9 +1237,9 @@ export default function FashionIsland() {
             </div>
             <div className="setrow">
               <span>pose</span>
-              <select value={look.anim} onChange={(e) => patch({ anim: e.target.value, frame: 0 })}>
+              <select value={look.anim} onChange={(e) => patch({ anim: e.target.value, frame: 0 })} aria-label="Pose">
                 {ANIMS.map((a) => (
-                  <option key={a}>{a}</option>
+                  <option key={a} value={a}>{({ stand1: 'Standing', stand2: 'Standing (weapon)', alert: 'Alert', jump: 'Jumping' } as Record<string, string>)[a] ?? a}</option>
                 ))}
               </select>
               <button onClick={() => patch({ frame: Math.max(0, look.frame - 1) })} aria-label="Previous frame">‹</button>
@@ -1239,23 +1261,13 @@ export default function FashionIsland() {
           </details>
           <footer className="settings-actions">
             <button className="primary" onClick={shareLook}><Icon name={copied || shared ? 'check' : 'share'} />{copied || shared ? 'Copied!' : 'Share look'}</button>
-            <button onClick={() => { setLook((l) => ({ ...l, items: {} })); }}>Clear worn</button>
+            <button onClick={() => { saveUndo(); setLook((l) => ({ ...l, items: {} })); }}>Clear worn</button>
           </footer>
         </div>
     )}
 
-    <div id="rail" ref={railRef} className={welcomeOpen && !welcomeLeaving ? 'welcoming' : undefined}>
+    <div id="rail" ref={railRef}>
       <div id="rail-grip" aria-hidden="true"><span /><small>Drag down to play</small></div>
-      {welcomeOpen && (
-        <section id="welcome" className={welcomeLeaving ? 'leaving' : undefined} role="dialog" aria-labelledby="welcome-title">
-          <header>
-            <h2 id="welcome-title">Create your character</h2>
-            <p>Pick a gender and skin tone — name is optional. You can change these later in settings.</p>
-          </header>
-          <CharacterEditor look={look} skins={skins} onName={(name) => patch({ name })} onSex={setSex} onSkin={(skin) => patch({ skin })} />
-          <button className="welcome-done" onClick={finishWelcome}>Start dressing</button>
-        </section>
-      )}
         <div id="rail-head">
           {searchScope === 'all' ? (
             <div className="head-search" role="search">
@@ -1348,10 +1360,15 @@ export default function FashionIsland() {
               ))}
             </div>
             <div id="slot-list" role="list" aria-label="Equipped items, head to feet">
+              {q.trim() && railSlots.every((slot) => !(railItems[slot.id] ?? []).some((row) => matchesFuzzy(row.type === 'hair' ? CATALOG.styles[row.id]?.name : CATALOG.items[row.id]?.name, row.id, q.trim().toLowerCase()))) && (
+                <p className="slot-hint">No items match “{q.trim()}”. <button type="button" className="inline-link" onClick={() => setQ('')}>Clear search</button></p>
+              )}
               {railSlots.map((slot) => {
                 // Unreleased styles live outside railItems (drawer group only),
                 // so fold them into the pool when searching.
-                const pool = q.trim() && (slot.id === 'Hair' || slot.id === 'Face')
+                const pool = q.trim() && slot.id !== 'Hair' && slot.id !== 'Face'
+                  ? [...(railItems[slot.id] ?? []), ...getGroupEquips('unreleased').filter((id) => equipSlot(CATALOG.items[id]?.sub ?? '') === slot.id || (slot.id === 'Accessories' && !EQUIP_SECTIONS.some((sec) => sec.id === equipSlot(CATALOG.items[id]?.sub ?? '')))).map((id): CatRow => ({ type: 'item' as const, id }))]
+                  : q.trim() && (slot.id === 'Hair' || slot.id === 'Face')
                   ? [...(railItems[slot.id] ?? []),
                       ...(slot.id === 'Hair' ? unreleasedHairStyles : unreleasedFaces).map((id): CatRow => ({
                         type: slot.id === 'Hair' ? 'hair' : 'item',
@@ -1384,6 +1401,13 @@ export default function FashionIsland() {
                     <div className="slot-head">
                       <div className="slot-title-wrap">
                         <span className="slot-label">{slot.label}</span>
+                        {(() => {
+                          const wornName = slot.id === 'Hair' ? getStyle(CATALOG, Math.floor(look.hair / 10))?.name
+                            : slot.id === 'Face' ? getItem(CATALOG, look.face)?.name
+                            : look.items[slot.id] ? getItem(CATALOG, look.items[slot.id])?.name : undefined;
+                          const wornId = slot.id !== 'Hair' && slot.id !== 'Face' ? look.items[slot.id] : undefined;
+                          return wornName ? <span className="slot-worn">{wornName}{wornId ? <button type="button" className="slot-remove" aria-label={`Remove ${wornName}`} title={`Remove ${wornName}`} onClick={() => { const it = getItem(CATALOG, wornId); if (it) wearItemById(wornId, it.sub); }}>×</button> : null}</span> : null;
+                        })()}
                         {expiryLabel && <span suppressHydrationWarning className="slot-expiry">· 🕒 {expiryLabel}</span>}
                       </div>
                       <button className="slot-seeall" aria-label={`See all ${slot.label}`} onClick={() => { openCat(slot.id); setCatQ(q); }}>See all →</button>
@@ -1493,7 +1517,7 @@ export default function FashionIsland() {
                           <button
                             type="button"
                             className="banner-tryon-btn"
-                            onClick={() => tryOnCrate(card.items)}
+                            onClick={() => { saveUndo(); tryOnCrate(card.items); }}
                             title="Try on a random coordinated outfit from this crate"
                           >
                             🎲 Try Crate Look
@@ -2046,7 +2070,7 @@ function Tile(props: {
           </div>
         )}
         {props.img ? (
-          <img decoding="async" draggable={false} src={props.img} alt="" />
+          <img decoding="async" draggable={false} src={props.img} alt="" onError={(e) => { const next = iconFallbackURL(e.currentTarget.src); if (next) e.currentTarget.src = next; }} />
         ) : (
           <span style={{ fontSize: 18 }}>{props.big}</span>
         )}

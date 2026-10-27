@@ -184,6 +184,60 @@ test('hides layers covered by another item vslot claim', () => {
   assert.ok(result.layers.some((layer) => layer.key === 'hat'));
   assert.ok(result.layers.every((layer) => layer.key !== 'hair'));
 });
+
+test('drops only the hat-covered hair strands, keeping the rest', () => {
+  const layers: SourceLayer[] = [
+    ...sourceBase(),
+    {
+      key: 'hair-fringe', itemKey: '30130', part: 'Hair', name: 'hairOverHead', image,
+      width: 10, height: 10, origin: { x: 0, y: 0 },
+      map: { brow: { x: 0, y: 0 } }, z: 'hairOverHead',
+    },
+    {
+      key: 'hair-side', itemKey: '30130', part: 'Hair', name: 'hair', image,
+      width: 10, height: 10, origin: { x: 0, y: 0 },
+      map: { brow: { x: 0, y: 0 } }, z: 'hair',
+    },
+    {
+      key: 'cap', itemKey: '1002000', part: 'Hat', name: 'cap', image,
+      width: 10, height: 10, origin: { x: 0, y: 0 },
+      map: { brow: { x: 0, y: 0 } }, z: 'cap', vslot: 'CpH1H5',
+    },
+  ];
+
+  const result = composeLayers(layers, ['body', 'arm', 'head', 'hair', 'cap', 'hairOverHead']);
+
+  // A standard CpH1H5 cap covers the H1 fringe but keeps the H2 side hair.
+  assert.ok(result.layers.every((layer) => layer.key !== 'hair-fringe'));
+  assert.ok(result.layers.some((layer) => layer.key === 'hair-side'));
+});
+
+test('drops every hair strand under a full-coverage hat', () => {
+  const layers: SourceLayer[] = [
+    ...sourceBase(),
+    {
+      key: 'hair-fringe', itemKey: '30130', part: 'Hair', name: 'hairOverHead', image,
+      width: 10, height: 10, origin: { x: 0, y: 0 },
+      map: { brow: { x: 0, y: 0 } }, z: 'hairOverHead',
+    },
+    {
+      key: 'hair-side', itemKey: '30130', part: 'Hair', name: 'hair', image,
+      width: 10, height: 10, origin: { x: 0, y: 0 },
+      map: { brow: { x: 0, y: 0 } }, z: 'hair',
+    },
+    {
+      key: 'dr-lim', itemKey: '1002996', part: 'Hat', name: 'capOverHair', image,
+      width: 10, height: 10, origin: { x: 0, y: 0 },
+      map: { brow: { x: 0, y: 0 } }, z: 'capOverHair', vslot: 'CpHdH1H2H3H4H5H6HsHfHbAfAyAsAe',
+    },
+  ];
+
+  const result = composeLayers(layers, ['body', 'arm', 'head', 'hair', 'capOverHair', 'hairOverHead']);
+
+  assert.ok(result.layers.every((layer) => layer.part !== 'Hair'));
+  assert.ok(result.layers.some((layer) => layer.key === 'dr-lim'));
+});
+
 test('draws eye decorations over the face', () => {
   const layers: SourceLayer[] = [
     ...sourceBase(),

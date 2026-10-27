@@ -212,9 +212,6 @@ export async function renderLayeredCharacter(
   for (const { record, selection } of loaded) {
     if (!record) missing.push(selection.id);
   }
-  const hatHasCap = loaded.some(({ selection, record }) => selection.part === 'Hat'
-    && Object.values(record?.frames ?? {}).flat().some((effect) =>
-      ['cap', 'capAccessory', 'capBelowAccessory'].includes(effect.position ?? '')));
 
   for (const { selection, record } of loaded) {
     if (!record) continue;
@@ -226,7 +223,6 @@ export async function renderLayeredCharacter(
     const effects = frameEffects(record, look, selection.face ?? false);
     for (let index = 0; index < effects.length; index++) {
       const effect = effects[index]!;
-      if (selection.hair && hatHasCap && effect.position === 'hairOverHead') continue;
       try {
         const image = await localImage(effect.image);
         spriteLayers.push({

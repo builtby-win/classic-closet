@@ -41,6 +41,9 @@ export interface ItemMeta {
   src?: 'OSMS' | 'GMS' | 'MCW';
   history?: string[];
   coupon?: 'mystery' | 'signature';
+  /** Cash weapon skins that ship frames for a single weapon family only
+   *  (Plastic Slingshot → Bow, Toy Rifle → Crossbow); baked by bake-sprites. */
+  wsub?: string;
 }
 
 export interface SearchEntry {
@@ -144,6 +147,12 @@ const WEAPON_STANCE: Record<string, { stand: string; walk: string; attack: strin
   // them), so equipping one from a 2H stance steers back to stand1.
   Cash: { stand: 'stand1', walk: 'walk1', attack: 'swingO1', attacks: ['swingO1', 'swingO2', 'swingO3', 'stabO1', 'stabO2'] },
 };
+
+/** Weapon family that decides stance, motions and hand usage: a cash skin
+ *  that only fits one weapon type behaves as that type, else its own sub. */
+export function weaponSubOf(item: { sub: string; wsub?: string } | undefined): string | undefined {
+  return item ? item.wsub ?? item.sub : undefined;
+}
 
 /** Poses play mode uses for the worn weapon (`attack` is the signature one, `attacks` the baked variants a plain attack picks from); bare hands swing like a 1H weapon. */
 export function weaponMotion(sub: string | undefined): { stand: string; walk: string; attack: string; attacks: string[] } {
@@ -317,7 +326,7 @@ export function randomLook(sex: Sex, random: () => number = Math.random, exclude
   const faceStyle = faceStyleId(pick(CATALOG.indexes.faces[sex].active));
   const eyeColor = Math.floor(random() * EYE_COLORS.length);
   const stance = stanceForWeapon(
-    items.Weapon != null ? CATALOG.items[items.Weapon]?.sub : undefined,
+    items.Weapon != null ? weaponSubOf(CATALOG.items[items.Weapon]) : undefined,
     DEFAULT_LOOK.anim,
   );
   return {
@@ -434,6 +443,16 @@ export function iconURL(itemId: number): string {
   return `https://maplestory.io/api/${region}/${version}/item/${itemId}/icon`;
 }
 
+const ICON_SOURCES = ['MCW/CBT2', 'GMS/270', 'GMS/255'];
+
+/** Next icon URL to try when a maplestory.io icon 404s (not every region/version
+ *  ships every icon, e.g. GMS 270 lacks the Aurora cash scepters), or null. */
+export function iconFallbackURL(url: string): string | null {
+  const match = /\/api\/(\w+\/\w+)\/item\//.exec(url);
+  const next = match ? ICON_SOURCES[ICON_SOURCES.indexOf(match[1]!) + 1] : undefined;
+  return match && next ? url.replace(match[1]!, next) : null;
+}
+
 /** Apply an equip pick with Overall ↔ Top/Bottom and 2H-weapon ↔ Shield exclusion.
  *  Needs the picked item's sub (not just the slot): a two-handed weapon drops the
  *  shield, and tapping a shield while a two-handed weapon is worn swaps to a
@@ -448,11 +467,12 @@ export function applyPick(items: Look['items'], slot: string, id: number | null,
   if ((slot === 'Top' || slot === 'Bottom') && id) {
     delete next.Overall;
   }
-  if (slot === 'Weapon' && id && sub && TWO_HAND_SUBS[sub]) {
+  const pickSub = slot === 'Weapon' && id ? weaponSubOf(CATALOG.items[id]) ?? sub : sub;
+  if (slot === 'Weapon' && id && pickSub && TWO_HAND_SUBS[pickSub]) {
     delete next.Shield;
   }
   if (slot === 'Shield' && id) {
-    const weaponSub = CATALOG.items[next.Weapon ?? -1]?.sub;
+    const weaponSub = weaponSubOf(CATALOG.items[next.Weapon ?? -1]);
     if (weaponSub && TWO_HAND_SUBS[weaponSub]) {
       // Swap to a one-handed weapon so the shield has a free hand: prefer the
       // starter Sword, else the first 1H classic-equip in the catalog.

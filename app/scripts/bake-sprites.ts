@@ -67,6 +67,39 @@ async function fetchItemData(id: number, src?: 'GMS' | 'OSMS' | 'MCW', sub?: str
   return null;
 }
 
+/** Weapon-type codes (the keys of `frameBooksPerWeaponType`) → catalog sub. */
+const WEAPON_TYPE_SUB: Record<number, string> = {
+  30: 'One-Handed Sword', 31: 'One-Handed Axe', 32: 'One-Handed Blunt Weapon', 33: 'Dagger',
+  37: 'Wand', 38: 'Staff', 40: 'Two-Handed Sword', 41: 'Two-Handed Axe', 42: 'Two-Handed Blunt',
+  43: 'Spear', 44: 'Pole Arm', 45: 'Bow', 46: 'Crossbow', 47: 'Claw',
+};
+const TWO_HANDED_CODES = [40, 41, 42];
+
+/** A cash weapon skin only draws over the weapon types it ships frames for, so a
+ *  skin tied to one family (Plastic Slingshot → Bow, Toy Rifle → Crossbow) is that
+ *  weapon when worn. Skins spanning several families stay generic `Cash`. */
+function weaponFamilyOf(codes: number[]): string | undefined {
+  if (!codes.length) return undefined;
+  const sameFamily = codes.every((code) => code === codes[0])
+    || codes.every((code) => TWO_HANDED_CODES.includes(code));
+  return sameFamily ? WEAPON_TYPE_SUB[Math.min(...codes)] : undefined;
+}
+
+async function classifyCashWeapons(): Promise<void> {
+  const cash = Object.entries<any>(catalog.items).filter(([, meta]) => meta?.sub === 'Cash');
+  let changed = 0;
+  await pool(cash, 6, async ([idStr, meta]) => {
+    const raw = await fetchItemData(Number(idStr), meta.src, meta.sub);
+    if (!raw) throw new Error(`Could not classify cash weapon ${idStr}: no item data`);
+    const wsub = weaponFamilyOf(Object.keys(raw.frameBooksPerWeaponType ?? {}).map(Number));
+    if (wsub === meta.wsub) return;
+    if (wsub) meta.wsub = wsub;
+    else delete meta.wsub;
+    changed++;
+  });
+  console.log(`Classified ${cash.length} cash weapons (${changed} changed).`);
+}
+
 const BAKED_ACTIONS = new Set(['stand1', 'stand2', 'alert', 'jump', 'default']);
 /** Play-mode poses live in `<id>.motion.json`, fetched only when the pad opens. */
 const MOTION_ACTIONS = new Set([
@@ -289,6 +322,10 @@ async function main() {
     ...hairIds.map((id): [number, any] => [id, { src: catalog.styles[Math.floor(id / 10)]?.src }]),
   ], 10, ([id, meta]) => bakeMotion(id, meta));
 
+  console.log('--- Classifying cash weapons ---');
+  await classifyCashWeapons();
+  writeFileSync(catalogPath, JSON.stringify(catalog));
+
   console.log('--- Pruning unbaked unreleased entries ---');
   let prunedStyles = 0;
   let prunedFaces = 0;
@@ -325,10 +362,24 @@ async function main() {
       prunedFaces++;
     }
   }
-  if (prunedStyles || prunedFaces) {
+  let prunedEquips = 0;
+  for (const [idStr, meta] of Object.entries<any>(catalog.items)) {
+    if (meta?.sub === 'Face' || meta?.bannerId !== 'unreleased') continue;
+    if (existsSync(join(ITEMS_DIR, `${idStr}.json`))) continue;
+    delete catalog.items[idStr];
+    for (const sex of ['m', 'f', 'u'] as const) {
+      const arr: number[] | undefined = catalog.indexes.groups?.['unreleased']?.[sex];
+      const i = arr?.indexOf(Number(idStr)) ?? -1;
+      if (i >= 0) arr!.splice(i, 1);
+    }
+    const si = catalog.indexes.search.findIndex((e: any) => e.id === Number(idStr));
+    if (si >= 0) catalog.indexes.search.splice(si, 1);
+    prunedEquips++;
+  }
+  if (prunedStyles || prunedFaces || prunedEquips) {
     writeFileSync(catalogPath, JSON.stringify(catalog));
   }
-  console.log(`Pruned ${prunedStyles} unreleased styles and ${prunedFaces} unreleased faces with incomplete art.`);
+  console.log(`Pruned ${prunedStyles} unreleased styles, ${prunedFaces} unreleased faces and ${prunedEquips} unreleased equips with incomplete art.`);
   console.log(`Done! Total: ${count} baked, ${skipped} already existed.`);
 }
 
