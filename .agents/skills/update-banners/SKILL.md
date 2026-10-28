@@ -153,6 +153,10 @@ Candidates are token-overlap suggestions only — never auto-applied. Resolution
 
 **5. Bake.** `pnpm bake-sprites` retries fetches and throws on real failure (rings warn-only). Confirm zero `unbaked` non-ring IDs before deploy.
 
+Baked files in `public/sprites/items/*.json` carry a `base` stamp (the dataset they were fetched from). The bake is incremental but re-fetches any file whose stamp differs from the catalog's current `src`, logging `rebake <id>: …`. So after adding or changing a `"src": "MCW1"` pin, just run `pnpm catalog && pnpm bake-sprites` — never hand-delete sprites. Unstamped legacy files are trusted unless the item is `MCW1`. Expect `rebake` lines only when a `src` changed; unexpected ones mean a wrong pin or wrong catalog `src`.
+
+**MCW1 cosmetics gotcha:** ids for faces/hairs newer than CBT2 (21030–21033, 20028/20029, hair 3086–3088/3183–3185) are *different retail items* in GMS 270 (21033 = Insolent Face). Datamined/unreleased entries bake from GMS first, so if a face later ships in Classic, pin `"src": "MCW1"` in `rotations.json` **and** rebake, then compare `public/sprites/items/<id>.json` dimensions to `https://maplestory.io/api/MCW/1/item/<id>` (eyeball the render too). Keep `MCW1_FACE_IDS`/`MCW1_HAIR_STYLES` in `src/lib/og.ts` in sync (tests/og.test.ts enforces it).
+
 ---
 
 ## 4. Surfacing Prices in the UI

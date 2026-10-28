@@ -42,21 +42,22 @@ async function fetchWithTimeout(url: string, ms = 7000): Promise<Response> {
   return fetch(url, { headers: UA, signal: AbortSignal.timeout(ms) });
 }
 
-async function fetchItemData(id: number, src?: 'GMS' | 'OSMS' | 'MCW' | 'MCW1', sub?: string, tries = 3): Promise<any | null> {
+function sourceBase(src?: 'GMS' | 'OSMS' | 'MCW' | 'MCW1', sub?: string): string {
   // Same numeric ids are different items per region (e.g. GMS 1332001 is
   // Halfmoon Zamadar, MCW 1332001 is Fruit Knife). Region is the catalog's
   // per-item src verdict — bake strictly from that region, never silently
   // fall back to same-id different-art records (cf. White Beanie 1007073).
-  // Transient flakes retry here, then throw loud instead of baking wrong art.
   const cosmetic = sub === 'Hair' || sub === 'Face';
   const gmsFirst = src === 'GMS' || (src === 'OSMS' && cosmetic);
   // MCW1 = Classic launch dataset (MCW/1), for cosmetics newer than CBT2 whose
   // ids hold different retail items in GMS 270 (cf. 20028 Crystal Face).
-  const base = src === 'MCW1'
-    ? 'https://maplestory.io/api/MCW/1'
-    : gmsFirst
-      ? 'https://maplestory.io/api/GMS/270'
-      : 'https://maplestory.io/api/MCW/CBT2';
+  if (src === 'MCW1') return 'https://maplestory.io/api/MCW/1';
+  return gmsFirst ? 'https://maplestory.io/api/GMS/270' : 'https://maplestory.io/api/MCW/CBT2';
+}
+
+async function fetchItemData(id: number, src?: 'GMS' | 'OSMS' | 'MCW' | 'MCW1', sub?: string, tries = 3): Promise<any | null> {
+  // Transient flakes retry here, then throw loud instead of baking wrong art.
+  const base = sourceBase(src, sub);
   for (let attempt = 1; attempt <= tries; attempt++) {
     try {
       const res = await fetchWithTimeout(`${base}/item/${id}`, 12000);
@@ -146,7 +147,16 @@ function extractFrames(raw: any, actions: Set<string> = BAKED_ACTIONS): Record<s
 
 async function bakeItem(id: number, meta: any): Promise<boolean> {
   const dest = join(ITEMS_DIR, `${id}.json`);
-  if (existsSync(dest)) return true;
+  const base = sourceBase(meta?.src, meta?.sub);
+  if (existsSync(dest)) {
+    // A catalog src change (e.g. a new MCW1 pin) must invalidate art baked from the old source.
+    // Files baked before the stamp existed are trusted, except MCW1 ones: those ids are
+    // different items in every other dataset, so an unstamped file cannot be proven right.
+    const baked = JSON.parse(readFileSync(dest, 'utf8'));
+    const stale = baked.base ? baked.base !== base : meta?.src === 'MCW1';
+    if (!stale) return true;
+    console.warn(`rebake ${id}: baked from ${baked.base ?? 'unknown source'}, catalog wants ${base}`);
+  }
 
   const raw = await fetchItemData(id, meta?.src, meta?.sub);
   if (!raw || !raw.frameBooks) return false;
@@ -157,7 +167,7 @@ async function bakeItem(id: number, meta: any): Promise<boolean> {
 
   if (!Object.keys(frames).length) return false;
 
-  writeFileSync(dest, JSON.stringify({ id, frames, vslot: vslots.join(''), islot: islots.join('') }));
+  writeFileSync(dest, JSON.stringify({ id, base, frames, vslot: vslots.join(''), islot: islots.join('') }));
   return true;
 }
 
@@ -211,7 +221,6 @@ async function main() {
   console.log(`--- Baking ${itemEntries.length} items (concurrency: 10) ---`);
 
   let count = 0;
-  let skipped = 0;
   let success = 0;
   // Rings ship zero frameBooks (chat/label UI effect, no avatar layers):
   // expected-unbakeable, warn only. Anything else failing is real.
@@ -220,11 +229,7 @@ async function main() {
 
   await pool(itemEntries, 10, async ([idStr, meta]) => {
     const id = Number(idStr);
-    const dest = join(ITEMS_DIR, `${id}.json`);
-    if (existsSync(dest)) {
-      skipped++;
-      return;
-    }
+    // bakeItem skips files already baked from the right source.
     const ok = await bakeItem(id, meta);
     count++;
     if (ok) {
@@ -238,7 +243,7 @@ async function main() {
       equipFailed.push(id);
     }
     if (count % 50 === 0) {
-      console.log(`Progress: ${count} baked (${success} ok, ${skipped} skipped)...`);
+      console.log(`Progress: ${count} processed (${success} ok)...`);
     }
   });
   if (equipFailed.length) {
@@ -296,8 +301,7 @@ async function main() {
   }
 
   await pool(hairIds, 10, async (hairId) => {
-    const dest = join(ITEMS_DIR, `${hairId}.json`);
-    if (existsSync(dest)) return;
+    // bakeItem skips files already baked from the right source.
     if (!await bakeItem(hairId, { src: catalog.styles[Math.floor(hairId / 10)]?.src })) {
       hairFailed.push(hairId);
     }
@@ -384,7 +388,7 @@ async function main() {
     writeFileSync(catalogPath, JSON.stringify(catalog));
   }
   console.log(`Pruned ${prunedStyles} unreleased styles, ${prunedFaces} unreleased faces and ${prunedEquips} unreleased equips with incomplete art.`);
-  console.log(`Done! Total: ${count} baked, ${skipped} already existed.`);
+  console.log(`Done! ${count} items processed.`);
 }
 
 main().catch((error) => {
