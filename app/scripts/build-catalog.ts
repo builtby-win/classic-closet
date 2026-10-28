@@ -24,7 +24,7 @@ const API = 'https://maplestory.io/api/MCW/CBT2';
 const OSMS_REF = '63db09449642c4bf3414276223e4cb7d72af02d9';
 const OSMS_DATA = `https://raw.githubusercontent.com/ohmi69/osms_datamine_dashboard/${OSMS_REF}/data/current`;
 const CMS = 'https://g.nexonstatic.com/maplestory/cms/v1/general-posts';
-type AssetSource = 'OSMS' | 'GMS' | 'MCW';
+type AssetSource = 'OSMS' | 'GMS' | 'MCW' | 'MCW1';
 /** Region a pin forces for baking. 'MCW' is strict: MCW frames or throw, never
  *  silently fall back to a same-id different-art GMS record (cf. White Beanie). */
 type PinSource = 'MCW' | 'GMS' | 'OSMS';
@@ -63,6 +63,9 @@ interface BannerDef {
   label: string;
   start: string;
   end: string;
+  /** Exact UTC instants when Nexon's switch hour matters (08:00 UTC); optional. */
+  startAt?: string;
+  endAt?: string;
   note?: string;
   post?: string;
   rates?: string;
@@ -81,6 +84,8 @@ export interface BannerMeta {
   label: string;
   start: string | null;
   end: string | null;
+  startAt?: string;
+  endAt?: string;
   note?: string;
   post?: string;
   rates?: string;
@@ -175,8 +180,9 @@ const rotations: RotationsFile = JSON.parse(readFileSync(rotationsPath, 'utf8'))
 
 const founderRates = await rateTable(45538);
 const mysteryRates = await rateTable(46331);
+const halloweenRates = await rateTable(46524);
 const auroraRates = await rateTable(45659);
-console.log(`rates fetched: founder=${founderRates.size} mystery=${mysteryRates.size} aurora=${auroraRates.size}`);
+console.log(`rates fetched: founder=${founderRates.size} mystery=${mysteryRates.size} halloween=${halloweenRates.size} aurora=${auroraRates.size}`);
 
 const [osmsItemsFile, osmsBeauty, count] = await Promise.all([
   fetch(`${OSMS_DATA}/items.json`).then((r) => {
@@ -191,6 +197,10 @@ const [osmsItemsFile, osmsBeauty, count] = await Promise.all([
 ]);
 const mcwDump: RawItem[] = await fetch(`${API}/item/list?count=${count}`).then((r) => r.json());
 const mcwById = new Map(mcwDump.map(item => [item.id, item]));
+// MCW/1 is the Classic launch dataset: newer than CBT2, and the only place some
+// cosmetics live while GMS 270 reuses their ids for different retail items.
+const mcw1Count = await fetch('https://maplestory.io/api/MCW/1/item/count').then((r) => r.json()) as number;
+const mcw1ById = new Map((await fetch(`https://maplestory.io/api/MCW/1/item/list?count=${mcw1Count}`).then((r) => r.json()) as RawItem[]).map((item) => [item.id, item]));
 const osmsGear: RawItem[] = osmsItemsFile.items
   .filter((item) => item.category === 'Equipment')
   .map((item) => {
@@ -380,6 +390,17 @@ function findItem(name: string, subCategory: string): { item: RawItem | GmsItem;
   return null;
 }
 
+/** A rotation entry may pin `"src": "MCW1"` when GMS 270 holds a different item at its id.
+ *  Verified against MCW/1 by name so a wrong pin fails the build instead of baking wrong art. */
+function resolveCosmeticSrc(entry: { name: string; src?: AssetSource }, id: number, sub: 'Hair' | 'Face', detected: AssetSource | undefined | null): AssetSource | undefined | null {
+  if (entry.src !== 'MCW1') return detected;
+  const hit = mcw1ById.get(id);
+  if (hit?.typeInfo.subCategory !== sub || hit.name.toLowerCase() !== entry.name.toLowerCase()) {
+    throw new Error(`MCW1 pin does not match MCW/1: ${entry.name} (${id}) -> ${hit?.name ?? 'missing'}`);
+  }
+  return 'MCW1';
+}
+
 // Explicit coupon IDs may exist only in retail data. Never apply this fallback to equips.
 function cosmeticSource(id: number, sub: 'Hair' | 'Face'): AssetSource | undefined | null {
   const osmsId = sub === 'Face'
@@ -416,6 +437,7 @@ const fastCatalog: FastCatalog = {
     groups: {
       'founder-crate': { m: [], f: [], u: [] },
       'mystery-crate': { m: [], f: [], u: [] },
+      'halloween-crate': { m: [], f: [], u: [] },
       'aurora-crate': { m: [], f: [], u: [] },
       'cover-10day': { m: [], f: [], u: [] },
       'classic-equips': { m: [], f: [], u: [] },
@@ -432,6 +454,8 @@ for (const b of [...rotations.current, ...(rotations.past || [])]) {
     label: b.label,
     start: b.start,
     end: b.end,
+    startAt: b.startAt,
+    endAt: b.endAt,
     note: b.note,
     post: b.post,
     rates: b.rates,
@@ -456,7 +480,7 @@ for (const banner of rotations.current) {
       }
     }
     if (style != null) {
-      const source = cosmeticSource(style * 10, 'Hair');
+      const source = resolveCosmeticSrc(h, style * 10, 'Hair', cosmeticSource(style * 10, 'Hair'));
       if (source === null) throw new Error(`No sprite source for hair: ${h.name} (${style})`);
       src = source;
     }
@@ -532,7 +556,7 @@ for (const banner of rotations.current) {
       if (found) { faceId = found.item.id; src = found.src; }
     }
     if (faceId != null) {
-      const source = cosmeticSource(faceId, 'Face');
+      const source = resolveCosmeticSrc(f, faceId, 'Face', cosmeticSource(faceId, 'Face'));
       if (source === null) throw new Error(`No sprite source for face: ${f.name} (${faceId})`);
       src = source;
     }
@@ -645,6 +669,35 @@ for (const banner of rotations.current) {
           src,
         };
         fastCatalog.indexes.groups['mystery-crate'][sex].push(hit.id);
+        fastCatalog.indexes.search.push({
+          id: hit.id,
+          name: hit.name,
+          sub: hit.typeInfo.subCategory,
+          sex,
+        });
+      }
+    }
+  }
+
+  // Equips (Halloween Mystery Crate)
+  if (banner.id === 'halloween-crate-oct26') {
+    for (const [name, rate] of halloweenRates) {
+      const resolved = resolveCrateItem(name);
+      if (!resolved.length) logCrateMiss(name);
+      for (const { item: hit, src } of resolved) {
+        if (hit.typeInfo.overallCategory !== 'Equip') continue;
+        const sex = sexOf(hit);
+        fastCatalog.items[hit.id] = {
+          name: hit.name,
+          sub: hit.typeInfo.subCategory,
+          sex,
+          bannerId: banner.id,
+          attainable: true,
+          group: 'halloween-crate',
+          rate,
+          src,
+        };
+        fastCatalog.indexes.groups['halloween-crate'][sex].push(hit.id);
         fastCatalog.indexes.search.push({
           id: hit.id,
           name: hit.name,

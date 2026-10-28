@@ -14,6 +14,7 @@
   ],
   "items": [],
   "hide": [
-    { "id": 1057069, "wrongIconMd5": "b03d3124807da61347acad45dd76f6ed", "note": "Race Queen Uniform (Mystery Fashion Crate 2.50%): MCW serves stale retail BLUE art (worn render verified vs red/white Nexon set 2026-10-21); GMS 270 has nothing. True Classic art in no dataset yet. Drop when a source grows the red/white art." }
+    { "id": 1057069, "wrongIconMd5": "b03d3124807da61347acad45dd76f6ed", "note": "Race Queen Uniform (Mystery Fashion Crate 2.50%): MCW serves stale retail BLUE art (worn render verified vs red/white Nexon set 2026-10-21); GMS 270 has nothing. True Classic art in no dataset yet. Drop when a source grows the red/white art." },
+    { "id": 1702092, "note": "Glowing Pumpkin Basket (Halloween Mystery Fashion Crate 2.00%): GMS 270 ships only per-weapon-type frames (no frameBooks) and MCW CBT2 serves a different item (Super Scrubber) under this id; nothing bakeable yet. Drop when a source ships avatar frames for it." }
   ]
 }

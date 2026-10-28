@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { DEFAULT_LOOK, EYE_COLORS, faceColorIndex, faceStyleId, formatAttainableInfo, fuzzyScore, matchesFuzzy, renderURL, iconURL, matchesJob, randomLook, equipSlot, type Sex, applyPick, stanceForWeapon, weaponSubOf, iconFallbackURL, TWO_HAND_SUBS, RANDOM_EQUIP_SLOTS, saveLookToStorage, loadLookForSex, mirrorStyleForSex, firstBannerStyle, defaultHairForSex, defaultFaceForSex } from '../src/lib/fashion';
+import { DEFAULT_LOOK, EYE_COLORS, faceColorIndex, faceStyleId, formatAttainableInfo, fuzzyScore, matchesFuzzy, renderURL, assetSource, iconURL, matchesJob, randomLook, equipSlot, type Sex, applyPick, stanceForWeapon, weaponSubOf, iconFallbackURL, TWO_HAND_SUBS, RANDOM_EQUIP_SLOTS, saveLookToStorage, loadLookForSex, mirrorStyleForSex, firstBannerStyle, defaultHairForSex, defaultFaceForSex } from '../src/lib/fashion';
 import catalog from '../src/data/catalog.json';
 
 test('mixed render preserves Classic body and equips with retail cosmetics', () => {
@@ -175,27 +175,58 @@ test('fuzzy search matches substrings, typos, and ids', () => {
   assert.ok(matchesFuzzy('Antagonist', 30130, ''));
 });
 
-test('Alert Face is active, attainable, and properly resolved across eye colors', () => {
-  const alertFace = catalog.items[20805 as unknown as keyof typeof catalog.items];
-  assert.ok(alertFace, '20805 Alert Face must be present in catalog');
-  assert.equal(alertFace.name, 'Alert Face');
-  assert.equal(alertFace.sex, 'm');
-  assert.equal(alertFace.bannerId, 'style-oct26');
-  assert.equal(alertFace.attainable, true);
-  assert.equal(alertFace.coupon, 'mystery');
-  assert.equal(alertFace.rate, '16.67%');
+test('Puppy Eyes Face is active, attainable, and properly resolved across eye colors', () => {
+  const face = catalog.items[20029 as unknown as keyof typeof catalog.items];
+  assert.ok(face, '20029 Puppy Eyes Face must be present in catalog');
+  assert.equal(face.name, 'Puppy Eyes Face');
+  assert.equal(face.sex, 'm');
+  assert.equal(face.bannerId, 'style-oct28');
+  assert.equal(face.attainable, true);
+  assert.equal(face.coupon, 'mystery');
+  assert.equal(face.rate, '16.67%');
 
   // Must be in active male faces index
-  assert.ok(catalog.indexes.faces.m.active.includes(20805));
+  assert.ok(catalog.indexes.faces.m.active.includes(20029));
 
-  // Resolved across eye colors (e.g. 20005 black eyes)
-  const infoBlack = formatAttainableInfo(catalog as any, 20005);
+  // Resolved across eye colors (e.g. 20329 with colored eyes)
+  const infoBlack = formatAttainableInfo(catalog as any, 20029);
   assert.equal(infoBlack.isAttainable, true);
   assert.equal(infoBlack.bannerLabel, 'Mystery & Signature Style Coupons');
 
-  const infoViolet = formatAttainableInfo(catalog as any, 20805);
-  assert.equal(infoViolet.isAttainable, true);
-  assert.equal(infoViolet.bannerLabel, 'Mystery & Signature Style Coupons');
+  const infoColored = formatAttainableInfo(catalog as any, 20329);
+  assert.equal(infoColored.isAttainable, true);
+  assert.equal(infoColored.bannerLabel, 'Mystery & Signature Style Coupons');
+});
+
+test('MCW/1-only cosmetics render and icon from MCW/1', () => {
+  assert.deepEqual(assetSource(20329), { region: 'MCW', version: '1' });
+  assert.deepEqual(assetSource(30863), { region: 'MCW', version: '1' });
+  assert.deepEqual(assetSource(20805), { region: 'GMS', version: '270' });
+  assert.equal(iconURL(30860), 'https://maplestory.io/api/MCW/1/item/30860/icon');
+  assert.equal(iconURL(20028), '/sprites/faces/20028.png');
+  assert.equal(iconFallbackURL('https://maplestory.io/api/MCW/1/item/30860/icon'), null);
+});
+
+test('rotated-out Alert Face is a past rotation', () => {
+  const alertFace = catalog.items[20805 as unknown as keyof typeof catalog.items];
+  assert.ok(alertFace, '20805 Alert Face must stay in catalog');
+  assert.equal(alertFace.bannerId, 'style-oct26');
+  assert.equal(alertFace.attainable, false);
+  assert.ok(catalog.indexes.faces.m.past.includes(20805));
+  assert.ok(!catalog.indexes.faces.m.active.includes(20805));
+});
+
+test('Halloween crate indexes its drops and bannerId', () => {
+  const group = catalog.indexes.groups['halloween-crate'];
+  const ids = [...group.u, ...group.m, ...group.f];
+  assert.ok(ids.length >= 50, `expected >=50 Halloween crate entries, got ${ids.length}`);
+  for (const id of ids) {
+    const item = catalog.items[id as unknown as keyof typeof catalog.items];
+    assert.equal(item.bannerId, 'halloween-crate-oct26');
+    assert.equal(item.attainable, true);
+  }
+  assert.equal(catalog.banners['halloween-crate-oct26'].end, '2026-11-04');
+  assert.equal(catalog.banners['style-oct28'].end, '2026-11-11');
 });
 
 test('both male and female items are accessible and sort matching sex first', () => {

@@ -42,7 +42,7 @@ async function fetchWithTimeout(url: string, ms = 7000): Promise<Response> {
   return fetch(url, { headers: UA, signal: AbortSignal.timeout(ms) });
 }
 
-async function fetchItemData(id: number, src?: 'GMS' | 'OSMS' | 'MCW', sub?: string, tries = 3): Promise<any | null> {
+async function fetchItemData(id: number, src?: 'GMS' | 'OSMS' | 'MCW' | 'MCW1', sub?: string, tries = 3): Promise<any | null> {
   // Same numeric ids are different items per region (e.g. GMS 1332001 is
   // Halfmoon Zamadar, MCW 1332001 is Fruit Knife). Region is the catalog's
   // per-item src verdict — bake strictly from that region, never silently
@@ -50,9 +50,13 @@ async function fetchItemData(id: number, src?: 'GMS' | 'OSMS' | 'MCW', sub?: str
   // Transient flakes retry here, then throw loud instead of baking wrong art.
   const cosmetic = sub === 'Hair' || sub === 'Face';
   const gmsFirst = src === 'GMS' || (src === 'OSMS' && cosmetic);
-  const base = gmsFirst
-    ? 'https://maplestory.io/api/GMS/270'
-    : 'https://maplestory.io/api/MCW/CBT2';
+  // MCW1 = Classic launch dataset (MCW/1), for cosmetics newer than CBT2 whose
+  // ids hold different retail items in GMS 270 (cf. 20028 Crystal Face).
+  const base = src === 'MCW1'
+    ? 'https://maplestory.io/api/MCW/1'
+    : gmsFirst
+      ? 'https://maplestory.io/api/GMS/270'
+      : 'https://maplestory.io/api/MCW/CBT2';
   for (let attempt = 1; attempt <= tries; attempt++) {
     try {
       const res = await fetchWithTimeout(`${base}/item/${id}`, 12000);
@@ -245,7 +249,7 @@ async function main() {
   }
 
   console.log('--- Baking Face Color Variants ---');
-  const faceJobs = new Map<number, { src?: 'GMS' | 'OSMS' }>();
+  const faceJobs = new Map<number, { src?: 'GMS' | 'OSMS' | 'MCW1' }>();
   for (const [id, meta] of Object.entries<any>(catalog.items)) {
     if (meta.sub !== 'Face') continue;
     const sex = Number(id) >= 21000 ? 'f' : 'm';

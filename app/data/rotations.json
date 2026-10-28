@@ -31,6 +31,22 @@
       "rates": "https://g.nexonstatic.com/maplestory/cms/v1/general-posts/45537"
     },
     {
+      "id": "style-oct28",
+      "label": "Mystery Style Coupons (Halloween)",
+      "start": "2026-10-28",
+      "end": "2026-11-11",
+      "post": "https://www.nexon.com/maplestory/news/sale/46602/classic-world-cash-shop-update-oct-28",
+      "rates": "https://g.nexonstatic.com/maplestory/cms/v1/general-posts/45537"
+    },
+    {
+      "id": "halloween-crate-oct26",
+      "label": "Halloween Mystery Fashion Crate",
+      "start": "2026-10-28",
+      "end": "2026-11-04",
+      "post": "https://www.nexon.com/maplestory/news/sale/46602/classic-world-cash-shop-update-oct-28",
+      "rates": "https://g.nexonstatic.com/maplestory/cms/v1/general-posts/46524"
+    },
+    {
       "id": "covers-10day-nov26",
       "label": "10-Day Equip Covers",
       "start": "2026-10-06",
@@ -40,41 +56,43 @@
   ],
   "current": [
     {
-      "id": "style-oct26",
+      "id": "style-oct28",
       "type": "style-coupon",
       "label": "Mystery & Signature Style Coupons",
-      "start": "2026-10-06",
-      "end": "2026-10-28",
+      "start": "2026-10-28",
+      "end": "2026-11-11",
+      "startAt": "2026-10-28T08:00:00Z",
+      "endAt": "2026-11-11T08:00:00Z",
       "note": "Mystery Hair 5,500 NX · Mystery Face 3,500 NX · Signature Hair 7,500 NX · Signature Face 5,500 NX · 14-day styles",
-      "post": "https://www.nexon.com/maplestory/news/sale/45819/founder-s-access-cash-shop",
+      "post": "https://www.nexon.com/maplestory/news/sale/46602/classic-world-cash-shop-update-oct-28",
       "rates": "https://g.nexonstatic.com/maplestory/cms/v1/general-posts/45537",
       "hairs": [
-        { "name": "Metrosexual Hair", "sex": "m", "rate": "16.67%", "style": 3026 },
-        { "name": "Antagonist", "sex": "m", "rate": "16.67%", "style": 3013 },
-        { "name": "Dreamcatcher", "sex": "m", "rate": "16.67%", "style": 3080 },
-        { "name": "Bed Head Hair", "sex": "m", "rate": "16.67%", "style": 3239 },
-        { "name": "Prince Cut Hair", "sex": "m", "rate": "16.67%", "style": 3300 },
-        { "name": "Short Regent Cut", "sex": "m", "rate": "16.67%", "style": 3335 },
-        { "name": "Lovely Ladyhawk", "sex": "f", "rate": "16.67%", "style": 3168 },
-        { "name": "Angelica Hair", "sex": "f", "rate": "16.67%", "style": 3115 },
-        { "name": "Caspia Hair", "sex": "f", "rate": "16.67%", "style": 3122 },
-        { "name": "Rose", "sex": "f", "rate": "16.67%", "style": 3123 },
-        { "name": "Ponytail-to-the-Side", "sex": "f", "rate": "16.67%", "style": 3475 },
-        { "name": "Vivacious Wavy Hair", "sex": "f", "rate": "16.67%", "style": 3421 }
+        { "name": "Angelcakes Hair", "sex": "m", "rate": "16.67%", "style": 3086, "src": "MCW1" },
+        { "name": "Super Tuft Hair", "sex": "m", "rate": "16.67%", "style": 3087, "src": "MCW1" },
+        { "name": "Wild Tangles Hair", "sex": "m", "rate": "16.67%", "style": 3088, "src": "MCW1" },
+        { "name": "Natural", "sex": "m", "rate": "16.67%", "style": 3041 },
+        { "name": "Casanova", "sex": "m", "rate": "16.67%", "style": 3045 },
+        { "name": "Roving Rockstar", "sex": "m", "rate": "16.67%", "style": 3073 },
+        { "name": "Fluffy Pigtails", "sex": "f", "rate": "16.67%", "style": 3183, "src": "MCW1" },
+        { "name": "Romantic Braid Hair", "sex": "f", "rate": "16.67%", "style": 3184, "src": "MCW1" },
+        { "name": "Grace Hair", "sex": "f", "rate": "16.67%", "style": 3185, "src": "MCW1" },
+        { "name": "Onna's Honor", "sex": "f", "rate": "16.67%", "style": 3180 },
+        { "name": "Francesca", "sex": "f", "rate": "16.67%", "style": 3102 },
+        { "name": "Rockstar Hair", "sex": "f", "rate": "16.67%", "style": 3105 }
       ],
       "faces": [
-        { "name": "Rebel's Fire", "sex": "m", "rate": "16.67%", "id": 20804 },
-        { "name": "Worrisome Glare", "sex": "m", "rate": "16.67%", "id": 20808 },
-        { "name": "Alert Face", "sex": "m", "rate": "16.67%", "id": 20805 },
-        { "name": "Overjoyed Smile", "sex": "m", "rate": "16.67%", "id": 20821 },
-        { "name": "Innocent Gaze", "sex": "m", "rate": "16.67%", "id": 20033 },
-        { "name": "Distant Gaze", "sex": "m", "rate": "16.67%", "id": 20035 },
-        { "name": "Beauty Stare", "sex": "f", "rate": "16.67%", "id": 21816 },
-        { "name": "Strong Stare", "sex": "f", "rate": "16.67%", "id": 21803 },
-        { "name": "Prim Face", "sex": "f", "rate": "16.67%", "id": 21053 },
-        { "name": "Posh Look", "sex": "f", "rate": "16.67%", "id": 21057 },
-        { "name": "Bulbous-Eyed Face", "sex": "f", "rate": "16.67%", "id": 21072 },
-        { "name": "Round Eyed Face", "sex": "f", "rate": "16.67%", "id": 21077 }
+        { "name": "Crystal Face", "sex": "m", "rate": "16.67%", "id": 20028, "src": "MCW1" },
+        { "name": "Puppy Eyes Face", "sex": "m", "rate": "16.67%", "id": 20029, "src": "MCW1" },
+        { "name": "Curious Dog", "sex": "m", "rate": "16.67%", "id": 20012 },
+        { "name": "Dramatic Face", "sex": "m", "rate": "16.67%", "id": 20003 },
+        { "name": "Ghostface Stare", "sex": "m", "rate": "16.67%", "id": 20016 },
+        { "name": "Sad Innocence", "sex": "m", "rate": "16.67%", "id": 20007 },
+        { "name": "Tender Love", "sex": "f", "rate": "16.67%", "id": 21030, "src": "MCW1" },
+        { "name": "Pure Gaze", "sex": "f", "rate": "16.67%", "id": 21031, "src": "MCW1" },
+        { "name": "Bright Eyes", "sex": "f", "rate": "16.67%", "id": 21032, "src": "MCW1" },
+        { "name": "Existentially Tired Face", "sex": "f", "rate": "16.67%", "id": 21033, "src": "MCW1" },
+        { "name": "Lazy Look", "sex": "f", "rate": "16.67%", "id": 21024 },
+        { "name": "Innocent Look", "sex": "f", "rate": "16.67%", "id": 21023 }
       ],
       "signatureHairs": [
         { "name": "Bowl Cut", "sex": "m", "style": 3019 },
@@ -111,6 +129,7 @@
       "label": "Founder's Mystery Fashion Crate",
       "start": "2026-10-06",
       "end": "2026-10-28",
+      "endAt": "2026-10-28T08:00:00Z",
       "note": "Mystery Fashion Crate · 3,500 NX",
       "post": "https://www.nexon.com/maplestory/news/sale/45819/founder-s-access-cash-shop",
       "rates": "https://g.nexonstatic.com/maplestory/cms/v1/general-posts/45538"
@@ -121,9 +140,22 @@
       "label": "Mystery Fashion Crate",
       "start": "2026-10-21",
       "end": "2026-11-04",
+      "endAt": "2026-11-04T08:00:00Z",
       "note": "3,500 NX · 11× 35,000 NX · 7-day duration",
       "post": "https://www.nexon.com/maplestory/news/sale/46362/grand-launch-cash-shop-update",
       "rates": "https://g.nexonstatic.com/maplestory/cms/v1/general-posts/46331"
+    },
+    {
+      "id": "halloween-crate-oct26",
+      "type": "crate",
+      "label": "Halloween Mystery Fashion Crate",
+      "start": "2026-10-28",
+      "end": "2026-11-04",
+      "startAt": "2026-10-28T08:00:00Z",
+      "endAt": "2026-11-04T08:00:00Z",
+      "note": "4,900 NX · 11× 49,000 NX · 7-day duration",
+      "post": "https://www.nexon.com/maplestory/news/sale/46602/classic-world-cash-shop-update-oct-28",
+      "rates": "https://g.nexonstatic.com/maplestory/cms/v1/general-posts/46524"
     },
     {
       "id": "aurora-s1",
@@ -131,6 +163,7 @@
       "label": "Aurora Stamp Shop Season 1",
       "start": "2026-10-06",
       "end": "2027-01-13",
+      "endAt": "2027-01-13T08:00:00Z",
       "rates": "https://g.nexonstatic.com/maplestory/cms/v1/general-posts/45659"
     },
     {
@@ -139,11 +172,50 @@
       "label": "10-Day Equip Covers",
       "start": "2026-10-06",
       "end": "2026-11-18",
+      "endAt": "2026-11-18T18:00:00Z",
       "note": "700–1,200 NX · 10-day duration",
       "post": "https://www.nexon.com/maplestory/news/sale/45819/founder-s-access-cash-shop"
     }
   ],
   "past": [
+    {
+      "id": "style-oct26",
+      "type": "style-coupon",
+      "label": "Mystery Styles (Founder's Access)",
+      "start": "2026-10-06",
+      "end": "2026-10-28",
+      "note": "Mystery Hair 5,500 NX · Mystery Face 3,500 NX · 14-day styles",
+      "post": "https://www.nexon.com/maplestory/news/sale/45819/founder-s-access-cash-shop",
+      "rates": "https://g.nexonstatic.com/maplestory/cms/v1/general-posts/45537",
+      "hairs": [
+        { "name": "Metrosexual Hair", "sex": "m", "rate": "16.67%", "style": 3026 },
+        { "name": "Antagonist", "sex": "m", "rate": "16.67%", "style": 3013 },
+        { "name": "Dreamcatcher", "sex": "m", "rate": "16.67%", "style": 3080 },
+        { "name": "Bed Head Hair", "sex": "m", "rate": "16.67%", "style": 3239 },
+        { "name": "Prince Cut Hair", "sex": "m", "rate": "16.67%", "style": 3300 },
+        { "name": "Short Regent Cut", "sex": "m", "rate": "16.67%", "style": 3335 },
+        { "name": "Lovely Ladyhawk", "sex": "f", "rate": "16.67%", "style": 3168 },
+        { "name": "Angelica Hair", "sex": "f", "rate": "16.67%", "style": 3115 },
+        { "name": "Caspia Hair", "sex": "f", "rate": "16.67%", "style": 3122 },
+        { "name": "Rose", "sex": "f", "rate": "16.67%", "style": 3123 },
+        { "name": "Ponytail-to-the-Side", "sex": "f", "rate": "16.67%", "style": 3475 },
+        { "name": "Vivacious Wavy Hair", "sex": "f", "rate": "16.67%", "style": 3421 }
+      ],
+      "faces": [
+        { "name": "Rebel's Fire", "sex": "m", "rate": "16.67%", "id": 20804 },
+        { "name": "Worrisome Glare", "sex": "m", "rate": "16.67%", "id": 20808 },
+        { "name": "Alert Face", "sex": "m", "rate": "16.67%", "id": 20805 },
+        { "name": "Overjoyed Smile", "sex": "m", "rate": "16.67%", "id": 20821 },
+        { "name": "Innocent Gaze", "sex": "m", "rate": "16.67%", "id": 20033 },
+        { "name": "Distant Gaze", "sex": "m", "rate": "16.67%", "id": 20035 },
+        { "name": "Beauty Stare", "sex": "f", "rate": "16.67%", "id": 21816 },
+        { "name": "Strong Stare", "sex": "f", "rate": "16.67%", "id": 21803 },
+        { "name": "Prim Face", "sex": "f", "rate": "16.67%", "id": 21053 },
+        { "name": "Posh Look", "sex": "f", "rate": "16.67%", "id": 21057 },
+        { "name": "Bulbous-Eyed Face", "sex": "f", "rate": "16.67%", "id": 21072 },
+        { "name": "Round Eyed Face", "sex": "f", "rate": "16.67%", "id": 21077 }
+      ]
+    },
     {
       "id": "beta-style-sep26",
       "type": "style-coupon",

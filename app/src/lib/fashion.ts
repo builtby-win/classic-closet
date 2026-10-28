@@ -11,6 +11,8 @@ export interface BannerMeta {
   label: string;
   start: string | null;
   end: string | null;
+  startAt?: string;
+  endAt?: string;
   note?: string;
   post?: string;
   rates?: string;
@@ -23,7 +25,7 @@ export interface HairStyleMeta {
   bannerId: string;
   attainable: boolean;
   rate?: string;
-  src?: 'OSMS' | 'GMS' | 'MCW';
+  src?: 'OSMS' | 'GMS' | 'MCW' | 'MCW1';
   history?: string[];
   coupon?: 'mystery' | 'signature';
 }
@@ -38,7 +40,7 @@ export interface ItemMeta {
   attainable: boolean;
   group?: string;
   rate?: string;
-  src?: 'OSMS' | 'GMS' | 'MCW';
+  src?: 'OSMS' | 'GMS' | 'MCW' | 'MCW1';
   history?: string[];
   coupon?: 'mystery' | 'signature';
   /** Cash weapon skins that ship frames for a single weapon family only
@@ -89,6 +91,7 @@ export type SectionId =
   | 'FaceSignature'
   | 'founder-crate'
   | 'mystery-crate'
+  | 'halloween-crate'
   | 'aurora-crate'
   | 'cover-10day'
   | 'Shield' | 'Hat' | 'Top' | 'Bottom' | 'Overall' | 'Shoes' | 'Glove' | 'Weapon' | 'Cape' | 'Accessories';
@@ -148,6 +151,28 @@ const WEAPON_STANCE: Record<string, { stand: string; walk: string; attack: strin
   Cash: { stand: 'stand1', walk: 'walk1', attack: 'swingO1', attacks: ['swingO1', 'swingO2', 'swingO3', 'stabO1', 'stabO2'] },
 };
 
+const ALL_ATTACKS = new Set(Object.values(WEAPON_STANCE).flatMap((m) => m.attacks));
+
+/** Short weapon-family name shown in attack pose labels; Cash (unknown family) and bare hands get none. */
+const WEAPON_NOUN: Record<string, string> = {
+  'One-Handed Sword': 'sword', 'One-Handed Axe': 'axe', 'One-Handed Blunt Weapon': 'blunt', Dagger: 'dagger', Claw: 'claw', Wand: 'wand', Staff: 'staff',
+  'Two-Handed Sword': '2H sword', 'Two-Handed Axe': '2H axe', 'Two-Handed Blunt': '2H blunt', Spear: 'spear', 'Pole Arm': 'polearm', Crossbow: 'crossbow', Bow: 'bow',
+};
+
+/** Pose picker entries for the worn weapon: one "Standing" that resolves to its stance, plus only the attacks it has. */
+export function weaponPoses(sub: string | undefined): { anim: string; label: string }[] {
+  const { stand, attacks } = weaponMotion(sub);
+  const seen: Record<string, number> = {};
+  const attackPoses = attacks.map((anim) => {
+    const verb = anim.startsWith('stab') ? 'Stab' : anim.startsWith('shoot') ? 'Shoot' : 'Swing';
+    const n = (seen[verb] = (seen[verb] ?? 0) + 1);
+    const noun = sub && WEAPON_NOUN[sub];
+    const base = noun ? `${verb} ${noun}` : verb;
+    return { anim, label: verb === 'Shoot' ? base : `${base} ${n}` };
+  });
+  return [{ anim: stand, label: 'Standing' }, { anim: 'alert', label: 'Alert' }, { anim: 'jump', label: 'Jumping' }, ...attackPoses];
+}
+
 /** Weapon family that decides stance, motions and hand usage: a cash skin
  *  that only fits one weapon type behaves as that type, else its own sub. */
 export function weaponSubOf(item: { sub: string; wsub?: string } | undefined): string | undefined {
@@ -182,6 +207,8 @@ export function stanceForWeapon(sub: string | undefined, currentAnim: string): {
   if (!sub) return null;
   const want = WEAPON_STANCE[sub];
   if (!want) return null;
+  // An attack pose the new weapon doesn't have (e.g. a bow's shoot1 kept after swapping to a sword).
+  if (ALL_ATTACKS.has(currentAnim) && !want.attacks.includes(currentAnim)) return { anim: want.stand, frame: 0 };
   if ((currentAnim === 'stand1' || currentAnim === 'stand2') && currentAnim !== want.stand) {
     return { anim: want.stand, frame: 0 };
   }
@@ -192,27 +219,29 @@ export function stanceForWeapon(sub: string | undefined, currentAnim: string): {
 }
 
 /** Banner/group sort for equip drawers: limited NX first (by urgency), classic last.
- *  Founder's crate ends Oct 28 → Mystery crate ends Nov 4 → covers end Nov 18 → Aurora stamp ends Jan 13. */
+ *  Founder's crate ends Oct 28 → Halloween/Mystery crates end Nov 4 → covers end Nov 18 → Aurora stamp ends Jan 13. */
 export const GROUP_RANK: Record<string, number> = {
   'founder-crate': 0,
-  'mystery-crate': 1,
-  'cover-10day': 2,
-  'aurora-crate': 3,
-  'style-coupon': 4,
-  'classic-equips': 5,
+  'halloween-crate': 1,
+  'mystery-crate': 2,
+  'cover-10day': 3,
+  'aurora-crate': 4,
+  'style-coupon': 5,
+  'classic-equips': 6,
 };
 
 export function bannerRank(item: ItemMeta | HairStyleMeta | undefined): number {
   if (!item) return 99;
   const group = (item as ItemMeta).group;
   if (group && group in GROUP_RANK) return GROUP_RANK[group]!;
-  return 5;
+  return 6;
 }
 
 /** Short group tag for badges */
 export const GROUP_SHORT: Record<string, string> = {
   'founder-crate': 'Founder',
   'mystery-crate': 'Mystery',
+  'halloween-crate': 'Halloween',
   'aurora-crate': 'Aurora',
   'style-coupon': 'Style',
   'cover-10day': '10-Day',
@@ -416,6 +445,7 @@ export function assetSource(itemId: number): { region: string; version: string }
   const meta = getItem(CATALOG, itemId);
   const isGmsCosmetic = meta?.src === 'GMS'
     || (meta?.src === 'OSMS' && (meta.sub === 'Hair' || meta.sub === 'Face'));
+  if (meta?.src === 'MCW1') return { region: 'MCW', version: '1' };
   return isGmsCosmetic
     ? { region: 'GMS', version: '270' }
     : { region: REGION, version: VERSION };
@@ -435,7 +465,7 @@ export function renderURL(look: Look): string {
 /** Item icons use the same source as the character renderer. */
 export function iconURL(itemId: number): string {
   const meta = getItem(CATALOG, itemId);
-  if (meta?.src === 'OSMS' && meta.sub === 'Face') {
+  if ((meta?.src === 'OSMS' || meta?.src === 'MCW1') && meta.sub === 'Face') {
     const faceBase = itemId >= 21000 ? 21000 : 20000;
     return `/sprites/faces/${faceBase + faceStyleId(itemId)}.png`;
   }
@@ -449,6 +479,8 @@ const ICON_SOURCES = ['MCW/CBT2', 'GMS/270', 'GMS/255'];
  *  ships every icon, e.g. GMS 270 lacks the Aurora cash scepters), or null. */
 export function iconFallbackURL(url: string): string | null {
   const match = /\/api\/(\w+\/\w+)\/item\//.exec(url);
+  // MCW/1 icons are MCW1-only cosmetics: other sources hold different items at the same id.
+  if (match?.[1] === 'MCW/1') return null;
   const next = match ? ICON_SOURCES[ICON_SOURCES.indexOf(match[1]!) + 1] : undefined;
   return match && next ? url.replace(match[1]!, next) : null;
 }

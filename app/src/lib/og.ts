@@ -28,15 +28,25 @@ export interface OgSource {
  *  different items under several of these ids (e.g. MCW 1003050 is a sword,
  *  not Bunny Ears). */
 export const GMS_EQUIP_IDS: ReadonlySet<number> = new Set([
-  1002501, 1002738, 1002753, 1002943, 1002978, 1003006, 1003050, 1003807,
-  1003998, 1004026, 1004027, 1004028, 1004094, 1012083, 1012374, 1012450,
-  1022188, 1032029, 1032052, 1042066, 1042081, 1042082, 1042086, 1042146,
-  1042150, 1042238, 1042260, 1042270, 1042287, 1050125, 1050146, 1050152,
-  1050158, 1050304, 1051139, 1051170, 1051173, 1051180, 1051372, 1060119,
-  1062171, 1062174, 1062185, 1072200, 1072330, 1072331, 1072332, 1072379,
-  1072529, 1072876, 1072910, 1082171, 1082565, 1082581, 1102005, 1102093,
-  1102137, 1112113, 1112135, 1112238, 1702405, 1702445, 1702468,
+  1002389, 1002501, 1002525, 1002544, 1002555, 1002556, 1002566, 1002738,
+  1002753, 1002839, 1002912, 1002943, 1002978, 1003006, 1003022, 1003050,
+  1003742, 1003807, 1003998, 1004000, 1004026, 1004027, 1004028, 1004094,
+  1006227, 1012044, 1012050, 1012083, 1012374, 1012450, 1022188, 1032029,
+  1032052, 1042066, 1042081, 1042082, 1042086, 1042146, 1042150, 1042238,
+  1042260, 1042270, 1042287, 1050125, 1050146, 1050152, 1050158, 1050304,
+  1051139, 1051170, 1051173, 1051180, 1051372, 1052067, 1052172, 1052183,
+  1060119, 1062035, 1062171, 1062174, 1062185, 1072199, 1072200, 1072330,
+  1072331, 1072332, 1072379, 1072529, 1072876, 1072910, 1082157, 1082171,
+  1082565, 1082581, 1082633, 1102005, 1102006, 1102093, 1102098, 1102137,
+  1102150, 1112113, 1112135, 1112238, 1702036, 1702405, 1702445, 1702468,
+  1702477, 1702478, 1702806,
 ]);
+
+/** Cosmetics that exist only in MCW/1 (catalog src MCW1): GMS 270 holds different
+ *  items under these ids. Hair is keyed by style (id / 10, any color); faces by
+ *  their base id (family base + style, any eye color). */
+export const MCW1_HAIR_STYLES: ReadonlySet<number> = new Set([3086, 3087, 3088, 3183, 3184, 3185]);
+export const MCW1_FACE_IDS: ReadonlySet<number> = new Set([20028, 20029, 21030, 21031, 21032, 21033]);
 
 /** Region routing for a single numeric asset id. Handles every hair color
  *  variant (style * 10 + 0-7), every eye color (base + color * 100 + style),
@@ -46,6 +56,10 @@ export function ogSourceFor(itemId: number): OgSource {
     Number.isInteger(itemId) &&
     ((itemId >= 30000 && itemId < 50000) || (itemId >= 20000 && itemId < 22000))
   ) {
+    const isFace = itemId < 30000;
+    if (isFace ? MCW1_FACE_IDS.has((itemId >= 21000 ? 21000 : 20000) + (itemId % 100)) : MCW1_HAIR_STYLES.has(Math.floor(itemId / 10))) {
+      return { region: 'MCW', version: '1' };
+    }
     return { region: 'GMS', version: '270' };
   }
   if (GMS_EQUIP_IDS.has(itemId)) {

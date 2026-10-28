@@ -191,7 +191,7 @@
 .name-input:focus { outline: none; border-color: var(--accent); }
 .randomizer-options summary { cursor: pointer; color: var(--dim); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
 .randomizer-options[open] summary { margin-bottom: 4px; }
-.frame-num { min-width: 16px; text-align: center; }
+.setrow .frame-num { min-width: 0; text-align: center; white-space: nowrap; font-size: 13px; font-weight: 500; text-transform: none; letter-spacing: 0; }
 .settings-actions { display: flex; gap: 8px; }
 .settings-actions button { flex: 1; min-height: 40px; border: 0; border-radius: 10px; background: var(--surface-2); color: var(--txt); font: inherit; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
 .settings-actions button.primary { background: var(--accent); color: #1a1205; }
@@ -220,7 +220,7 @@
 .seg { display: flex; background: var(--surface-2); border-radius: 10px; padding: 2px; gap: 2px; flex: 1; }
 .seg button { flex: 1; min-height: 32px; }
 .seg button.on { background: var(--surface); color: var(--txt); box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
-.setrow select { appearance: none; }
+.setrow select { appearance: none; flex: 1 1 0; min-width: 0; }
 .setrow .class-weapon { color: var(--dim); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px; }
 #skins { display: flex; gap: 8px; align-items: center; }
 #skins button {
@@ -1154,6 +1154,7 @@
   font-size: 10px;
 }
 .banner-status-badge.active { background: rgba(46, 204, 113, 0.2); color: #2ecc71; border: 1px solid rgba(46, 204, 113, 0.35); }
+.banner-status-badge.upcoming { background: rgba(155, 120, 255, 0.18); color: #b79cff; border: 1px solid rgba(155, 120, 255, 0.35); }
 .banner-status-badge.ended { background: rgba(255, 255, 255, 0.08); color: var(--dim); border: 1px solid rgba(255, 255, 255, 0.12); }
 .banner-dates { color: var(--dim); font-size: 10.5px; }
 
@@ -1581,4 +1582,52 @@
 @media (max-width: 899px) and (orientation: landscape) {
   #stage { height: 52dvh; }
   #canvas { max-width: min(260px, 48dvh); }
+}
+
+/* ── Drop announcements ── */
+.drops-scrim { position: fixed; inset: 0; background: rgba(0,0,0,0.55); backdrop-filter: blur(2px); z-index: 60; animation: drops-fade 0.2s ease-out; }
+.drops-modal {
+  position: fixed; z-index: 61; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(460px, calc(100vw - 24px)); max-height: min(640px, calc(100dvh - 24px));
+  display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--line);
+  border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.6); overflow: hidden;
+  animation: drops-pop 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+.drops-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 16px 16px 10px; background: linear-gradient(180deg, var(--accent-soft), transparent); }
+.drops-head h2 { margin: 0; font-size: 18px; font-weight: 800; }
+.drops-head p { margin: 2px 0 0; color: var(--dim); font-size: 12.5px; }
+.drops-x { flex: none; width: 30px; height: 30px; border: 0; border-radius: 8px; background: var(--surface-2); color: var(--dim); font-size: 14px; cursor: pointer; }
+.drops-x:hover { color: var(--txt); }
+.drops-list { overflow-y: auto; padding: 4px 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+.drops-card { border: 1px solid var(--line); border-radius: 12px; background: var(--surface-2); padding: 12px; }
+.drops-card.upcoming { border-color: rgba(155,120,255,0.4); }
+.drops-card.live { border-color: rgba(46,204,113,0.4); }
+.drops-card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.drops-type { font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--dim); }
+.drops-pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.drops-pill i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; animation: drops-pulse 1.4s ease-in-out infinite; }
+.drops-pill.upcoming { background: rgba(155,120,255,0.18); color: #b79cff; }
+.drops-pill.live { background: rgba(46,204,113,0.18); color: #2ecc71; }
+.drops-card h3 { margin: 6px 0 0; font-size: 15px; font-weight: 700; }
+.drops-note { margin: 2px 0 0; color: var(--dim); font-size: 11.5px; }
+.drops-preview { display: flex; align-items: center; gap: 4px; margin-top: 10px; flex-wrap: wrap; }
+.drops-preview img { width: 36px; height: 36px; object-fit: contain; image-rendering: pixelated; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 2px; }
+.drops-more { color: var(--dim); font-size: 11px; font-weight: 700; padding: 0 4px; }
+.drops-actions { display: flex; gap: 8px; margin-top: 12px; }
+.drops-actions button { min-height: 38px; border: 0; border-radius: 10px; font: inherit; font-weight: 700; cursor: pointer; }
+.drops-try { flex: 1; background: var(--accent); color: #1a1205; }
+.drops-try:hover { filter: brightness(1.08); }
+.drops-all { background: transparent; color: var(--dim); padding: 0 10px; }
+.drops-all:hover { color: var(--txt); }
+.drops-chip { position: relative; padding-left: 8px; padding-right: 8px; min-width: 0; }
+.drops-chip .drops-dot { position: absolute; top: -2px; right: -2px; width: 9px; height: 9px; border-radius: 50%; background: #ff5a5f; border: 2px solid var(--bg); animation: drops-pulse 1.4s ease-in-out infinite; }
+.banner-status-badge.upcoming { background: rgba(155,120,255,0.18); }
+.tile .tile-expiration.new, .tile.on .tile-expiration.new { background: #2ecc71; border-color: #2ecc71; color: #04210f !important; }
+.tile .tile-expiration.soon, .tile.on .tile-expiration.soon { background: #ff6b5e; border-color: #ff6b5e; color: #2a0500 !important; }
+.tile .tile-expiration.upcoming, .tile.on .tile-expiration.upcoming { background: #9b78ff; border-color: #9b78ff; color: #120a2e !important; }
+@keyframes drops-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes drops-pop { from { opacity: 0; transform: translate(-50%, -46%) scale(0.96); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
+@keyframes drops-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.45; transform: scale(0.8); } }
+@media (prefers-reduced-motion: reduce) {
+  .drops-scrim, .drops-modal, .drops-pill i, .drops-chip .drops-dot { animation: none; }
 }

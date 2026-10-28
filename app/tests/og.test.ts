@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import catalogData from '../src/data/catalog.json';
-import { crawlerRenderURL, GMS_EQUIP_IDS, ogSourceFor, parseLookParams } from '../src/lib/og';
+import { crawlerRenderURL, GMS_EQUIP_IDS, MCW1_FACE_IDS, MCW1_HAIR_STYLES, ogSourceFor, parseLookParams } from '../src/lib/og';
 import { encodeLook, faceVariantId, type Look } from '../src/lib/fashion';
 function entriesOf(url: string): Array<{ itemId: number; region: string; version: string }> {
   const u = new URL(url);
@@ -106,4 +106,20 @@ test('og routing mirrors catalog src for every GMS equip', () => {
   for (const id of [1050146, 1051170]) {
     assert.deepEqual(ogSourceFor(id), { region: 'GMS', version: '270' });
   }
+});
+
+test('og routing mirrors catalog src for MCW/1-only cosmetics', () => {
+  const styles = catalogData.styles as Record<string, { src?: string }>;
+  const items = catalogData.items as Record<string, { src?: string; sub: string }>;
+  const hair = Object.keys(styles).map(Number).filter((id) => styles[String(id)]?.src === 'MCW1');
+  const faces = Object.keys(items).map(Number).filter((id) => items[String(id)]?.src === 'MCW1');
+  assert.ok(hair.length > 0 && faces.length > 0, 'expected MCW1 cosmetics in catalog');
+  assert.deepEqual([...MCW1_HAIR_STYLES].sort(), hair.sort());
+  assert.deepEqual([...MCW1_FACE_IDS].sort(), faces.sort());
+  // Any color variant routes MCW/1; neighbours stay on GMS 270.
+  assert.deepEqual(ogSourceFor(30863), { region: 'MCW', version: '1' });
+  assert.deepEqual(ogSourceFor(20328), { region: 'MCW', version: '1' });
+  assert.deepEqual(ogSourceFor(21630), { region: 'MCW', version: '1' });
+  assert.deepEqual(ogSourceFor(30130), { region: 'GMS', version: '270' });
+  assert.deepEqual(ogSourceFor(20805), { region: 'GMS', version: '270' });
 });

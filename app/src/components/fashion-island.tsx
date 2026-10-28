@@ -32,8 +32,10 @@ import {
   randomLook,
   stanceForWeapon,
   TWO_HAND_SUBS,
+  weaponPoses,
   weaponSubOf,
   RANDOM_EQUIP_SLOTS,
+  type BannerMeta,
   type ItemMeta,
   type RandomEquipSlot,
   type ResolvedItem,
@@ -46,8 +48,11 @@ import {
 import catalogData from '../data/catalog.json';
 import LayeredCharacterCanvas from './layered-character-canvas';
 import GamePad from './game-pad';
+import DropModal, { type DropEntry } from './drop-modal';
+import { announcements, dropInfo, loadSeen, saveSeen, unseen } from '../lib/drops';
 import { autoSwipeLevel } from '../lib/afterimage';
 import { PlayController, PLAY_POSES, SPRITE_CANVAS } from '../lib/play-controller';
+import { ATTACK_FRAMES } from '../lib/skills';
 import { warmPoses } from '../lib/layered-client-renderer';
 import './fashion.css';
 
@@ -75,7 +80,6 @@ const AVATAR_PX = 44;
 // Head-and-shoulders crop, in the centered 128px box of the sprite canvas.
 const AVATAR_INSET = (SPRITE_CANVAS - 128) / 2;
 const AVATAR_CROP = { x: AVATAR_INSET + 34, y: AVATAR_INSET + 20, size: 60 };
-const ANIMS = ['stand1', 'stand2', 'alert', 'jump'];
 const EQUIP_SECTIONS = [
   { id: 'Hat', label: 'Hats' },
   { id: 'Top', label: 'Shirts' },
@@ -100,6 +104,19 @@ function daysUntil(isoDate: string): number {
   const todayUTC = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
   const targetUTC = Date.UTC(y, m - 1, d);
   return Math.round((targetUTC - todayUTC) / (1000 * 60 * 60 * 24));
+}
+/** Sale phase from the exact start/end instants: a future start is Upcoming, not Active. */
+function bannerPhase(banner: BannerMeta): { statusText: string; isActive: boolean; isUpcoming: boolean } {
+  const info = dropInfo(banner, Date.now());
+  if (info.state === 'upcoming') {
+    return { statusText: `Upcoming · starts ${shortDate(banner.start!)}`, isActive: false, isUpcoming: true };
+  }
+  const days = info.endsInMs != null ? Math.ceil(info.endsInMs / 86_400_000) : null;
+  return {
+    statusText: info.state === 'ended' ? 'Ended' : days != null && days > 1 ? `Active · ${days}d left` : days != null ? 'Ends today' : 'Active',
+    isActive: info.state === 'live',
+    isUpcoming: false,
+  };
 }
 function formatCountdown(isoDate: string | null | undefined, attainable?: boolean): string | null {
   if (attainable === false || !isoDate) return null;
@@ -401,7 +418,7 @@ export default function FashionIsland() {
   );
 
   const equipSections = useMemo(() => {
-    const ids = [...new Set(['founder-crate', 'mystery-crate', 'aurora-crate', 'cover-10day', 'classic-equips', 'unreleased'].flatMap(getGroupEquips))]
+    const ids = [...new Set(['founder-crate', 'halloween-crate', 'mystery-crate', 'aurora-crate', 'cover-10day', 'classic-equips', 'unreleased'].flatMap(getGroupEquips))]
       .filter((id) => !!CATALOG.items[id]);
     return EQUIP_SECTIONS.map((section) => ({
       ...section,
@@ -524,8 +541,8 @@ export default function FashionIsland() {
       buckets.set(key, list);
     }
     const order = job !== 'All'
-      ? ['classic-equips', 'founder-crate', 'mystery-crate', 'cover-10day', 'aurora-crate', 'unreleased', 'off-job']
-      : ['founder-crate', 'mystery-crate', 'cover-10day', 'aurora-crate', 'classic-equips', 'unreleased'];
+      ? ['classic-equips', 'founder-crate', 'halloween-crate', 'mystery-crate', 'cover-10day', 'aurora-crate', 'unreleased', 'off-job']
+      : ['founder-crate', 'halloween-crate', 'mystery-crate', 'cover-10day', 'aurora-crate', 'classic-equips', 'unreleased'];
     const groups = order
       .filter((key) => (buckets.get(key)?.length ?? 0) > 0)
       .map((key) => {
@@ -534,6 +551,7 @@ export default function FashionIsland() {
         const banner = getBanner(CATALOG, bannerId);
         const dates = banner?.start && banner?.end ? ` · ${shortDate(banner.start)}–${shortDate(banner.end)}` : '';
         const label = key === 'founder-crate' ? "Founder's Mystery Crate"
+          : key === 'halloween-crate' ? 'Halloween Mystery Crate'
           : key === 'mystery-crate' ? 'Mystery Fashion Crate'
           : key === 'cover-10day' ? '10-Day Covers'
           : key === 'aurora-crate' ? 'Aurora Stamp Shop'
@@ -682,6 +700,7 @@ export default function FashionIsland() {
       daysLeft: number | null;
       statusText: string;
       isActive: boolean;
+      isUpcoming?: boolean;
       items: Array<{ id: number; name: string; sub: string; rate?: string; isHair?: boolean; sex?: 'm' | 'f' | 'u'; sexMismatch?: number }>;
     }> = [];
 
@@ -720,6 +739,26 @@ export default function FashionIsland() {
       }
       return paired;
     };
+    // 0. Halloween Mystery Fashion Crate
+    const hc = CATALOG.banners['halloween-crate-oct26'];
+    if (hc) {
+      const days = getDays(hc.end);
+      list.push({
+        id: hc.id,
+        label: hc.label,
+        type: 'crate',
+        typeLabel: 'Halloween Crate',
+        start: hc.start,
+        end: hc.end,
+        note: hc.note,
+        post: hc.post,
+        rates: hc.rates,
+        daysLeft: days,
+        ...bannerPhase(hc),
+        items: crateItems('halloween-crate'),
+      });
+    }
+
     // 1. Mystery Fashion Crate
     const mc = CATALOG.banners['mystery-crate-nov26'];
     if (mc) {
@@ -735,8 +774,7 @@ export default function FashionIsland() {
         post: mc.post,
         rates: mc.rates,
         daysLeft: days,
-        statusText: days != null && days > 0 ? `Active · ${days}d left` : days === 0 ? 'Ends today' : 'Ended',
-        isActive: days != null && days >= 0,
+        ...bannerPhase(mc),
         items: crateItems('mystery-crate'),
       });
     }
@@ -756,14 +794,13 @@ export default function FashionIsland() {
         post: fc.post,
         rates: fc.rates,
         daysLeft: days,
-        statusText: days != null && days > 0 ? `Active · ${days}d left` : days === 0 ? 'Ends today' : 'Ended',
-        isActive: days != null && days >= 0,
+        ...bannerPhase(fc),
         items: crateItems('founder-crate'),
       });
     }
 
     // 3. Style Coupons
-    const sc = CATALOG.banners['style-oct26'];
+    const sc = CATALOG.banners['style-oct28'];
     if (sc) {
       const days = getDays(sc.end);
       const items: Array<{ id: number; name: string; sub: string; rate?: string; isHair?: boolean; sex?: 'm' | 'f' | 'u'; sexMismatch?: number }> = [];
@@ -802,8 +839,7 @@ export default function FashionIsland() {
         post: sc.post,
         rates: sc.rates,
         daysLeft: days,
-        statusText: days != null && days > 0 ? `Active · ${days}d left` : days === 0 ? 'Ends today' : 'Ended',
-        isActive: days != null && days >= 0,
+        ...bannerPhase(sc),
         items,
       });
     }
@@ -823,8 +859,7 @@ export default function FashionIsland() {
         post: au.post,
         rates: au.rates,
         daysLeft: days,
-        statusText: days != null && days > 0 ? `Active · ${days}d left` : days === 0 ? 'Ends today' : 'Ended',
-        isActive: days != null && days >= 0,
+        ...bannerPhase(au),
         items: crateItems('aurora-crate'),
       });
     }
@@ -843,19 +878,19 @@ export default function FashionIsland() {
         note: cv.note,
         post: cv.post,
         daysLeft: days,
-        statusText: days != null && days > 0 ? `Active · ${days}d left` : days === 0 ? 'Ends today' : 'Ended',
-        isActive: days != null && days >= 0,
+        ...bannerPhase(cv),
         items: crateItems('cover-10day'),
       });
     }
 
-    // 6. Past Style Rotation
-    const beta = CATALOG.banners['beta-style-sep26'];
-    if (beta) {
+    // 6. Past Style Rotations (newest first)
+    for (const pastId of ['style-oct26', 'beta-style-sep26']) {
+      const beta = CATALOG.banners[pastId];
+      if (!beta) continue;
       const items: Array<{ id: number; name: string; sub: string; rate?: string; isHair?: boolean; sex?: 'm' | 'f' | 'u'; sexMismatch?: number }> = [];
       for (const hId of pastHairStyles) {
         const meta = getStyle(CATALOG, hId);
-        if (meta) items.push({
+        if (meta?.bannerId === beta.id) items.push({
           id: hId,
           name: meta.name,
           sub: 'Hair',
@@ -867,7 +902,7 @@ export default function FashionIsland() {
       }
       for (const fId of pastFaces) {
         const meta = getItem(CATALOG, fId);
-        if (meta) items.push({
+        if (meta?.bannerId === beta.id) items.push({
           id: fId,
           name: meta.name,
           sub: 'Face',
@@ -892,16 +927,17 @@ export default function FashionIsland() {
       });
     }
 
+    const phaseRank = (c: { isActive: boolean; isUpcoming?: boolean }) => (c.isActive ? 0 : c.isUpcoming ? 1 : 2);
     return list.sort((a, b) => {
       if (bannerSort === 'crates-first') {
         const isCrateA = a.type === 'crate' ? 0 : 1;
         const isCrateB = b.type === 'crate' ? 0 : 1;
         if (isCrateA !== isCrateB) return isCrateA - isCrateB;
-        if (a.isActive !== b.isActive) return Number(b.isActive) - Number(a.isActive);
+        if (phaseRank(a) !== phaseRank(b)) return phaseRank(a) - phaseRank(b);
         return (a.daysLeft ?? 999) - (b.daysLeft ?? 999);
       }
       if (bannerSort === 'date-asc') {
-        if (a.isActive !== b.isActive) return Number(b.isActive) - Number(a.isActive);
+        if (phaseRank(a) !== phaseRank(b)) return phaseRank(a) - phaseRank(b);
         return (a.daysLeft ?? 999) - (b.daysLeft ?? 999);
       }
       if (bannerSort === 'date-desc') {
@@ -934,6 +970,60 @@ export default function FashionIsland() {
   const [undoLook, setUndoLook] = useState<Look | null>(null);
   const lookSnapshotRef = useRef<Look>(look);
   const saveUndo = useCallback(() => setUndoLook(lookSnapshotRef.current), []);
+
+  // Announcements: a modal on first visit (and whenever a banner changes state,
+  // e.g. goes live), reopenable from the header chip. Client-only: it depends on the clock.
+  const [dropNow, setDropNow] = useState<number | null>(null);
+  const [dropsOpen, setDropsOpen] = useState(false);
+  const [dropsUnseen, setDropsUnseen] = useState(false);
+  useEffect(() => setDropNow(Date.now()), []);
+  const drops = useMemo(() => {
+    if (dropNow == null) return [];
+    const byId = new Map(bannerCards.filter((c) => c.type === 'crate' || c.type === 'style-coupon').map((c) => [c.id, c]));
+    return announcements([...byId.keys()].flatMap((id) => CATALOG.banners[id] ?? []), dropNow);
+  }, [dropNow, bannerCards]);
+  const dropEntries = useMemo<DropEntry[]>(() => {
+    const byId = new Map(bannerCards.map((c) => [c.id, c]));
+    return drops.flatMap(({ banner }) => {
+      const card = byId.get(banner.id);
+      if (!card || (card.type !== 'crate' && card.type !== 'style-coupon')) return [];
+      return [{ banner, typeLabel: card.typeLabel, kind: card.type, items: card.items }];
+    });
+  }, [drops, bannerCards]);
+  const dropsAutoOpened = useRef(false);
+  useEffect(() => {
+    if (dropNow == null || dropsAutoOpened.current || !drops.length) return;
+    dropsAutoOpened.current = true;
+    const fresh = unseen(drops, loadSeen());
+    setDropsUnseen(fresh.length > 0);
+    if (fresh.length) setDropsOpen(true);
+  }, [dropNow, drops]);
+  const closeDrops = useCallback(() => {
+    saveSeen(drops);
+    setDropsOpen(false);
+    setDropsUnseen(false);
+  }, [drops]);
+  const tryDrop = useCallback((entry: DropEntry) => {
+    saveUndo();
+    if (entry.kind === 'crate') {
+      tryOnCrate(entry.items);
+    } else {
+      const fits = (i: DropEntry['items'][number]) => !i.sex || i.sex === 'u' || i.sex === look.sex;
+      const pick = <T,>(list: T[]): T | undefined => list[Math.floor(Math.random() * list.length)];
+      const hair = pick(entry.items.filter((i) => i.isHair && fits(i)));
+      const face = pick(entry.items.filter((i) => i.sub === 'Face' && fits(i)));
+      patch({
+        ...(hair ? { hair: hair.id * 10 + look.hairCol } : {}),
+        ...(face ? { face: faceVariantId(look.sex, faceStyleId(face.id), faceColorIndex(look.face)) } : {}),
+      });
+    }
+    closeDrops();
+  }, [closeDrops, look.sex, look.hairCol, look.face, patch, saveUndo, tryOnCrate]);
+  const openDrop = useCallback((entry: DropEntry) => {
+    closeDrops();
+    setViewTab(entry.kind === 'crate' ? 'crates' : 'styles');
+    window.setTimeout(() => document.getElementById(`banner-title-${entry.banner.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
+  }, [closeDrops]);
   useEffect(() => { lookSnapshotRef.current = look; }, [look]);
   useEffect(() => {
     if (!undoLook) return;
@@ -977,6 +1067,11 @@ export default function FashionIsland() {
     .map(([k, v]) => ({ slot: k, id: v, meta: getItem(CATALOG, v) }));
 
   // Collect any non-attainable worn items
+  const poses = weaponPoses(weaponSubOf(getItem(CATALOG, look.items.Weapon)));
+  // Keep a pose the worn weapon lacks (stale shared link) selectable instead of a blank picker.
+  if (!poses.some((p) => p.anim === look.anim)) poses.push({ anim: look.anim, label: look.anim });
+  const frameCount = look.anim === 'jump' ? 1 : look.anim in ATTACK_FRAMES ? ATTACK_FRAMES[look.anim]! : look.anim.startsWith('stand') ? 3 : Infinity;
+  const maxFrame = frameCount - 1;
   const unattainableWorn = [
     hairMeta && !hairMeta.attainable ? { type: 'Hair', id: look.hair, meta: hairMeta } : null,
     faceMeta && !faceMeta.attainable ? { type: 'Face', id: look.face, meta: faceMeta } : null,
@@ -1153,6 +1248,8 @@ export default function FashionIsland() {
         ? 'Face'
         : catSec === 'founder-crate'
           ? "Founder's Crate"
+          : catSec === 'halloween-crate'
+            ? 'Halloween Crate'
           : catSec === 'mystery-crate'
             ? 'Mystery Crate'
           : catSec === 'aurora-crate'
@@ -1209,6 +1306,9 @@ export default function FashionIsland() {
         </div>
         </div>
       {controller && <GamePad controller={controller} onExit={stopPlay} />}
+      {dropsOpen && dropEntries.length > 0 && (
+        <DropModal entries={dropEntries} onTry={tryDrop} onOpen={openDrop} onClose={closeDrops} />
+      )}
       {settingsOpen && (
         <div className="settings-scrim" aria-hidden="true" onClick={() => setSettingsOpen(false)} />
       )}
@@ -1238,13 +1338,11 @@ export default function FashionIsland() {
             <div className="setrow">
               <span>pose</span>
               <select value={look.anim} onChange={(e) => patch({ anim: e.target.value, frame: 0 })} aria-label="Pose">
-                {ANIMS.map((a) => (
-                  <option key={a} value={a}>{({ stand1: 'Standing', stand2: 'Standing (weapon)', alert: 'Alert', jump: 'Jumping' } as Record<string, string>)[a] ?? a}</option>
-                ))}
+                {poses.map((p) => <option key={p.anim} value={p.anim}>{p.label}</option>)}
               </select>
               <button onClick={() => patch({ frame: Math.max(0, look.frame - 1) })} aria-label="Previous frame">‹</button>
-              <span className="frame-num">{look.frame}</span>
-              <button onClick={() => patch({ frame: look.frame + 1 })} aria-label="Next frame">›</button>
+              <span className="frame-num">{Number.isFinite(frameCount) ? `Frame ${look.frame + 1}/${frameCount}` : `Frame ${look.frame + 1}`}</span>
+              <button onClick={() => patch({ frame: Math.min(maxFrame, look.frame + 1) })} aria-label="Next frame">›</button>
             </div>
           </section>
           <details className="set-card randomizer-options">
@@ -1282,6 +1380,12 @@ export default function FashionIsland() {
                 <a className="site-credit" href="https://builtby.win/ston" target="_blank" rel="noopener noreferrer">by ston</a>
               </div>
               <div className="rail-head-actions">
+                {drops.length > 0 && (
+                  <button type="button" className="rail-head-btn drops-chip" onClick={() => setDropsOpen(true)} aria-label="What's new" title="What's new">
+                    <span aria-hidden="true">✨</span>
+                    {dropsUnseen && <i className="drops-dot" aria-hidden="true" />}
+                  </button>
+                )}
                 <div className="view-menu-wrap" ref={viewMenuRef}>
                   <button
                     type="button"
@@ -1505,7 +1609,7 @@ export default function FashionIsland() {
                     <div className="banner-head-main">
                       <div className="banner-badge-row">
                         <span className={`banner-type-badge ${card.type}`}>{card.typeLabel}</span>
-                        <span className={`banner-status-badge ${card.isActive ? 'active' : 'ended'}`}>
+                        <span className={`banner-status-badge ${card.isActive ? 'active' : card.isUpcoming ? 'upcoming' : 'ended'}`}>
                           {card.statusText}
                         </span>
                         {card.start && card.end && (
@@ -1996,15 +2100,21 @@ function Tile(props: {
   const isUnreleased = props.bannerId === 'unreleased';
   // Only choice-based acquisition gets a method badge. Random/mystery is the
   // default and the % badge already signals chance, so no dice badge.
-  const randomOnly = props.coupon === 'mystery' || props.bannerId === 'founder-crate-oct26' || props.bannerId === 'mystery-crate-nov26' || props.bannerId === 'beta-style-sep26';
+  const randomOnly = props.coupon === 'mystery' || props.bannerId === 'founder-crate-oct26' || props.bannerId === 'mystery-crate-nov26' || props.bannerId === 'halloween-crate-oct26' || props.bannerId === 'beta-style-sep26';
   const showSelect = !randomOnly && (props.coupon === 'signature' || !!banner);
   const isCover = props.bannerId === 'covers-10day-nov26';
-  const expiration = isCover
+  const drop = banner ? dropInfo(banner, Date.now()) : null;
+  const upcoming = drop?.state === 'upcoming';
+  const isNew = !!drop?.isNew && !notAttainable;
+  const endingSoon = !!drop?.endingSoon && !notAttainable;
+  const expiration = upcoming
+    ? `Upcoming · starts ${banner!.start}`
+    : isCover
     ? `10-day duration · sale ends ${banner?.end ?? 'Nov 18'}`
     : banner?.end
       ? `${notAttainable ? 'Expired' : 'Available until'} ${banner.end}`
       : notAttainable ? 'Not currently attainable' : undefined;
-  const countdown = formatCountdown(banner?.end, props.attainable);
+  const countdown = upcoming ? null : isNew ? 'NEW' : formatCountdown(banner?.end, props.attainable);
   const hasBadges = Boolean(expiration || (props.gender && props.gender !== 'u') || showSelect);
 
   return (
@@ -2059,7 +2169,7 @@ function Tile(props: {
                 UNRELEASED
               </span>
             ) : expiration && (
-              <span suppressHydrationWarning className={'tile-badge tile-expiration' + (notAttainable ? ' expired' : '')} role="img" aria-label={expiration} title={[expiration, props.lastText].filter(Boolean).join(' · ')}>
+              <span suppressHydrationWarning className={'tile-badge tile-expiration' + (notAttainable ? ' expired' : upcoming ? ' upcoming' : isNew ? ' new' : endingSoon ? ' soon' : '')} role="img" aria-label={expiration} title={[expiration, props.lastText].filter(Boolean).join(' · ')}>
                 {notAttainable || !countdown ? (
                   <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="8" cy="8" r="6" /><path d="M8 4v4l3 2" strokeLinecap="round" /></svg>
                 ) : (

@@ -12,6 +12,7 @@ Item icons are not baked into the repo. `iconURL(id)` in `app/src/lib/fashion.ts
 |---|---|
 | `MCW` (default), non-cosmetic `OSMS` | `MCW/CBT2` |
 | `GMS`, OSMS hair | `GMS/270` |
+| `MCW1` hair | `MCW/1` (no fallback: other sources hold different items at these ids) |
 | OSMS face | baked locally in `public/sprites/faces/` |
 
 Not every region/version ships every icon. A 404 shows as the browser's broken-image glyph.
