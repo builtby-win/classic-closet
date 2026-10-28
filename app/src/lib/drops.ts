@@ -82,6 +82,17 @@ export function announcements<T extends Dated>(banners: T[], now: number): Array
     || (a.info.state === 'live' ? (a.info.endsInMs ?? 0) - (b.info.endsInMs ?? 0) : a.info.startsInMs! - b.info.startsInMs!));
 }
 
+/** Whether an item can be bought right now. The sale window wins over the baked
+ *  flag, so a banner archived early still reads live until its end instant, and a
+ *  lapsed one reads expired without a redeploy. Banners without dates keep the flag. */
+export function attainableNow(attainable: boolean, banner: Dated | undefined, now: number): boolean {
+  if (!banner) return attainable;
+  const { start, end } = bannerWindow(banner);
+  if (start == null && end == null) return attainable;
+  const { state } = dropInfo(banner, now);
+  return state === 'live' ? true : state === 'ended' ? false : attainable;
+}
+
 /** Seen map: banner id → the state the visitor last saw it in, so going live re-announces it. */
 export type SeenMap = Record<string, DropState>;
 export const SEEN_KEY = 'classic-closet:drops-seen';

@@ -1,4 +1,5 @@
 import catalogData from '../data/catalog.json';
+import { attainableNow, dropInfo } from './drops';
 // Shared domain model for the fashion customizer.
 // Rendering is 100% remote (maplestory.io); this lib builds URLs + filters the baked catalog.
 
@@ -751,6 +752,7 @@ export function getBanner(catalog: FastCatalog, bannerId?: string): BannerMeta |
 export function formatAttainableInfo(
   catalog: FastCatalog,
   itemId: number | null | undefined,
+  now: number = Date.now(),
 ): {
   isAttainable: boolean;
   statusText: string;
@@ -768,11 +770,12 @@ export function formatAttainableInfo(
     return { isAttainable: false, statusText: 'Not released yet', bannerLabel: 'Not released yet' };
   }
   const banner = getBanner(catalog, item.bannerId);
-  if (item.attainable) {
+  if (attainableNow(item.attainable, banner, now)) {
     const end = banner?.end;
+    const upcoming = !!banner && dropInfo(banner, now).state === 'upcoming';
     return {
       isAttainable: true,
-      statusText: end ? `Ends ${end.slice(5)}` : 'Active',
+      statusText: upcoming && banner?.start ? `Starts ${banner.start.slice(5)}` : end ? `Ends ${end.slice(5)}` : 'Active',
       dateRangeText: banner?.start && banner?.end ? `${banner.start} – ${banner.end}` : undefined,
       bannerLabel: banner?.label,
     };

@@ -189,11 +189,11 @@ test('Puppy Eyes Face is active, attainable, and properly resolved across eye co
   assert.ok(catalog.indexes.faces.m.active.includes(20029));
 
   // Resolved across eye colors (e.g. 20329 with colored eyes)
-  const infoBlack = formatAttainableInfo(catalog as any, 20029);
+  const infoBlack = formatAttainableInfo(catalog as any, 20029, Date.parse('2026-10-30T00:00:00Z'));
   assert.equal(infoBlack.isAttainable, true);
   assert.equal(infoBlack.bannerLabel, 'Mystery & Signature Style Coupons');
 
-  const infoColored = formatAttainableInfo(catalog as any, 20329);
+  const infoColored = formatAttainableInfo(catalog as any, 20329, Date.parse('2026-10-30T00:00:00Z'));
   assert.equal(infoColored.isAttainable, true);
   assert.equal(infoColored.bannerLabel, 'Mystery & Signature Style Coupons');
 });
@@ -205,6 +205,15 @@ test('MCW/1-only cosmetics render and icon from MCW/1', () => {
   assert.equal(iconURL(30860), 'https://maplestory.io/api/MCW/1/item/30860/icon');
   assert.equal(iconURL(20028), '/sprites/faces/20028.png');
   assert.equal(iconFallbackURL('https://maplestory.io/api/MCW/1/item/30860/icon'), null);
+});
+
+test('rotated-out Alert Face still reads live until the old lineup ends at 08:00 UTC', () => {
+  const before = formatAttainableInfo(catalog as any, 20805, Date.parse('2026-10-28T07:59:00Z'));
+  assert.equal(before.isAttainable, true);
+  assert.equal(before.statusText, 'Ends 10-28');
+  const after = formatAttainableInfo(catalog as any, 20805, Date.parse('2026-10-28T08:00:00Z'));
+  assert.equal(after.isAttainable, false);
+  assert.equal(after.statusText, 'Not Attainable');
 });
 
 test('rotated-out Alert Face is a past rotation', () => {

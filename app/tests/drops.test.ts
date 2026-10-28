@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { announcements, dropInfo, formatDuration, unseen } from '../src/lib/drops';
+import { announcements, attainableNow, dropInfo, formatDuration, unseen } from '../src/lib/drops';
 
 const halloween = { id: 'h', start: '2026-10-28', end: '2026-11-04', startAt: '2026-10-28T08:00:00Z', endAt: '2026-11-04T08:00:00Z' };
 const older = { id: 'o', start: '2026-10-06', end: '2026-11-18', endAt: '2026-11-18T18:00:00Z' };
@@ -45,4 +45,17 @@ test('a banner is re-announced when its state changes', () => {
   assert.equal(unseen(before, { h: 'upcoming' }).length, 0);
   const after = announcements([halloween], T('2026-10-28T08:01:00Z'));
   assert.equal(unseen(after, { h: 'upcoming' }).length, 1);
+});
+
+test('attainableNow: the sale window beats the baked flag', () => {
+  // Archived early (flag false) but still on sale until the end instant.
+  const archived = { start: '2026-10-06', end: '2026-10-28', endAt: '2026-10-28T08:00:00Z' };
+  assert.equal(attainableNow(false, archived, T('2026-10-28T07:59:00Z')), true);
+  assert.equal(attainableNow(false, archived, T('2026-10-28T08:00:00Z')), false);
+  // Left in `current` past its end: lapses without a redeploy.
+  assert.equal(attainableNow(true, archived, T('2026-10-28T08:00:00Z')), false);
+  // Upcoming keeps the baked flag; undated banners and no banner are untouched.
+  assert.equal(attainableNow(true, halloween, T('2026-10-27T00:00:00Z')), true);
+  assert.equal(attainableNow(false, { start: null, end: null }, T('2026-10-27T00:00:00Z')), false);
+  assert.equal(attainableNow(true, undefined, T('2026-10-27T00:00:00Z')), true);
 });

@@ -809,9 +809,16 @@
 #slot-list { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 #drawer { overflow-y: auto; overscroll-behavior: contain; }
 #drawer > * { flex-shrink: 0; }
-#drawer-head { position: sticky; top: 0; z-index: 2; background: var(--surface); }
+#drawer-head { position: sticky; top: 0; z-index: 8; background: var(--surface); }
 .drawer-group-grid .tile { width: 100%; min-width: 0; }
-.rail-colors { display: flex; gap: 6px; overflow-x: auto; padding: 4px 3px 9px; }
+.rail-colors { display: flex; gap: 6px; overflow-x: auto; padding: 4px 3px 9px; scrollbar-width: none; }
+.rail-colors::-webkit-scrollbar { display: none; }
+/* Slim, low-contrast vertical scrollers that sit on the dark surface */
+#slot-list, #drawer, #scroll { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.16) transparent; }
+#slot-list::-webkit-scrollbar, #drawer::-webkit-scrollbar, #scroll::-webkit-scrollbar { width: 6px; }
+#slot-list::-webkit-scrollbar-track, #drawer::-webkit-scrollbar-track, #scroll::-webkit-scrollbar-track { background: transparent; }
+#slot-list::-webkit-scrollbar-thumb, #drawer::-webkit-scrollbar-thumb, #scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.16); border-radius: 3px; }
+#slot-list::-webkit-scrollbar-thumb:hover, #drawer::-webkit-scrollbar-thumb:hover, #scroll::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.28); }
 .rail-colors .color-swatch { flex: none; width: 26px; height: 26px; }
 .tile { transition: transform 0.15s; }
 .tile:not(.on) { border-color: var(--line); background: var(--surface-2); }
@@ -1543,8 +1550,9 @@
 
 /* ── Mobile optimization (≤899px): 44px targets, compact header, safe areas ── */
 @media (max-width: 899px) {
-  #stage { height: 36dvh; padding: 10px 12px; }
-  #canvas { max-width: min(300px, 34dvh); }
+  /* Extra top padding sits the character below the control row so tall hats and halos aren't clipped. */
+  #stage { height: calc(36dvh + 30px); padding: calc(40px + env(safe-area-inset-top)) 12px 6px; }
+  #canvas { max-width: min(300px, 31dvh); }
   #controls { top: calc(8px + env(safe-area-inset-top)); left: 10px; right: 10px; gap: 6px; }
   #avatar { width: 44px; height: 44px; }
   #controls .labeled-btn { height: 44px; min-width: 44px; padding: 0 9px; font-size: 11px; gap: 4px; }
@@ -1631,3 +1639,22 @@
 @media (prefers-reduced-motion: reduce) {
   .drops-scrim, .drops-modal, .drops-pill i, .drops-chip .drops-dot { animation: none; }
 }
+
+/* ── Crate quick filter ── */
+#crate-bar { display: flex; align-items: center; gap: 6px; padding: 6px 10px; flex: none; overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid var(--line); box-sizing: border-box; }
+#crate-bar::-webkit-scrollbar { display: none; }
+.crate-chip { flex: none; display: inline-flex; align-items: center; gap: 4px; min-height: 30px; padding: 4px 11px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface-2); color: var(--dim); font: inherit; font-size: 12px; font-weight: 700; white-space: nowrap; cursor: pointer; transition: all 0.12s ease; }
+.crate-chip:hover { color: var(--txt); }
+.crate-chip.on { background: var(--accent); border-color: var(--accent); color: #1a1205; }
+.crate-chip.upcoming:not(.on) { border-color: rgba(155,120,255,0.45); }
+.crate-chip-time { font-style: normal; font-size: 10px; font-weight: 800; padding: 1px 5px; border-radius: 999px; background: rgba(255,255,255,0.1); font-variant-numeric: tabular-nums; }
+.crate-chip.on .crate-chip-time { background: rgba(0,0,0,0.18); }
+.crate-chip-time.new { background: #2ecc71; color: #04210f; }
+.crate-chip-time.soon { background: #ff6b5e; color: #2a0500; }
+.crate-shuffle { margin-left: auto; color: var(--accent); border-color: rgba(245,166,35,0.45); }
+
+.brand-home { display: flex; align-items: center; gap: 8px; padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
+.brand-home:active { opacity: 0.7; }
+.slot-more { flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; width: 52px; height: 52px; border: 1px dashed var(--line); border-radius: 10px; background: transparent; color: var(--accent); font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; }
+.slot-more span { font-size: 9px; font-weight: 700; color: var(--dim); text-transform: uppercase; letter-spacing: 0.04em; }
+.slot-more:hover { border-color: var(--accent); }
