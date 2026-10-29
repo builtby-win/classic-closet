@@ -1456,6 +1456,7 @@ export default function PlaygroundIsland() {
               <button type="button" className={'pg-save' + (outfits.current ? ' on' : '')} onClick={toggleStar} aria-pressed={!!outfits.current}
                 aria-label={outfits.current ? 'Saved. Tap to remove' : 'Save this outfit'} title={outfits.current ? 'Saved. Tap to remove' : 'Save this outfit'}>
                 <svg viewBox="0 0 24 24" width="16" height="16" fill={outfits.current ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z" /></svg>
+                {outfits.current ? 'Saved' : 'Save'}
               </button>
             </div>
           )}

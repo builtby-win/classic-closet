@@ -519,6 +519,7 @@
 .tile.mismatch.on { opacity: 1; border-style: solid; }
 #drawer-color {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
   padding: 8px 16px;
@@ -526,8 +527,7 @@
   border-bottom: 1px solid var(--line);
 }
 #drawer-color-label { font-size: 12px; color: var(--dim); white-space: nowrap; }
-#drawer-color-band { display: flex; align-items: center; min-width: 0; padding: 0; flex: 1; gap: 8px; overflow-x: auto; scrollbar-width: none; }
-#drawer-color-band::-webkit-scrollbar { display: none; }
+#drawer-color-band { display: flex; flex-wrap: wrap; align-items: center; min-width: 0; padding: 3px 0; flex: 1 1 100%; gap: 8px; }
 #drawer-grid {
   overflow-y: auto;
   flex: 1;
