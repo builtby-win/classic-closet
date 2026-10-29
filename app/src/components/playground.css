@@ -3,7 +3,10 @@
 /* ── Under the character: ★ keeps the look; Compare only appears once it differs from where you started ── */
 /* Name stays exactly where the closet puts it; Save hangs off its right edge and never shifts it. */
 .name-row { pointer-events: none; }
-.name-row > button { pointer-events: auto; }
+.name-row > button, .name-row > input { pointer-events: auto; }
+/* The name tag is editable here: reset the button chrome, keep the tag look. */
+button.name-tag { border: 0; font-family: inherit; cursor: text; }
+input.name-tag.editing { width: 150px; border: 1px solid var(--accent); font-family: inherit; text-align: center; outline: none; cursor: text; }
 .pg-save { position: absolute; left: calc(100% + 8px); top: 50%; transform: translateY(-50%); display: inline-flex; align-items: center; justify-content: center; gap: 5px; height: 28px; padding: 0 11px 0 9px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--txt); font: 650 12px/1 inherit; font-family: inherit; white-space: nowrap; cursor: pointer; transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease; }
 .pg-save:hover { border-color: rgba(245,166,35,0.5); }
 .pg-save.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }

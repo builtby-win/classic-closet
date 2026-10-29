@@ -1062,6 +1062,7 @@ export default function PlaygroundIsland() {
   // Nothing is recorded while trying things on. Compare pins what you're wearing
   // as A, then B follows the live look as you keep trying things on.
   const outfits = useSavedOutfits(look);
+  const [editingName, setEditingName] = useState(false);
   const [pin, setPin] = useState<{ look: Look; name?: string } | null>(null);
   const comparing = pin !== null && !controller;
   /** Put an outfit on the character, keeping the current pose, emote and name. */
@@ -1511,7 +1512,12 @@ export default function PlaygroundIsland() {
           )}
           {!comparing && (
             <div className="name-row">
-              <span className={'name-tag' + (look.name ? '' : ' empty')}>{look.name ? String(look.name) : 'Your name'}</span>
+              {editingName
+                ? <input className="name-tag editing" autoFocus value={look.name ?? ''} maxLength={NAME_MAX} placeholder="Your name" aria-label="Your name" autoComplete="off" autoCorrect="off" spellCheck={false}
+                    onChange={(e) => patch({ name: cleanName(e.target.value) })}
+                    onBlur={() => setEditingName(false)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'Escape') e.currentTarget.blur(); }} />
+                : <button type="button" className={'name-tag' + (look.name ? '' : ' empty')} onClick={() => setEditingName(true)} title="Edit name">{look.name ? String(look.name) : 'Your name'}</button>}
               <button type="button" className={'pg-save' + (outfits.current ? ' on' : '')} onClick={toggleStar} aria-pressed={!!outfits.current}
                 aria-label={outfits.current ? 'Saved. Tap to remove' : 'Save this outfit'} title={outfits.current ? 'Saved. Tap to remove' : 'Save this outfit'}>
                 <svg viewBox="0 0 24 24" width="16" height="16" fill={outfits.current ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z" /></svg>
