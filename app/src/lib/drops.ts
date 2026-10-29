@@ -66,6 +66,17 @@ export function formatDuration(ms: number): string {
   return `${s}s`;
 }
 
+/** Countdown to the minute, no seconds: "1d 14h 20m", "7h 05m", "12m". */
+export function formatHM(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 60_000));
+  const d = Math.floor(total / 1440);
+  const h = Math.floor((total % 1440) / 60);
+  const m = total % 60;
+  if (d > 0) return `${d}d ${h}h ${m}m`;
+  if (h > 0) return `${h}h ${String(m).padStart(2, '0')}m`;
+  return m > 0 ? `${m}m` : '<1m';
+}
+
 export interface Announcement<T extends Dated> {
   banner: T;
   info: DropInfo;

@@ -632,7 +632,7 @@
 .tile.mini .tile-expiration.expired, .tile.mini.on .tile-expiration.expired { width: 14px; height: 14px; padding: 0; color: #2a0500 !important; }
 .tile-expiration svg { width: 12px; height: 12px; }
 .tile.mini .tile-expiration svg { width: 10px; height: 10px; }
-.tile-rate-badge, .tile.on .tile-rate-badge { position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%); font-size: 11px; font-weight: 800; letter-spacing: 0.02em; color: #fff; background: rgba(0,0,0,0.72); border: 1px solid rgba(255,255,255,0.22); border-radius: 999px; padding: 2px 8px; line-height: 1.5; white-space: nowrap; pointer-events: none; box-shadow: 0 1px 4px rgba(0,0,0,0.45); }
+.tile .tile-rate-badge, .tile.on .tile-rate-badge { position: absolute; top: auto; bottom: 2px; display: block; overflow: visible; -webkit-line-clamp: unset; left: 50%; transform: translateX(-50%); font-size: 11px; font-weight: 800; letter-spacing: 0.02em; color: #fff; background: rgba(0,0,0,0.72); border: 1px solid rgba(255,255,255,0.22); border-radius: 999px; padding: 2px 8px; line-height: 1.5; white-space: nowrap; pointer-events: none; box-shadow: 0 1px 4px rgba(0,0,0,0.45); }
 
 /* ── Category page ── */
 #catpage { display: none; flex: 1; flex-direction: column; overflow: hidden; min-height: 0; }

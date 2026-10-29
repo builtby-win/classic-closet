@@ -49,7 +49,7 @@ import catalogData from '../data/catalog.json';
 import LayeredCharacterCanvas from './layered-character-canvas';
 import GamePad from './game-pad';
 import DropModal, { type DropEntry } from './drop-modal';
-import { announcements, attainableNow, dropInfo, loadSeen, saveSeen, unseen } from '../lib/drops';
+import { announcements, attainableNow, dropInfo, formatHM, loadSeen, saveSeen, unseen } from '../lib/drops';
 import { autoSwipeLevel } from '../lib/afterimage';
 import { PlayController, PLAY_POSES, SPRITE_CANVAS } from '../lib/play-controller';
 import { ATTACK_FRAMES } from '../lib/skills';
@@ -117,7 +117,7 @@ function daysUntil(isoDate: string): number {
 function bannerPhase(banner: BannerMeta): { statusText: string; isActive: boolean; isUpcoming: boolean } {
   const info = dropInfo(banner, Date.now());
   if (info.state === 'upcoming') {
-    return { statusText: `Upcoming · starts ${shortDate(banner.start!)}`, isActive: false, isUpcoming: true };
+    return { statusText: `Upcoming · drops in ${formatHM(info.startsInMs!)}`, isActive: false, isUpcoming: true };
   }
   const days = info.endsInMs != null ? Math.ceil(info.endsInMs / 86_400_000) : null;
   return {
@@ -997,6 +997,12 @@ export default function FashionIsland() {
   const [dropsOpen, setDropsOpen] = useState(false);
   const [dropsUnseen, setDropsUnseen] = useState(false);
   useEffect(() => setDropNow(Date.now()), []);
+  // Countdown labels (to the minute) read the clock at render, so re-render each minute.
+  const [, setMinuteTick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setMinuteTick((n) => n + 1), 60_000);
+    return () => clearInterval(timer);
+  }, []);
   const drops = useMemo(() => {
     if (dropNow == null) return [];
     const byId = new Map(bannerCards.filter((c) => c.type === 'crate' || c.type === 'style-coupon').map((c) => [c.id, c]));
@@ -1589,8 +1595,8 @@ export default function FashionIsland() {
                   return bannerId ? getBanner(CATALOG, bannerId) : null;
                 }).find((b) => b?.end);
                 const featuredDrop = featuredExpiryBanner ? dropInfo(featuredExpiryBanner, Date.now()) : null;
-                const expiryLabel = featuredDrop?.state === 'upcoming' && featuredExpiryBanner?.start
-                  ? `drops ${shortDate(featuredExpiryBanner.start)}`
+                const expiryLabel = featuredDrop?.state === 'upcoming' && featuredDrop.startsInMs != null
+                  ? `drops in ${formatHM(featuredDrop.startsInMs)}`
                   : featuredDrop?.endsInMs != null && featuredDrop.endsInMs > 0
                     ? (featuredDrop.endsInMs < 86_400_000 ? 'ends today' : `${Math.ceil(featuredDrop.endsInMs / 86_400_000)}d left`)
                     : null;
@@ -2208,7 +2214,7 @@ function Tile(props: {
   // Only choice-based acquisition gets a method badge. Random/mystery is the
   // default and the % badge already signals chance, so no dice badge.
   const randomOnly = props.coupon === 'mystery' || props.bannerId === 'founder-crate-oct26' || props.bannerId === 'mystery-crate-nov26' || props.bannerId === 'halloween-crate-oct26' || props.bannerId === 'beta-style-sep26';
-  const showSelect = !randomOnly && (props.coupon === 'signature' || !!banner);
+  const showSelect = !randomOnly && !props.rateBadge && !props.rate && (props.coupon === 'signature' || !!banner);
   const isCover = props.bannerId === 'covers-10day-nov26';
   const drop = banner ? dropInfo(banner, Date.now()) : null;
   const upcoming = drop?.state === 'upcoming';
@@ -2222,7 +2228,7 @@ function Tile(props: {
       ? `${notAttainable ? 'Expired' : 'Available until'} ${banner.end}`
       : notAttainable ? 'Not currently attainable' : undefined;
   const countdown = upcoming ? null : isNew ? 'NEW' : formatCountdown(banner, !notAttainable);
-  const hasBadges = Boolean(expiration || (props.gender && props.gender !== 'u') || showSelect);
+  const hasBadges = Boolean(expiration || showSelect);
 
   return (
     <button
@@ -2256,20 +2262,6 @@ function Tile(props: {
                   </svg>
                 </span>
               )}
-              {props.gender && props.gender !== 'u' && (
-                <span
-                  className={`tile-gender-tag ${props.gender}`}
-                  role="img"
-                  aria-label={props.gender === 'm' ? 'Male' : 'Female'}
-                  title={props.gender === 'm' ? 'Male equip' : 'Female equip'}
-                >
-                  {props.gender === 'm' ? (
-                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle cx="6.5" cy="9.5" r="4" /><path d="M9.5 6.5 14 2M11 2h3v3" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                  ) : (
-                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle cx="8" cy="6" r="3.6" /><path d="M8 9.6V15M5.4 12.8h5.2" strokeLinecap="round" /></svg>
-                  )}
-                </span>
-              )}
             </div>
             {isUnreleased ? (
               <span className="tile-badge tile-unreleased" role="img" aria-label="Not released yet" title="Not released yet">
@@ -2293,7 +2285,7 @@ function Tile(props: {
         )}
         {props.rateBadge && <span className="tile-rate-badge" role="img" aria-label={`Chance ${props.rateBadge}`} title={`Chance ${props.rateBadge}`}>{shortRate(props.rateBadge)}</span>}
       </div>
-      {props.slotTag && !props.mini && <span className="tile-slot-tag">{props.slotTag}</span>}
+      {props.slotTag && !props.mini && !hasBadges && <span className="tile-slot-tag">{props.slotTag}</span>}
       {props.label && !props.mini && <span className="tile-label">{props.label}</span>}
       {jobLabel && !props.mini && <em className="rate">{jobLabel}</em>}
       {props.rate && !props.rateBadge && !props.mini && <em className="rate">{props.rate}</em>}

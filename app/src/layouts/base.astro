@@ -4,11 +4,13 @@ import { OG_DEFAULT_IMAGE, OG_DESCRIPTION, OG_SITE_URL, OG_TITLE_DEFAULT } from 
 interface Props {
   title?: string;
   description?: string;
+  noindex?: boolean;
 }
 
 const {
   title = OG_TITLE_DEFAULT,
   description = OG_DESCRIPTION,
+  noindex = false,
 } = Astro.props;
 
 const canonical = `${OG_SITE_URL}/`;
@@ -20,6 +22,7 @@ const canonical = `${OG_SITE_URL}/`;
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="description" content={description} />
+    {noindex && <meta name="robots" content="noindex" />}
     <title>{title}</title>
     <link rel="preload" href="/fonts/inter-latin-variable.woff2" as="font" type="font/woff2" crossorigin />
 
