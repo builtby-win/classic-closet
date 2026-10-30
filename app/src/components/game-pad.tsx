@@ -3,6 +3,7 @@ import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react';
 import type { PlayController, PlayInput } from '../lib/play-controller';
 import { SWIPE_LEVELS, swipeDot } from '../lib/afterimage';
 import { loadSkills, SKILL_IDS, type BakedSkill } from '../lib/skills';
+import { wieldLabel } from '../lib/fashion';
 
 const KEYS: Record<string, PlayInput> = {
   ArrowLeft: 'left', a: 'left',
@@ -56,7 +57,7 @@ function PadButton({ input, controller, className, label, hotkey, children }: {
 }
 
 /** On-screen pad for play mode; keyboard works at the same time on desktop. */
-export default function GamePad({ controller, onExit }: { controller: PlayController; onExit: () => void }) {
+export default function GamePad({ controller, onExit, wield }: { controller: PlayController; onExit: () => void; wield?: { choices: string[]; value: string; onChange: (wield: string) => void } }) {
   const swipeY = useRef<number | null>(null);
   const [skills, setSkills] = useState<BakedSkill[]>([]);
   const [picked, setPicked] = useState(0);
@@ -120,6 +121,14 @@ export default function GamePad({ controller, onExit }: { controller: PlayContro
           swipeY.current = null;
         }}
       ><span /><small>Closet</small></button>
+      {wield && wield.choices.length > 1 && (
+        <label className="pad-wield">
+          Wield
+          <select value={wield.value} aria-label="Wield weapon as" onChange={(event) => { wield.onChange(event.target.value); event.target.blur(); }}>
+            {wield.choices.map((choice) => <option key={choice} value={choice}>{wieldLabel(choice)}</option>)}
+          </select>
+        </label>
+      )}
       <button type="button" className="pad-mastery" onClick={() => setSwipe((current) => (current + 1) % SWIPE_LEVELS.length)} aria-label={`Weapon swipe: ${tier.name}. Tap to change`}>
         <i style={{ background: tier.level === null ? 'conic-gradient(#6f96ff, #c86eff, #ff5f6e, #6f96ff)' : swipeDot(tier.level) }} />Swipe · {tier.name}
       </button>

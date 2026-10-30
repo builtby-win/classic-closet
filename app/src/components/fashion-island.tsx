@@ -1464,7 +1464,7 @@ export default function FashionIsland() {
           </div>
         </div>
         </div>
-      {controller && <GamePad controller={controller} onExit={stopPlay} />}
+      {controller && <GamePad controller={controller} onExit={stopPlay} wield={{ choices: wieldChoices, value: wornWield, onChange: chooseWield }} />}
       {dropsOpen && dropEntries.length > 0 && (
         <DropModal entries={dropEntries} onTry={tryDrop} onOpen={openDrop} onClose={closeDrops} />
       )}
