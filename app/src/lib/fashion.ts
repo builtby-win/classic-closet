@@ -312,8 +312,8 @@ export function stanceForWeapon(sub: string | undefined, currentAnim: string): {
   return null;
 }
 
-/** Banner/group sort for equip drawers: limited NX first (by urgency), classic last.
- *  Founder's crate ends Oct 28 → Halloween/Mystery crates end Nov 4 → covers end Nov 18 → Aurora stamp ends Jan 13. */
+/** Banner/group sort for equip drawers: sales still on first (by urgency), classic next, lapsed sales last.
+ *  Halloween/Mystery crates end Nov 4 → covers end Nov 18 → Aurora stamp ends Jan 13. */
 export const GROUP_RANK: Record<string, number> = {
   'founder-crate': 0,
   'halloween-crate': 1,
@@ -324,9 +324,15 @@ export const GROUP_RANK: Record<string, number> = {
   'classic-equips': 6,
 };
 
-export function bannerRank(item: ItemMeta | HairStyleMeta | undefined): number {
+/** Rank for a lapsed sale: after every live group and classic equips. */
+const EXPIRED_RANK = 7;
+
+/** `now` (client clock) demotes items whose sale window has ended; without it the baked order applies. */
+export function bannerRank(item: ItemMeta | HairStyleMeta | undefined, now?: number | null): number {
   if (!item) return 99;
   const group = (item as ItemMeta).group;
+  if (now != null && group && group !== 'classic-equips' && group !== 'unreleased'
+    && !attainableNow(item.attainable !== false, getBanner(CATALOG, item.bannerId), now)) return EXPIRED_RANK;
   if (group && group in GROUP_RANK) return GROUP_RANK[group]!;
   return 6;
 }

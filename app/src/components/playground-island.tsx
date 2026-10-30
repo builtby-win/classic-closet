@@ -585,7 +585,7 @@ export default function PlaygroundIsland() {
       const s = CATALOG.items[id]?.sex;
       return s && s !== 'u' && s !== look.sex ? 1 : 0;
     };
-    const rankOf = (id: number) => bannerRank(CATALOG.items[id]);
+    const rankOf = (id: number) => bannerRank(CATALOG.items[id], dropNow);
     return filtered
       .map((id) => ({ type: 'item' as const, id, mismatch: mismatchOf(id), sexMismatch: sexMismatchOf(id), tier: tierOf(id) }))
       .sort((a, b) =>
@@ -595,7 +595,7 @@ export default function PlaygroundIsland() {
         levelOf(a.id) - levelOf(b.id) ||
         nameOf(a.id).localeCompare(nameOf(b.id))
       );
-  }, [catSec, catQ, getGroupEquips, equipSections, job, look.sex, weaponGroup]);
+  }, [catSec, catQ, getGroupEquips, equipSections, job, look.sex, weaponGroup, dropNow]);
 
 
   // Equip drawers: partition the flat row list into banner sections so NX
@@ -1123,19 +1123,29 @@ export default function PlaygroundIsland() {
       return [{ banner, typeLabel: card.typeLabel, kind: card.type, items: card.items }];
     });
   }, [drops, bannerCards]);
+  // Auto-open lists only what the visitor hasn't seen; the header chip reopens the full list.
+  const [freshDropIds, setFreshDropIds] = useState<Set<string> | null>(null);
   const dropsAutoOpened = useRef(false);
   useEffect(() => {
     if (dropNow == null || dropsAutoOpened.current || !drops.length) return;
     dropsAutoOpened.current = true;
     const fresh = unseen(drops, loadSeen());
     setDropsUnseen(fresh.length > 0);
-    if (fresh.length) setDropsOpen(true);
+    if (fresh.length) {
+      setFreshDropIds(new Set(fresh.map(({ banner }) => banner.id)));
+      setDropsOpen(true);
+    }
   }, [dropNow, drops]);
   const closeDrops = useCallback(() => {
     saveSeen(drops);
     setDropsOpen(false);
     setDropsUnseen(false);
+    setFreshDropIds(null);
   }, [drops]);
+  const shownDropEntries = useMemo(
+    () => (freshDropIds ? dropEntries.filter((entry) => freshDropIds.has(entry.banner.id)) : dropEntries),
+    [dropEntries, freshDropIds],
+  );
   // Show the banner at the top of its tab so the look they tried has its source in view.
   const revealDrop = useCallback((entry: DropEntry) => {
     setPinnedBanner(entry.banner.id);
@@ -1265,7 +1275,7 @@ export default function PlaygroundIsland() {
       ? couponRank(CATALOG.styles[row.id]?.coupon, CATALOG.styles[row.id]?.attainable)
       : CATALOG.items[row.id]?.sub === 'Face'
         ? couponRank(CATALOG.items[row.id]?.coupon, CATALOG.items[row.id]?.attainable)
-        : bannerRank(CATALOG.items[row.id]);
+        : bannerRank(CATALOG.items[row.id], dropNow);
     const restSort = (a: CatRow & { mismatch?: boolean; sexMismatch?: number; tier?: number }, b: CatRow & { mismatch?: boolean; sexMismatch?: number; tier?: number }) =>
       (a.sexMismatch ?? 0) - (b.sexMismatch ?? 0) ||
       (a.tier ?? 0) - (b.tier ?? 0) ||
@@ -1291,7 +1301,7 @@ export default function PlaygroundIsland() {
       }
     }
     return result;
-  }, [railSlots, mysteryHairs, signatureHairs, starterHairStyles, pastHairStyles, mysteryFaces, signatureFaces, starterFaces, pastFaces, equipSections, job, look.sex, crateFilter]);
+  }, [railSlots, mysteryHairs, signatureHairs, starterHairStyles, pastHairStyles, mysteryFaces, signatureFaces, starterFaces, pastFaces, equipSections, job, look.sex, crateFilter, dropNow]);
 
 
   // Play mode: a pad drives the preview with a pose override (see play-controller).
@@ -1575,8 +1585,8 @@ export default function PlaygroundIsland() {
         </div>
         </div>
       {controller && <GamePad controller={controller} onExit={stopPlay} wield={{ choices: wieldChoices, value: wornWield, onChange: chooseWield }} />}
-      {dropsOpen && dropEntries.length > 0 && (
-        <DropModal entries={dropEntries} onTry={tryDrop} onOpen={openDrop} onClose={closeDrops} />
+      {dropsOpen && shownDropEntries.length > 0 && (
+        <DropModal entries={shownDropEntries} onTry={tryDrop} onOpen={openDrop} onClose={closeDrops} />
       )}
       {settingsOpen && (
         <div className="settings-scrim" aria-hidden="true" onClick={() => setSettingsOpen(false)} />
