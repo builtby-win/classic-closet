@@ -64,7 +64,7 @@ import { warmPoses } from '../lib/layered-client-renderer';
 import './fashion.css';
 import './playground.css';
 import CompareView from './compare-view';
-import EmoteCarousel from './emote-carousel';
+import EmoteCarousel, { PREVIEW_EMOTE, useEmoteSprites } from './emote-carousel';
 import OutfitsPanel from './outfits-panel';
 import { outfitKey, snapshot, useSavedOutfits, type Outfit } from '../lib/outfits';
 
@@ -228,6 +228,7 @@ export default function PlaygroundIsland() {
   const JOBS = ['All', 'Warrior', 'Magician', 'Bowman', 'Thief'];
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [emoteOpen, setEmoteOpen] = useState(false);
+  const emoteSprites = useEmoteSprites(look.face);
   const [controller, setController] = useState<PlayController | null>(null);
   const lookRef = useRef(look);
   lookRef.current = look;
@@ -1513,7 +1514,7 @@ export default function PlaygroundIsland() {
               {!comparing && (
                 <button type="button" className={'pg-toggle pg-emote-btn' + (look.emote ? ' has-emote' : '')} onClick={() => setEmoteOpen(true)}
                   aria-haspopup="true" aria-label="Face emotes" title="Face emotes">
-                  <span aria-hidden="true">{EMOTES.find((emote) => emote.id === look.emote)?.glyph ?? '🙂'}</span>
+                  {emoteSprites[look.emote ?? PREVIEW_EMOTE] && <img src={emoteSprites[look.emote ?? PREVIEW_EMOTE]} alt="" draggable={false} />}
                 </button>
               )}
               {recents.length > 0 && (
@@ -1541,7 +1542,7 @@ export default function PlaygroundIsland() {
             </div>
           )}
           {emoteOpen && !comparing && !controller && (
-            <EmoteCarousel value={look.emote} onPick={(emote) => patch({ emote })} onClose={() => setEmoteOpen(false)} />
+            <EmoteCarousel faceId={look.face} value={look.emote} onPick={(emote) => patch({ emote })} onClose={() => setEmoteOpen(false)} />
           )}
           {undoLook && <div className="undo-bar" role="status"><span>Outfit changed</span><button type="button" onClick={(e) => { e.stopPropagation(); setLook(undoLook); setUndoLook(null); }}>Undo</button><button type="button" aria-label="Dismiss" onClick={(e) => { e.stopPropagation(); setUndoLook(null); }}>×</button></div>}
           {wieldNotice && wieldNotice.id === look.items.Weapon && (
@@ -1754,7 +1755,8 @@ export default function PlaygroundIsland() {
                           && (slot.id === 'Hair' ? CATALOG.styles[id]?.sex : CATALOG.items[id]?.sex) !== look.sex ? 1 : 0,
                       }))]
                   : (railItems[slot.id] ?? []);
-                const items = pool.filter(row => matchesFuzzy(row.type === 'hair' ? CATALOG.styles[row.id]?.name : CATALOG.items[row.id]?.name, row.id, q.trim().toLowerCase()));
+                const matchedRows = pool.filter(row => matchesFuzzy(row.type === 'hair' ? CATALOG.styles[row.id]?.name : CATALOG.items[row.id]?.name, row.id, q.trim().toLowerCase()));
+                const items = slot.id === 'Weapon' && weaponGroup ? matchedRows.filter((row) => weaponInGroup(CATALOG.items[row.id], weaponGroup)) : matchedRows;
                 if ((q.trim() || crateFilter) && !items.length) return null;
                 // Faces match by style (color variants share one tile) — first
                 // match wins so at most one tile ever shows selected.
@@ -1791,7 +1793,15 @@ export default function PlaygroundIsland() {
                       </div>
                       <button className="slot-seeall" aria-label={`See all ${slot.label}`} onClick={() => { openCat(slot.id); setCatQ(q); }}>See all →</button>
                     </div>
-                    {slot.id === 'Weapon' && wieldChoices.length > 1 && <WieldPicker choices={wieldChoices} value={wornWield} onChange={chooseWield} />}
+                    {slot.id === 'Weapon' && (() => {
+                      const wornSub = weaponSubOf(getItem(CATALOG, look.items.Weapon), look.wield);
+                      return (
+                        <div className="slot-stance">
+                          <WeaponGroupFilter value={weaponGroup} onChange={setWeaponGroup} />
+                          {wornSub && <WieldPicker choices={wieldChoices.length > 1 ? wieldChoices : [wornSub]} value={wieldChoices.length > 1 ? wornWield : wornSub} onChange={chooseWield} />}
+                        </div>
+                      );
+                    })()}
                     {(slot.id === 'Hair' || slot.id === 'Face') && <div className="rail-colors" role="group" aria-label={slot.id === 'Hair' ? 'Hair color' : 'Eye color'}>
                       {(slot.id === 'Hair' ? HAIR_COLORS : EYE_COLORS).map((color, i) => <ColorSwatch key={color} color={color} dot={(slot.id === 'Hair' ? HAIR_DOTS : EYE_DOTS)[i]} selected={(slot.id === 'Hair' ? look.hairCol : faceColorIndex(look.face)) === i} onClick={() => slot.id === 'Hair' ? patch({ hair: Math.floor(look.hair / 10) * 10 + i, hairCol: i }) : patch({ face: faceVariantId(look.face >= 21000 ? 'f' : 'm', faceStyleId(look.face), i) })} />)}
                     </div>}
@@ -2082,7 +2092,7 @@ export default function PlaygroundIsland() {
         {catSec && (
           <div id="drawer" className="open">
             <div id="drawer-head">
-              <button id="drawer-back" onClick={() => { setCatSec(null); setSearchScope(null); setCatQ(''); }}>‹ back</button>
+              <button id="drawer-back" onClick={() => { setCatSec(null); setSearchScope(null); setCatQ(''); }} aria-label="Back"><Icon name="back" /><span>Back</span></button>
               {searchScope === catSec ? (
                 <div className="head-search" role="search">
                   <input autoFocus aria-label={`Search ${drawerTitle}`} value={catQ} onChange={(e) => setCatQ(e.target.value)} onKeyDown={(e) => { if (e.key === 'Escape') { setSearchScope(null); setCatQ(''); } }} placeholder={`Search ${drawerTitle}…`} enterKeyHint="search" autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} />
@@ -2509,7 +2519,7 @@ function CharacterEditor({ look, skins, onName, onSex, onSkin }: {
   );
 }
 
-function Icon({ name }: { name: 'settings' | 'shuffle' | 'search' | 'close' | 'share' | 'check' | 'play' }) {
+function Icon({ name }: { name: 'settings' | 'shuffle' | 'search' | 'close' | 'share' | 'check' | 'play' | 'back' }) {
   return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     {name === 'settings' && <><path d="m9 3-.6 2.5-2.2 1.3-2.5-.7-2 3.5 1.9 1.8v2.6l-1.9 1.8 2 3.5 2.5-.7 2.2 1.3L9 22h4l.6-2.6 2.2-1.3 2.5.7 2-3.5-1.9-1.8v-2.6l1.9-1.8-2-3.5-2.5.7-2.2-1.3L13 3Z" /><circle cx="11" cy="12.5" r="3" /></>}
     {name === 'shuffle' && <><rect x="3" y="3" width="18" height="18" rx="4" /><path d="M7 7h.01M17 7h.01M12 12h.01M7 17h.01M17 17h.01" strokeWidth="3" /></>}
@@ -2517,6 +2527,7 @@ function Icon({ name }: { name: 'settings' | 'shuffle' | 'search' | 'close' | 's
     {name === 'close' && <path d="m6 6 12 12M6 18 18 6" />}
     {name === 'share' && <><circle cx="6" cy="12" r="2.5" /><circle cx="18" cy="6" r="2.5" /><circle cx="18" cy="18" r="2.5" /><path d="m8.2 10.8 7.6-3.6M8.2 13.2l7.6 3.6" /></>}
     {name === 'check' && <path d="m4.5 12.5 5 5 10-11" />}
+    {name === 'back' && <path d="m14.5 6-6 6 6 6" />}
     {name === 'play' && <><rect x="2.5" y="7" width="19" height="10" rx="5" /><path d="M8 10v4M6 12h4M16 11h.01M18 13h.01" strokeWidth="2" /></>}
   </svg>;
 }

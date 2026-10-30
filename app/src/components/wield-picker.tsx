@@ -5,7 +5,7 @@ export default function WieldPicker({ choices, value, onChange }: { choices: str
   return (
     <label className="wield-picker">
       <span>Wield as</span>
-      <select value={value} onChange={(e) => onChange(e.target.value)} aria-label="Wield weapon as">
+      <select value={value} onChange={(e) => onChange(e.target.value)} disabled={choices.length < 2} title={choices.length < 2 ? 'This weapon only has art for this type' : undefined} aria-label="Wield weapon as">
         {choices.map((choice) => <option key={choice} value={choice}>{wieldLabel(choice)}</option>)}
       </select>
     </label>

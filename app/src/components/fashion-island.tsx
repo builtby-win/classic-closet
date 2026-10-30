@@ -1635,7 +1635,8 @@ export default function FashionIsland() {
                           && (slot.id === 'Hair' ? CATALOG.styles[id]?.sex : CATALOG.items[id]?.sex) !== look.sex ? 1 : 0,
                       }))]
                   : (railItems[slot.id] ?? []);
-                const items = pool.filter(row => matchesFuzzy(row.type === 'hair' ? CATALOG.styles[row.id]?.name : CATALOG.items[row.id]?.name, row.id, q.trim().toLowerCase()));
+                const matchedRows = pool.filter(row => matchesFuzzy(row.type === 'hair' ? CATALOG.styles[row.id]?.name : CATALOG.items[row.id]?.name, row.id, q.trim().toLowerCase()));
+                const items = slot.id === 'Weapon' && weaponGroup ? matchedRows.filter((row) => weaponInGroup(CATALOG.items[row.id], weaponGroup)) : matchedRows;
                 if ((q.trim() || crateFilter) && !items.length) return null;
                 // Faces match by style (color variants share one tile) — first
                 // match wins so at most one tile ever shows selected.
@@ -1672,7 +1673,15 @@ export default function FashionIsland() {
                       </div>
                       <button className="slot-seeall" aria-label={`See all ${slot.label}`} onClick={() => { openCat(slot.id); setCatQ(q); }}>See all →</button>
                     </div>
-                    {slot.id === 'Weapon' && wieldChoices.length > 1 && <WieldPicker choices={wieldChoices} value={wornWield} onChange={chooseWield} />}
+                    {slot.id === 'Weapon' && (() => {
+                      const wornSub = weaponSubOf(getItem(CATALOG, look.items.Weapon), look.wield);
+                      return (
+                        <div className="slot-stance">
+                          <WeaponGroupFilter value={weaponGroup} onChange={setWeaponGroup} />
+                          {wornSub && <WieldPicker choices={wieldChoices.length > 1 ? wieldChoices : [wornSub]} value={wieldChoices.length > 1 ? wornWield : wornSub} onChange={chooseWield} />}
+                        </div>
+                      );
+                    })()}
                     {(slot.id === 'Hair' || slot.id === 'Face') && <div className="rail-colors" role="group" aria-label={slot.id === 'Hair' ? 'Hair color' : 'Eye color'}>
                       {(slot.id === 'Hair' ? HAIR_COLORS : EYE_COLORS).map((color, i) => <ColorSwatch key={color} color={color} dot={(slot.id === 'Hair' ? HAIR_DOTS : EYE_DOTS)[i]} selected={(slot.id === 'Hair' ? look.hairCol : faceColorIndex(look.face)) === i} onClick={() => slot.id === 'Hair' ? patch({ hair: Math.floor(look.hair / 10) * 10 + i, hairCol: i }) : patch({ face: faceVariantId(look.face >= 21000 ? 'f' : 'm', faceStyleId(look.face), i) })} />)}
                     </div>}
