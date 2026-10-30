@@ -2483,7 +2483,7 @@ function Tile(props: {
           </div>
         )}
         {props.img ? (
-          <img decoding="async" draggable={false} src={props.img} alt="" onError={(e) => { const next = iconFallbackURL(e.currentTarget.src); if (next) e.currentTarget.src = next; }} />
+          <img loading="lazy" decoding="async" draggable={false} src={props.img} alt="" onError={(e) => { const next = iconFallbackURL(e.currentTarget.src); if (next) e.currentTarget.src = next; }} />
         ) : (
           <span style={{ fontSize: 18 }}>{props.big}</span>
         )}
