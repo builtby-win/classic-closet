@@ -4,15 +4,18 @@
  * Incremental: skips assets already baked to disk.
  */
 
-import { writeFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { writeFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { bakeBaseBodies } from './bake-base-layers';
-import { EYE_COLORS, faceVariantId } from '../src/lib/fashion';
+import { EMOTES, EYE_COLORS, faceVariantId } from '../src/lib/fashion';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const catalogPath = join(ROOT, 'src', 'data', 'catalog.json');
 const catalog = JSON.parse(readFileSync(catalogPath, 'utf8'));
+const overlay: { weaponFits?: Array<{ id: number; types: string[] }> } = JSON.parse(readFileSync(join(ROOT, 'data', 'nexon-overlay.json'), 'utf8'));
+/** Weapon types Nexon says a cash skin fits, for skins whose dataset ships fewer frame books. */
+const weaponFits = new Map((overlay.weaponFits ?? []).map((fit) => [fit.id, fit]));
 
 const ITEMS_DIR = join(ROOT, 'public', 'sprites', 'items');
 const FACES_DIR = join(ROOT, 'public', 'sprites', 'faces');
@@ -90,17 +93,80 @@ function weaponFamilyOf(codes: number[]): string | undefined {
   return sameFamily ? WEAPON_TYPE_SUB[Math.min(...codes)] : undefined;
 }
 
+/** Order-independent fingerprint of a frame set, to spot weapon types that share art. */
+function framesKey(frames: Record<string, any[]>): string {
+  return JSON.stringify(Object.entries(frames).sort(([a], [b]) => (a < b ? -1 : 1)));
+}
+
+/** A skin's art differs per weapon type it ships (2H frames use stand2/swingT*, bows shoot1, …).
+ *  Bakes each distinct type's full frame set (idle + motion) to `<id>.w<code>.json` and returns
+ *  sub → file code; 0 means the type shares the skin's base art, so no extra file. */
+function bakeWeaponVariants(id: number, raw: any): Record<string, number> {
+  for (const file of readdirSync(ITEMS_DIR)) {
+    if (file.startsWith(`${id}.w`) && /^\d+\.w\d+\.json$/.test(file)) rmSync(join(ITEMS_DIR, file));
+  }
+  const everything = new Set([...BAKED_ACTIONS, ...MOTION_ACTIONS]);
+  const baseKey = framesKey(extractFrames(raw, everything));
+  const vslot: string = (raw.metaInfo?.vslots ?? []).join('');
+  const islot: string = (raw.metaInfo?.islots ?? []).join('');
+  const wtypes: Record<string, number> = {};
+  const fileByArt = new Map<string, number>();
+  for (const [codeStr, sub] of Object.entries(WEAPON_TYPE_SUB)) {
+    const book = raw.frameBooksPerWeaponType?.[codeStr];
+    if (!book) continue;
+    const frames = extractFrames({ frameBooks: book }, everything);
+    if (!Object.keys(frames).length) continue; // no art for this weapon type
+    const key = framesKey(frames);
+    if (key === baseKey) {
+      wtypes[sub] = 0;
+      continue;
+    }
+    let code = fileByArt.get(key);
+    if (code === undefined) {
+      code = Number(codeStr);
+      fileByArt.set(key, code);
+      writeFileSync(join(ITEMS_DIR, `${id}.w${code}.json`), JSON.stringify({ id, frames, vslot, islot }));
+    }
+    wtypes[sub] = code;
+  }
+  return wtypes;
+}
+
 async function classifyCashWeapons(): Promise<void> {
   const cash = Object.entries<any>(catalog.items).filter(([, meta]) => meta?.sub === 'Cash');
   let changed = 0;
   await pool(cash, 6, async ([idStr, meta]) => {
     const raw = await fetchItemData(Number(idStr), meta.src, meta.sub);
     if (!raw) throw new Error(`Could not classify cash weapon ${idStr}: no item data`);
-    const wsub = weaponFamilyOf(Object.keys(raw.frameBooksPerWeaponType ?? {}).map(Number));
-    if (wsub === meta.wsub) return;
+    // A weapon type with an empty frame book has no art for the skin, so it can't wear it.
+    const codes = Object.entries<any>(raw.frameBooksPerWeaponType ?? {}).filter(([, book]) => Object.keys(book ?? {}).length).map(([code]) => Number(code));
+    let wsub = weaponFamilyOf(codes);
+    const variants = bakeWeaponVariants(Number(idStr), raw);
+    // Types Nexon lists that the dataset has no frame book for share the skin's base art (generic actions cover every stance).
+    const fit = weaponFits.get(Number(idStr));
+    if (fit) {
+      const known = new Set(Object.values(WEAPON_TYPE_SUB));
+      const declared = Object.fromEntries(fit.types.map((sub) => {
+        if (!known.has(sub)) throw new Error(`nexon-overlay weaponFits ${idStr}: unknown weapon type ${sub}`);
+        return [sub, variants[sub] ?? 0];
+      }));
+      for (const sub of Object.keys(variants)) if (!(sub in declared)) declared[sub] = variants[sub]!;
+      for (const key of Object.keys(variants)) delete variants[key];
+      Object.assign(variants, declared);
+    }
+    const subs = Object.keys(variants);
+    // The player only gets a choice when the types differ in art or in how they stand and attack (all 1H types share one stance).
+    const stances = new Set(subs.map((sub) => (/^Two-Handed|^One-Handed|^(Dagger|Wand|Staff|Claw)$/.test(sub) ? sub.startsWith('Two') ? '2H' : '1H' : sub)));
+    const differs = new Set(Object.values(variants)).size > 1 || stances.size > 1;
+    const wtypes = subs.length > 1 && differs ? variants : undefined;
+    // A skin that spans several types defaults to the first (1H Sword when it has one), never the generic Cash pose.
+    if (!wsub && subs.length) wsub = subs[0];
+    const before = JSON.stringify([meta.wsub, meta.wtypes]);
     if (wsub) meta.wsub = wsub;
     else delete meta.wsub;
-    changed++;
+    if (wtypes) meta.wtypes = wtypes;
+    else delete meta.wtypes;
+    if (JSON.stringify([meta.wsub, meta.wtypes]) !== before) changed++;
   });
   console.log(`Classified ${cash.length} cash weapons (${changed} changed).`);
 }
@@ -198,6 +264,20 @@ async function bakeMotion(id: number, meta: any): Promise<void> {
   writeFileSync(dest, JSON.stringify({ id, v: MOTION_VERSION, frames: extractFrames(raw, MOTION_ACTIONS) }));
 }
 
+const EMOTE_ACTIONS = new Set(EMOTES.map((emote) => emote.id));
+/** Bumped when EMOTES grows so existing emote files are re-fetched once. */
+const EMOTE_VERSION = 1;
+
+/** Face expressions, kept out of the main face file: only the worn face's are fetched, when an emote is picked. */
+async function bakeEmotes(id: number, meta: any): Promise<void> {
+  const dest = join(ITEMS_DIR, `${id}.emotes.json`);
+  if (!existsSync(join(ITEMS_DIR, `${id}.json`))) return;
+  if (existsSync(dest) && JSON.parse(readFileSync(dest, 'utf8')).v >= EMOTE_VERSION) return;
+  const raw = await fetchItemData(id, meta?.src, meta?.sub);
+  if (!raw?.frameBooks) throw new Error(`no expression data for face ${id}`);
+  writeFileSync(dest, JSON.stringify({ id, v: EMOTE_VERSION, frames: extractFrames(raw, EMOTE_ACTIONS) }));
+}
+
 // Concurrency pool with progress
 async function pool<T>(items: T[], concurrency: number, fn: (item: T) => Promise<void>) {
   let idx = 0;
@@ -290,6 +370,16 @@ async function main() {
   console.log(`All ${faceJobs.size} face color variants present.`);
 
   bakeFaceIcons();
+  console.log('--- Baking face emotes ---');
+  const emoteFailed: number[] = [];
+  await pool([...faceJobs], 10, async ([id, meta]) => {
+    try {
+      await bakeEmotes(id, { ...meta, sub: 'Face' });
+    } catch {
+      emoteFailed.push(id);
+    }
+  });
+  if (emoteFailed.length) throw new Error(`Could not bake face emotes: ${emoteFailed.sort((a, b) => a - b).join(', ')}`);
   console.log('--- Baking Hair Styles ---');
   const hairFailed: number[] = [];
   const hairStyles = Object.keys(catalog.styles).map(Number);

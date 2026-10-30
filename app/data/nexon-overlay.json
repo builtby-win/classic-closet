@@ -13,6 +13,9 @@
     { "name": "Race Ace Cap", "id": 1007111, "src": "MCW", "note": "Same numeric id is a different retail item in GMS 270 (divergent icons); Classic art is MCW. Strict MCW bake." }
   ],
   "items": [],
+  "weaponFits": [
+    { "id": 1702806, "types": ["One-Handed Sword", "Two-Handed Sword", "One-Handed Axe", "Two-Handed Axe", "One-Handed Blunt Weapon", "Two-Handed Blunt", "Dagger", "Spear", "Pole Arm", "Wand", "Staff", "Bow", "Crossbow", "Claw"], "note": "Glowing Pumpkin Basket: Nexon lists 1H/2H swords, axes and blunt weapons, daggers, spears, polearms, wands, staves, bows, crossbows and claws. GMS 270 ships one frame book (tagged 1H Sword) whose generic stand/walk/swing/stab/shoot actions cover every stance, so the other types share that base art." }
+  ],
   "hide": [
     { "id": 1057069, "wrongIconMd5": "b03d3124807da61347acad45dd76f6ed", "note": "Race Queen Uniform (Mystery Fashion Crate 2.50%): MCW serves stale retail BLUE art (worn render verified vs red/white Nexon set 2026-10-21); GMS 270 has nothing. True Classic art in no dataset yet. Drop when a source grows the red/white art." },
     { "id": 1702092, "note": "Glowing Pumpkin Basket (Halloween Mystery Fashion Crate 2.00%): GMS 270 ships only per-weapon-type frames (no frameBooks) and MCW CBT2 serves a different item (Super Scrubber) under this id; nothing bakeable yet. Drop when a source ships avatar frames for it." }

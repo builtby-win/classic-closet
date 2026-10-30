@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { DEFAULT_LOOK, EYE_COLORS, faceColorIndex, faceStyleId, formatAttainableInfo, fuzzyScore, matchesFuzzy, renderURL, assetSource, iconURL, matchesJob, randomLook, equipSlot, type Sex, applyPick, stanceForWeapon, weaponSubOf, iconFallbackURL, TWO_HAND_SUBS, RANDOM_EQUIP_SLOTS, saveLookToStorage, loadLookForSex, mirrorStyleForSex, firstBannerStyle, defaultHairForSex, defaultFaceForSex } from '../src/lib/fashion';
+import { DEFAULT_LOOK, EYE_COLORS, faceColorIndex, faceStyleId, formatAttainableInfo, fuzzyScore, matchesFuzzy, renderURL, assetSource, iconURL, matchesJob, randomLook, equipSlot, type Sex, applyPick, stanceForWeapon, weaponSubOf, weaponVariant, wieldOptions, wieldChoice, oneHandedWield, resolveWield, encodeLook, decodeLook, iconFallbackURL, TWO_HAND_SUBS, RANDOM_EQUIP_SLOTS, saveLookToStorage, loadLookForSex, mirrorStyleForSex, firstBannerStyle, defaultHairForSex, defaultFaceForSex, EMOTES } from '../src/lib/fashion';
 import catalog from '../src/data/catalog.json';
 
 test('mixed render preserves Classic body and equips with retail cosmetics', () => {
@@ -121,13 +121,67 @@ test('each weapon family steers to a stance with renderer frames', () => {
 
 test('single-family cash weapons behave as that weapon', () => {
   const items = catalog.items as Record<string, { sub: string; wsub?: string }>;
-  // Plastic Slingshot is a bow, Toy Rifle a crossbow; the Aurora scepters fit every weapon so stay generic.
+  // Plastic Slingshot is a bow, Toy Rifle a crossbow.
   assert.equal(weaponSubOf(items[1702003]), 'Bow');
   assert.equal(weaponSubOf(items[1702014]), 'Crossbow');
-  assert.equal(weaponSubOf(items[1702445]), 'Cash');
   assert.deepEqual(stanceForWeapon(weaponSubOf(items[1702014]), 'stand1'), { anim: 'stand2', frame: 0 });
   assert.equal(applyPick({ Shield: 1092000 }, 'Weapon', 1702003, 'Cash').Shield, undefined);
   assert.equal(applyPick({ Weapon: 1702003 }, 'Shield', 1092000, 'Shield').Weapon !== 1702003, true);
+});
+
+test('multi-type cash weapons can be wielded as any type they ship art for', () => {
+  const items = catalog.items as Record<string, { sub: string; wsub?: string; wtypes?: Record<string, number> }>;
+  const scepter = items[1702445];
+  // The scepter fits every weapon family and defaults to one-handed; the broomstick only spear/pole arm.
+  assert.equal(weaponSubOf(scepter), 'One-Handed Sword');
+  for (const type of ['Two-Handed Sword', 'Spear', 'Pole Arm', 'Bow', 'Crossbow', 'Claw']) assert.ok(wieldOptions(scepter).includes(type), type);
+  assert.deepEqual(wieldOptions(items[1702036]), ['Spear', 'Pole Arm']);
+  assert.equal(weaponSubOf(scepter, 'Crossbow'), 'Crossbow');
+  assert.notEqual(weaponVariant(scepter, 'Crossbow'), weaponVariant(scepter, 'Bow'));
+  // A type the skin lacks (or a bogus value from a shared link) is ignored.
+  assert.equal(weaponSubOf(items[1702036], 'Crossbow'), 'Spear');
+  assert.equal(weaponSubOf(scepter, 'constructor'), 'One-Handed Sword');
+  assert.equal(weaponVariant(items[1702003], 'Crossbow'), 0);
+  assert.equal(wieldChoice(scepter, 'Spear'), 'Spear');
+  // Wielding a two-handed type frees the hand: it takes the shield off, and a shield swaps a skin with no one-handed art for a classic sword.
+  assert.equal(applyPick({ Shield: 1092000 }, 'Weapon', 1702445, 'Cash', 'Crossbow').Shield, undefined);
+  assert.equal(applyPick({ Shield: 1092000 }, 'Weapon', 1702445, 'Cash').Shield, 1092000);
+  assert.notEqual(applyPick({ Weapon: 1702036 }, 'Shield', 1092000, 'Shield').Weapon, 1702036);
+  // A skin that also has one-handed art keeps itself: the shield drops its wield to a one-handed type instead.
+  assert.equal(oneHandedWield(scepter, 'Spear'), 'One-Handed Sword');
+  assert.equal(oneHandedWield(scepter, 'Wand'), undefined);
+  assert.equal(oneHandedWield(scepter), undefined);
+  assert.equal(oneHandedWield(items[1702036], 'Spear'), undefined);
+  const shielded = applyPick({ Weapon: 1702445 }, 'Shield', 1092000, 'Shield', oneHandedWield(scepter, 'Spear'));
+  assert.deepEqual(shielded, { Weapon: 1702445, Shield: 1092000 });
+});
+
+test('a new cash weapon keeps the held type when it fits, else falls back with a notice', () => {
+  const items = catalog.items as Record<number, { sub: string; wsub?: string; wtypes?: Record<string, number> }>;
+  const crossbow = items[1462000]!, bow = items[1452000]!, sword = items[1302000]!, axe = items[1312000]!;
+  assert.deepEqual(resolveWield(crossbow, undefined, items[1702445]!), { wield: 'Crossbow' });
+  // From another skin wielded as a crossbow, the type carries on to the next skin that fits it.
+  assert.deepEqual(resolveWield(items[1702445], 'Crossbow', items[1702468]!), { wield: 'Crossbow' });
+  // The pumpkin basket ships one frame book but Nexon lists every family, so a held bow/crossbow keeps its type.
+  assert.deepEqual(resolveWield(bow, undefined, items[1702806]!), { wield: 'Bow' });
+  assert.deepEqual(resolveWield(crossbow, undefined, items[1702806]!), { wield: 'Crossbow' });
+  assert.deepEqual(resolveWield(sword, undefined, items[1702036]!), { notice: { types: ['Spear', 'Pole Arm'], applied: 'Spear', held: 'One-Handed Sword' } });
+  assert.deepEqual(resolveWield(crossbow, undefined, items[1702036]!).notice?.held, 'Crossbow');
+  // Swapping between one-handed types, a matching single-type skin, or nothing held never prompts.
+  assert.deepEqual(resolveWield(axe, undefined, { sub: 'Cash', wsub: 'One-Handed Sword' }), {});
+  assert.deepEqual(resolveWield(bow, undefined, items[1702003]!), {});
+  assert.deepEqual(resolveWield(undefined, undefined, items[1702036]!), {});
+  // A single-type skin that doesn't match what was held still says so.
+  assert.deepEqual(resolveWield(crossbow, undefined, items[1702003]!).notice, { types: ['Bow'], applied: 'Bow', held: 'Crossbow' });
+  // Classic weapons never carry a wield.
+  assert.deepEqual(resolveWield(items[1702445], 'Crossbow', sword), {});
+});
+
+test('the wield choice round-trips through share links only for skins that support it', () => {
+  const look = { ...DEFAULT_LOOK, items: { Weapon: 1702445 }, wield: 'Crossbow' };
+  assert.equal(decodeLook(encodeLook(look))?.wield, 'Crossbow');
+  assert.equal(decodeLook(encodeLook({ ...look, items: { Weapon: 1302000 } }))?.wield, undefined);
+  assert.equal(decodeLook(encodeLook({ ...look, wield: 'Warrior' }))?.wield, undefined);
 });
 
 test('icons fall back through older maplestory.io versions that still ship them', () => {
@@ -318,4 +372,12 @@ test('unreleased cash equips are preview-only and searchable', () => {
       assert.ok(searchIds.has(id), `unreleased equip ${id} must be in indexes.search`);
     }
   }
+});
+
+test('emote round-trips through the share URL and unknown emotes are dropped', () => {
+  for (const emote of EMOTES) assert.equal(decodeLook(encodeLook({ ...DEFAULT_LOOK, emote: emote.id }))?.emote, emote.id);
+  assert.equal(decodeLook(encodeLook({ ...DEFAULT_LOOK, emote: 'nope' }))?.emote, undefined);
+  assert.equal(decodeLook('hair=30130&face=20033&emote=nope')?.emote, undefined);
+  assert.equal(new URLSearchParams(encodeLook({ ...DEFAULT_LOOK, emoteFrame: 1 })).has('emoteFrame'), false);
+  assert.deepEqual(EMOTES.filter((emote) => emote.key).map((emote) => emote.key), ['F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7']);
 });
