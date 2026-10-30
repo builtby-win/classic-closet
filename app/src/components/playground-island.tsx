@@ -1133,6 +1133,9 @@ export default function PlaygroundIsland() {
     setDropsUnseen(fresh.length > 0);
     if (fresh.length) {
       setFreshDropIds(new Set(fresh.map(({ banner }) => banner.id)));
+      // Count it seen as soon as it's shown: reloading or navigating away with the modal
+      // open (never hitting close) must not bring it back next visit.
+      saveSeen(drops);
       setDropsOpen(true);
     }
   }, [dropNow, drops]);
