@@ -140,24 +140,24 @@ export default function GamePad({ controller, onExit, wield }: { controller: Pla
           <PadButton input="down" controller={controller} className="pad-down" label="Duck"><Arrow dir="down" /></PadButton>
           <PadButton input="right" controller={controller} className="pad-right" label="Walk right"><Arrow dir="right" /></PadButton>
         </div>
+        {skill ? <div className="pad-skill">
+          <PadButton input="skill" controller={controller} className="pad-cast" label={`Cast ${skill.name}`} hotkey="C">
+            <img src={skill.icon} alt="" draggable={false} />
+          </PadButton>
+          {skills.length > 1 && <button type="button" className="pad-swap" aria-label={`Skill: ${skill.name}. Choose skill`} aria-haspopup="menu" aria-expanded={menuOpen} title={skill.name} onClick={() => setMenuOpen(!menuOpen)}>
+            <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M5 8 L12 17 L19 8 Z" fill="#fff" stroke="#1d2b4a" strokeWidth="2.5" strokeLinejoin="round" /></svg>
+          </button>}
+          {menuOpen && <ul className="pad-skill-menu" role="menu">
+            {skills.map((option) => (
+              <li key={option.id} role="none">
+                <button type="button" role="menuitemradio" aria-checked={option.id === skill.id} onClick={() => { setPickedId(option.id); window.localStorage.setItem('mf-skill', option.id); setMenuOpen(false); }}>
+                  <img src={option.icon} alt="" draggable={false} />{option.name}
+                </button>
+              </li>
+            ))}
+          </ul>}
+        </div> : <div />}
         <div className="pad-actions">
-          {skill && <div className="pad-skill">
-            <PadButton input="skill" controller={controller} className="pad-cast" label={`Cast ${skill.name}`} hotkey="C">
-              <img src={skill.icon} alt="" draggable={false} />
-            </PadButton>
-            {skills.length > 1 && <button type="button" className="pad-swap" aria-label={`Skill: ${skill.name}. Choose skill`} aria-haspopup="menu" aria-expanded={menuOpen} title={skill.name} onClick={() => setMenuOpen(!menuOpen)}>
-              <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M5 8 L12 17 L19 8 Z" fill="#fff" stroke="#1d2b4a" strokeWidth="2.5" strokeLinejoin="round" /></svg>
-            </button>}
-            {menuOpen && <ul className="pad-skill-menu" role="menu">
-              {skills.map((option) => (
-                <li key={option.id} role="none">
-                  <button type="button" role="menuitemradio" aria-checked={option.id === skill.id} onClick={() => { setPickedId(option.id); window.localStorage.setItem('mf-skill', option.id); setMenuOpen(false); }}>
-                    <img src={option.icon} alt="" draggable={false} />{option.name}
-                  </button>
-                </li>
-              ))}
-            </ul>}
-          </div>}
           <PadButton input="jump" controller={controller} className="pad-jump" label="Jump" hotkey="Space">Jump</PadButton>
           <PadButton input="attack" controller={controller} className="pad-attack" label="Attack" hotkey="Z">Attack</PadButton>
         </div>
