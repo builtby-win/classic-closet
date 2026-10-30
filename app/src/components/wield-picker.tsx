@@ -1,29 +1,26 @@
 import { WEAPON_GROUPS, wieldLabel } from '../lib/fashion';
 
-/** One-tap stance switch for the worn weapon skin: a chip per weapon type it ships art for. */
+/** Stance switch for the worn weapon skin: one option per weapon type it ships art for. */
 export default function WieldPicker({ choices, value, onChange }: { choices: string[]; value: string; onChange: (wield: string) => void }) {
   return (
-    <div className="wield-picker" role="group" aria-label="Wield weapon as">
+    <label className="wield-picker">
       <span>Wield as</span>
-      {choices.map((choice) => (
-        <button key={choice} type="button" className={'job-pill' + (value === choice ? ' on' : '')} aria-pressed={value === choice} onClick={() => onChange(choice)}>
-          {wieldLabel(choice)}
-        </button>
-      ))}
-    </div>
+      <select value={value} onChange={(e) => onChange(e.target.value)} aria-label="Wield weapon as">
+        {choices.map((choice) => <option key={choice} value={choice}>{wieldLabel(choice)}</option>)}
+      </select>
+    </label>
   );
 }
 
-/** Weapon drawer filter by stance (1H, 2H, bow, …); tap the active chip again to clear. */
+/** Weapon drawer filter by stance (1H, 2H, bow, …). */
 export function WeaponGroupFilter({ value, onChange }: { value: string | null; onChange: (group: string | null) => void }) {
   return (
-    <div className="wield-picker" role="group" aria-label="Filter weapons by type">
+    <label className="wield-picker">
       <span>Type</span>
-      {WEAPON_GROUPS.map((group) => (
-        <button key={group.id} type="button" className={'job-pill' + (value === group.id ? ' on' : '')} aria-pressed={value === group.id} onClick={() => onChange(value === group.id ? null : group.id)}>
-          {group.label}
-        </button>
-      ))}
-    </div>
+      <select value={value ?? ''} onChange={(e) => onChange(e.target.value || null)} aria-label="Filter weapons by type">
+        <option value="">All types</option>
+        {WEAPON_GROUPS.map((group) => <option key={group.id} value={group.id}>{group.label}</option>)}
+      </select>
+    </label>
   );
 }
