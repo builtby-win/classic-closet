@@ -35,6 +35,7 @@ import {
   weaponPoses,
   weaponSubOf,
   weaponInGroup,
+  wieldForGroup,
   weaponVariant,
   wieldChoice,
   resolveWield,
@@ -294,6 +295,13 @@ export default function FashionIsland() {
     });
   }, []);
 
+  // Filtering by weapon type also wields the worn multi-type skin as that type.
+  const chooseWeaponGroup = useCallback((group: string | null) => {
+    setWeaponGroup(group);
+    const wield = group ? wieldForGroup(getItem(CATALOG, look.items.Weapon), group, weaponSubOf(getItem(CATALOG, look.items.Weapon), look.wield)) : undefined;
+    if (wield && wield !== weaponSubOf(getItem(CATALOG, look.items.Weapon), look.wield)) chooseWield(wield);
+  }, [look.items.Weapon, look.wield, chooseWield]);
+
   const chooseClass = useCallback((next: string) => {
     setJob(next);
     const weapon = randomClassicWeapon(look.sex, next === 'All' ? 'Beginner' : next);
@@ -341,8 +349,10 @@ export default function FashionIsland() {
     const unequipping = !cosmetic && currentId === id;
     const pickedWeapon = slot === 'Weapon' && !unequipping ? getItem(CATALOG, id) : undefined;
     const resolved = pickedWeapon ? resolveWield(getItem(CATALOG, look.items.Weapon), look.wield, pickedWeapon) : undefined;
-    const nextWield = slot === 'Weapon' ? resolved?.wield : slot === 'Shield' && !unequipping ? oneHandedWield(getItem(CATALOG, look.items.Weapon), look.wield) ?? look.wield : look.wield;
-    setWieldNotice(pickedWeapon && resolved?.notice ? { id, name: pickedWeapon.name, ...resolved.notice } : null);
+    // With a weapon type filter on, a multi-type skin is picked as that type.
+    const groupWield = pickedWeapon && weaponGroup ? wieldForGroup(pickedWeapon, weaponGroup, resolved?.wield ?? look.wield) : undefined;
+    const nextWield = slot === 'Weapon' ? groupWield ?? resolved?.wield : slot === 'Shield' && !unequipping ? oneHandedWield(getItem(CATALOG, look.items.Weapon), look.wield) ?? look.wield : look.wield;
+    setWieldNotice(pickedWeapon && !groupWield && resolved?.notice ? { id, name: pickedWeapon.name, ...resolved.notice } : null);
     const nextItems = cosmetic ? look.items : applyPick(look.items, slot, unequipping ? null : id, sub, nextWield);
     const removed = Object.keys(look.items).filter((key) => nextItems[key] === undefined || (key === 'Weapon' && nextItems[key] !== look.items[key]));
     const slotNames: Record<string, string> = { Top: 'shirt', Bottom: 'pants', Overall: 'overall', Shield: 'shield', Weapon: 'two-handed weapon' };
@@ -384,7 +394,7 @@ export default function FashionIsland() {
       const stance = stanceForWeapon(weaponSub, look.anim) ?? bareHands;
       patch({ items: nextItems, ...(slot === 'Weapon' || slot === 'Shield' ? { wield: nextWield } : {}), ...(stance ? { anim: stance.anim, frame: stance.frame } : {}) });
     }
-  }, [look, patch, job]);
+  }, [look, patch, job, weaponGroup]);
 
   const tryOnCrate = useCallback((items: Array<{ id: number; isHair?: boolean; sub: string; sex?: 'm' | 'f' | 'u' }>) => {
     const available = items.filter((i) => !i.sex || i.sex === 'u' || i.sex === look.sex);
@@ -1677,7 +1687,7 @@ export default function FashionIsland() {
                       const wornSub = weaponSubOf(getItem(CATALOG, look.items.Weapon), look.wield);
                       return (
                         <div className="slot-stance">
-                          <WeaponGroupFilter value={weaponGroup} onChange={setWeaponGroup} />
+                          <WeaponGroupFilter value={weaponGroup} onChange={chooseWeaponGroup} />
                           {wornSub && <WieldPicker choices={wieldChoices.length > 1 ? wieldChoices : [wornSub]} value={wieldChoices.length > 1 ? wornWield : wornSub} onChange={chooseWield} />}
                         </div>
                       );
@@ -1990,7 +2000,7 @@ export default function FashionIsland() {
                 ))}
               </div>
             )}
-            {catSec === 'Weapon' && <WeaponGroupFilter value={weaponGroup} onChange={setWeaponGroup} />}
+            {catSec === 'Weapon' && <WeaponGroupFilter value={weaponGroup} onChange={chooseWeaponGroup} />}
             {catSec === 'Weapon' && wieldChoices.length > 1 && <WieldPicker choices={wieldChoices} value={wornWield} onChange={chooseWield} />}
             {catSec === 'Hair' && (
               <div id="drawer-color">
