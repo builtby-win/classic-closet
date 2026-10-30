@@ -13,12 +13,23 @@ const OUT_DIR = join(ROOT, 'public', 'sprites', 'skills');
 const REFERENCE_ROOT = 'https://javipen.github.io/maplestory-cosmetic-playground/';
 
 /** Skill ids as they appear in the reference data/skills/ folder. */
-const SKILL_IDS = ['4201003', '4001003']; // Savage Blow, Lucky Seven
+const SKILL_IDS = [
+  '1001001', '1001002', // Power Strike, Slash Blast (warrior)
+  '2001002', '2001003', // Energy Bolt, Magic Claw (mage)
+  '3101005', '3201004', '3111003', // Arrow Bomb, Iron Arrow, Strafe (bow / crossbow)
+  '4001002', '4201003', '4001003', // Double Stab, Savage Blow, Lucky Seven (thief)
+];
+
+/** The reference names some records oddly or leaves them blank; the pad label is set here. */
+const NAME_OVERRIDES: Record<string, string> = { '3101005': 'Arrow Bomb', '3201004': 'Iron Arrow' };
 
 /**
- * Thrown projectiles are item sprites, not part of the skill data: skill id -> item id
- * whose icon flies at the target (Lucky Seven throws Subi throwing stars).
+ * Arrow Bomb's hit record (3101005) is unnamed and ships no in-flight arrow; that lives in the
+ * record named after the skill: skill id -> { sequence name -> record id to take it from }.
  */
+const SEQUENCE_DONORS: Record<string, Record<string, string>> = { '3101005': { ball: '3101004' } };
+
+/** Thrown item projectiles: skill id -> item id whose icon flies at the target (Lucky Seven's Subi stars). */
 const PROJECTILE_ITEMS: Record<string, number> = { '4001003': 2070000 };
 
 interface Point {
@@ -93,7 +104,14 @@ async function main(): Promise<void> {
     mkdirSync(skillDir, { recursive: true });
     const publicDir = `/sprites/skills/${id}`;
     const sequences: Record<string, BakedSkillFrame[]> = {};
-    for (const [name, frames] of Object.entries(raw.sequences)) {
+    const sources: [string, ReferenceFrame[]][] = Object.entries(raw.sequences);
+    for (const [name, donorId] of Object.entries(SEQUENCE_DONORS[id] ?? {})) {
+      const donorRaw: ReferenceSkill = JSON.parse((await fetchBytes(`data/skills/${donorId}.json`)).toString('utf8'));
+      const frames = donorRaw.sequences[name];
+      if (!frames) throw new Error(`Donor ${donorId} has no ${name} sequence`);
+      sources.push([name, frames]);
+    }
+    for (const [name, frames] of sources) {
       const baked: BakedSkillFrame[] = [];
       for (const frame of frames) {
         if (!frame.url) continue;
@@ -107,7 +125,8 @@ async function main(): Promise<void> {
       }
       if (baked.length) sequences[name] = baked;
     }
-    if (!raw.icon?.url) throw new Error(`Skill ${id} has no icon`);
+    const iconUrl = raw.icon?.url;
+    if (!iconUrl) throw new Error(`Skill ${id} has no icon`);
     let projectile: string | undefined;
     const item = PROJECTILE_ITEMS[id];
     if (item) {
@@ -122,14 +141,14 @@ async function main(): Promise<void> {
     }
     manifest[id] = {
       id,
-      name: raw.name,
-      icon: `${publicDir}/${await savePng(skillDir, raw.icon.url)}`,
+      name: NAME_OVERRIDES[id] ?? raw.name,
+      icon: `${publicDir}/${await savePng(skillDir, iconUrl)}`,
       masterLevel: raw.max_stored_level,
       weaponTypes: raw.weapon_types,
       projectile,
       sequences,
     };
-    console.log(`${raw.name}: ${Object.entries(sequences).map(([k, v]) => `${k}=${v.length}`).join(' ')}`);
+    console.log(`${NAME_OVERRIDES[id] ?? raw.name}: ${Object.entries(sequences).map(([k, v]) => `${k}=${v.length}`).join(' ')}`);
   }
   writeFileSync(join(OUT_DIR, 'skills.json'), JSON.stringify(manifest));
 }
