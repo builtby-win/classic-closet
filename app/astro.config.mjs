@@ -8,5 +8,6 @@ import react from '@astrojs/react';
 // + live render/icon images direct from maplestory.io (CORS: *).
 export default defineConfig({
   output: 'static',
+  devToolbar: { enabled: false },
   integrations: [react()],
 });
