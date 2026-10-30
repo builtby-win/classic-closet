@@ -937,7 +937,7 @@
 .pad-skill-menu button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 8px; border: 0; border-radius: 8px; background: none; color: var(--txt); font: 600 12px/1.2 'Inter', system-ui, sans-serif; text-align: left; cursor: pointer; }
 .pad-skill-menu button[aria-checked="true"] { background: var(--accent-soft); color: var(--accent); }
 .pad-skill-menu img { width: 24px; height: 24px; image-rendering: pixelated; }
-@media (max-width: 420px) { #gamepad { padding-left: 8px; padding-right: 8px; } .pad-row { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 4px; } .pad-dir, .pad-actions { gap: 4px; } .pad-btn { width: 41px; height: 41px; border-radius: 14px; } .pad-actions .pad-btn { width: 50px; height: 50px; } .pad-cast { width: 64px !important; height: 64px !important; border-radius: 20px; } .pad-cast img { width: 38px; height: 38px; } }
+@media (max-width: 420px) { #gamepad { padding-left: 8px; padding-right: 8px; } .pad-row { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 4px; } .pad-dir, .pad-actions { gap: 4px; } .pad-btn { width: 41px; height: 41px; border-radius: 14px; } .pad-actions .pad-btn { width: 50px; height: 50px; } .pad-cast { width: 64px !important; height: 64px !important; border-radius: 20px; } .pad-cast::before { inset: -3px; } .pad-cast img { width: 38px; height: 38px; } }
 /* Smaller character in play mode so skill effects (up to ~110 sprite px out) stay on screen. */
 .mf.playing #canvas { max-width: 230px; }
 .mf.playing .name-row { opacity: 0; }
