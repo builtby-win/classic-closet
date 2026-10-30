@@ -173,7 +173,7 @@ export function parseLookParams(params: URLSearchParams): ParsedLook | null {
     anim: cleanAnim(params.get('anim')),
     frame: toInt(params.get('frame'), DEFAULTS.frame, 0, 12),
   };
-  const KNOWN = new Set(['sex', 'skin', 'hair', 'hairCol', 'face', 'anim', 'frame', 'look']);
+  const KNOWN = new Set(['sex', 'skin', 'hair', 'hairCol', 'face', 'anim', 'frame', 'wield', 'look']);
   const items: Record<string, number> = {};
   for (const [k, v] of params) {
     if (KNOWN.has(k)) continue;

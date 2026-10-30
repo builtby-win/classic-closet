@@ -16,11 +16,11 @@ const KEYS: Record<string, PlayInput> = {
 
 const ARROW_ROTATE = { left: 270, down: 180, right: 90 } as const;
 
-/** Chunky white arrow with a dark outline, in the MapleStory UI style. */
+/** Chunky rounded white arrow, in the MapleStory UI style. */
 function Arrow({ dir }: { dir: keyof typeof ARROW_ROTATE }) {
   return (
-    <svg viewBox="0 0 24 24" width="32" height="32" aria-hidden="true" style={{ transform: `rotate(${ARROW_ROTATE[dir]}deg)` }}>
-      <path d="M12 3 L21 13 H15.5 V21 H8.5 V13 H3 Z" fill="#fff" stroke="#1d2b4a" strokeWidth="2" strokeLinejoin="round" />
+    <svg className="pad-arrow" viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" style={{ transform: `rotate(${ARROW_ROTATE[dir]}deg)` }}>
+      <path d="M12 5.5 L19 13.5 H14.5 V19 H9.5 V13.5 H5 Z" fill="#fff" stroke="#fff" strokeWidth="3" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -110,28 +110,30 @@ export default function GamePad({ controller, onExit, wield }: { controller: Pla
 
   return (
     <div id="gamepad" role="group" aria-label="Character controls">
-      <button
-        type="button"
-        id="pad-grip"
-        aria-label="Back to closet"
-        onClick={onExit}
-        onPointerDown={(event) => { swipeY.current = event.clientY; }}
-        onPointerUp={(event) => {
-          if (swipeY.current !== null && swipeY.current - event.clientY > 30) onExit();
-          swipeY.current = null;
-        }}
-      ><span /><small>Closet</small></button>
-      {wield && wield.choices.length > 1 && (
-        <label className="pad-wield">
-          Wield
-          <select value={wield.value} aria-label="Wield weapon as" onChange={(event) => { wield.onChange(event.target.value); event.target.blur(); }}>
-            {wield.choices.map((choice) => <option key={choice} value={choice}>{wieldLabel(choice)}</option>)}
-          </select>
-        </label>
-      )}
-      <button type="button" className="pad-mastery" onClick={() => setSwipe((current) => (current + 1) % SWIPE_LEVELS.length)} aria-label={`Weapon swipe: ${tier.name}. Tap to change`}>
-        <i style={{ background: tier.level === null ? 'conic-gradient(#6f96ff, #c86eff, #ff5f6e, #6f96ff)' : swipeDot(tier.level) }} />Swipe · {tier.name}
-      </button>
+      <div className="pad-top">
+        {wield && wield.choices.length > 1 && (
+          <label className="pad-wield">
+            Wield
+            <select value={wield.value} aria-label="Wield weapon as" onChange={(event) => { wield.onChange(event.target.value); event.target.blur(); }}>
+              {wield.choices.map((choice) => <option key={choice} value={choice}>{wieldLabel(choice)}</option>)}
+            </select>
+          </label>
+        )}
+        <button
+          type="button"
+          id="pad-grip"
+          aria-label="Back to closet"
+          onClick={onExit}
+          onPointerDown={(event) => { swipeY.current = event.clientY; }}
+          onPointerUp={(event) => {
+            if (swipeY.current !== null && swipeY.current - event.clientY > 30) onExit();
+            swipeY.current = null;
+          }}
+        ><span /><small>Closet</small></button>
+        <button type="button" className="pad-mastery" onClick={() => setSwipe((current) => (current + 1) % SWIPE_LEVELS.length)} aria-label={`Weapon swipe: ${tier.name}. Tap to change`}>
+          <i style={{ background: tier.level === null ? 'conic-gradient(#6f96ff, #c86eff, #ff5f6e, #6f96ff)' : swipeDot(tier.level) }} />Swipe · {tier.name}
+        </button>
+      </div>
       <div className="pad-row">
         <div className="pad-dir">
           <PadButton input="left" controller={controller} className="pad-left" label="Walk left"><Arrow dir="left" /></PadButton>

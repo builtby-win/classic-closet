@@ -71,6 +71,8 @@ Icons are fetched client-side, so a fix only reaches prod after `pnpm deploy`.
 
 Cash weapon skins ship frames per underlying weapon type (`frameBooksPerWeaponType`). `bake-sprites`
 writes a catalog `wsub` (Bow, Crossbow, Claw, …) for skins that fit a single family, and
-`weaponSubOf()` makes stance, shield removal and play-mode attacks follow it. Re-run
-`pnpm bake-sprites` after `pnpm catalog` so new cash weapons get classified; `pnpm catalog`
-rewrites `catalog.json` and drops `wsub`.
+`weaponSubOf()` makes stance, shield removal and play-mode attacks follow it. Skins that ship art for
+several types also get `wtypes` (sub → variant file code) and per-type art in
+`public/sprites/items/<id>.w<code>.json`; the "wield as" picker sets `Look.wield` (`?wield=`), which
+`weaponSubOf`/`weaponVariant` and the renderer honor. Re-run `pnpm bake-sprites` after `pnpm catalog`
+so new cash weapons get classified; `pnpm catalog` rewrites `catalog.json` and drops `wsub`/`wtypes`.

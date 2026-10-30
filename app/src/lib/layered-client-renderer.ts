@@ -1,5 +1,5 @@
 import { CLASSIC_ZMAP_ORDER, composeLayers, drawComposition, type Point, type SourceLayer } from './layered-renderer';
-import type { Look } from './fashion';
+import { CATALOG, weaponVariant, type Look } from './fashion';
 import { ATTACK_FRAMES } from './skills';
 
 interface BaseEffect {
@@ -37,7 +37,7 @@ interface ItemRecord {
 /** Poses baked into `<id>.motion.json` (play mode) instead of the main item file. */
 export const MOTION_ANIMS = new Set(['walk1', 'walk2', 'prone', ...Object.keys(ATTACK_FRAMES)]);
 
-const records = new Map<number, Promise<ItemRecord | null>>();
+const records = new Map<string, Promise<ItemRecord | null>>();
 const motionRecords = new Map<number, Promise<ItemRecord | null>>();
 const images = new Map<string, Promise<HTMLImageElement>>();
 let baseManifest: Promise<BaseManifest | null> | null = null;
@@ -82,14 +82,45 @@ async function fetchRemoteItem(id: number): Promise<ItemRecord | null> {
   }
 }
 
-function localItem(id: number): Promise<ItemRecord | null> {
-  const cached = records.get(id);
+/** `variant` > 0 is a cash weapon's per-weapon-type art (`<id>.w<variant>.json`), which already carries its motion frames. */
+function localItem(id: number, variant = 0): Promise<ItemRecord | null> {
+  const key = variant ? `${id}.w${variant}` : String(id);
+  const cached = records.get(key);
   if (cached) return cached;
-  const request = fetch(`/sprites/items/${id}.json`)
-    .then((response) => response.ok ? response.json() as Promise<ItemRecord> : fetchRemoteItem(id))
-    .catch(() => fetchRemoteItem(id));
-  records.set(id, request);
+  const request = fetch(`/sprites/items/${key}.json`)
+    .then((response) => response.ok ? response.json() as Promise<ItemRecord> : variant ? localItem(id) : fetchRemoteItem(id))
+    .catch(() => variant ? localItem(id) : fetchRemoteItem(id));
+  records.set(key, request);
   return request;
+}
+
+const emoteRecords = new Map<number, Promise<ItemRecord | null>>();
+
+/** Face record plus its expression frames; a face without an emote file just keeps its default expression. */
+function localEmoteFace(id: number): Promise<ItemRecord | null> {
+  let request = emoteRecords.get(id);
+  if (!request) {
+    request = Promise.all([
+      localItem(id),
+      fetch(`/sprites/items/${id}.emotes.json`)
+        .then((response) => response.ok ? response.json() as Promise<Pick<ItemRecord, 'frames'>> : null)
+        .catch(() => null),
+    ]).then(([record, emotes]) => record && emotes ? { ...record, frames: { ...record.frames, ...emotes.frames } } : record);
+    emoteRecords.set(id, request);
+  }
+  return request;
+}
+
+/** The face's own expression art by emote id (`default` included), as data URLs for the picker. */
+export async function faceExpressionSprites(id: number): Promise<Record<string, string>> {
+  const record = await localEmoteFace(id);
+  const sprites: Record<string, string> = {};
+  for (const [key, effects] of Object.entries(record?.frames ?? {})) {
+    const [name, frame] = key.split(':');
+    const image = effects[0]?.image;
+    if (name && frame === '0' && image) sprites[name] = image;
+  }
+  return sprites;
 }
 
 /** Item record plus its play-mode frames; a missing motion file just means no extra poses. */
@@ -121,7 +152,8 @@ function localImage(src: string): Promise<HTMLImageElement> {
   if (cached) return cached;
   const request = new Promise<HTMLImageElement>((resolve, reject) => {
     const image = new Image();
-    image.onload = () => resolve(image);
+    // Resolve only once decoded, so the first drawImage never decodes on the main thread mid-frame.
+    image.onload = () => { image.decode().catch(() => undefined).then(() => resolve(image)); };
     image.onerror = () => reject(new Error('Could not load local sprite image'));
     image.src = src;
   });
@@ -131,7 +163,10 @@ function localImage(src: string): Promise<HTMLImageElement> {
 }
 
 function frameEffects(record: ItemRecord, look: Look, isFace: boolean): EffectRecord[] {
-  if (isFace) return record.frames['default:0'] ?? [];
+  if (isFace) {
+    const emote = look.emote;
+    return (emote && (record.frames[`${emote}:${look.emoteFrame ?? 0}`] ?? record.frames[`${emote}:0`])) || record.frames['default:0'] || [];
+  }
   const wanted = `${look.anim || 'stand1'}:${look.frame || 0}`;
   return record.frames[wanted]
     ?? record.frames[`${look.anim || 'stand1'}:0`]
@@ -205,10 +240,13 @@ export async function renderLayeredCharacter(
     if (id != null) selections.push({ id, part: slot });
   }
 
-  const loaded = await Promise.all(selections.map(async (selection) => ({
-    selection,
-    record: await (!selection.face && MOTION_ANIMS.has(look.anim) ? localMotionItem(selection.id) : localItem(selection.id)),
-  })));
+  const weaponId = look.items.Weapon;
+  const variant = weaponId != null ? weaponVariant(CATALOG.items[weaponId], look.wield) : 0;
+  const loaded = await Promise.all(selections.map(async (selection) => {
+    if (selection.face && look.emote) return { selection, record: await localEmoteFace(selection.id) };
+    if (selection.part === 'Weapon' && variant) return { selection, record: await localItem(selection.id, variant) };
+    return { selection, record: await (!selection.face && MOTION_ANIMS.has(look.anim) ? localMotionItem(selection.id) : localItem(selection.id)) };
+  }));
   for (const { record, selection } of loaded) {
     if (!record) missing.push(selection.id);
   }
@@ -245,19 +283,72 @@ export async function renderLayeredCharacter(
   return { missing: [...new Set(missing)], unresolved: composition.unresolved, origin };
 }
 
-/** Decode every frame of the given poses ahead of time so play mode never stalls on first use. */
-export async function warmPoses(look: Look, poses: Array<{ anim: string; frames: number }>): Promise<void> {
-  const scratch = document.createElement('canvas').getContext('2d');
-  if (!scratch) return;
-  for (const { anim, frames } of poses) {
-    for (let frame = 0; frame < frames; frame++) {
-      await renderLayeredCharacter(scratch, { ...look, anim, frame }).catch(() => undefined);
-    }
+/** A fully composited look+pose, ready to blit with a single drawImage. */
+export interface PosedFrame {
+  canvas: HTMLCanvasElement;
+  missing: number[];
+  unresolved: string[];
+  origin: Point;
+}
+
+/** Composited frames of the current look only (play mode cycles a handful of poses); cleared whenever the look changes. */
+let framesLook = '';
+const frames = new Map<string, Promise<PosedFrame>>();
+const readyFrames = new Map<string, PosedFrame>();
+
+/** Identity of everything about a look except its pose. */
+export function lookIdentity(look: Look): string {
+  return JSON.stringify({ ...look, name: '', anim: '', frame: 0, emote: '', emoteFrame: 0 });
+}
+
+function frameKey(look: Look, size: number): string {
+  return `${look.anim}:${look.frame}:${look.emote ?? ''}:${look.emoteFrame ?? 0}:${size}`;
+}
+
+/** The composited frame if it is already built, else undefined; lets callers draw synchronously. */
+export function readyPosedFrame(identity: string, look: Look, size: number): PosedFrame | undefined {
+  return identity === framesLook ? readyFrames.get(frameKey(look, size)) : undefined;
+}
+
+/** Composite (once) a look at a pose into its own canvas. `identity` is `lookIdentity(look)`. */
+export function posedFrame(identity: string, look: Look, size: number): Promise<PosedFrame> {
+  if (identity !== framesLook) {
+    framesLook = identity;
+    frames.clear();
+    readyFrames.clear();
+  }
+  const key = frameKey(look, size);
+  const cached = frames.get(key);
+  if (cached) return cached;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return Promise.reject(new Error('no 2d context'));
+  const request = renderLayeredCharacter(ctx, look, size, size).then((result) => {
+    const built: PosedFrame = { canvas, ...result };
+    // A frame built with missing art may be fixed by a retry, so only complete frames are cached.
+    if (identity !== framesLook) return built;
+    if (result.missing.length || result.unresolved.length) frames.delete(key);
+    else readyFrames.set(key, built);
+    return built;
+  });
+  request.catch(() => { if (frames.get(key) === request) frames.delete(key); });
+  frames.set(key, request);
+  return request;
+}
+
+/** Composite every frame of the given poses ahead of time so play mode never stalls on first use. */
+export async function warmPoses(look: Look, poses: Array<{ anim: string; frames: number }>, size: number): Promise<void> {
+  const identity = lookIdentity(look);
+  for (const { anim, frames: count } of poses) {
+    await Promise.all(Array.from({ length: count }, (_, frame) =>
+      posedFrame(identity, { ...look, anim, frame }, size).catch(() => undefined)));
   }
 }
 
 /** Attack poses an item actually has baked frames for (cash weapons ship whatever their art needs). */
-export async function motionActions(id: number): Promise<Set<string>> {
-  const record = await localMotionItem(id);
+export async function motionActions(id: number, variant = 0): Promise<Set<string>> {
+  const record = await (variant ? localItem(id, variant) : localMotionItem(id));
   return new Set(Object.keys(record?.frames ?? {}).map((key) => key.split(':')[0]!));
 }

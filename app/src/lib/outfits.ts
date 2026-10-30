@@ -23,7 +23,7 @@ export function outfitKey(look: Look): string {
 
 /** A detached copy safe to keep: pose and name stripped. */
 export function snapshot(look: Look): Look {
-  return { ...look, name: '', anim: 'stand1', frame: 0, items: { ...look.items } };
+  return { ...look, name: '', anim: 'stand1', frame: 0, emote: undefined, emoteFrame: undefined, items: { ...look.items } };
 }
 
 function read(): Outfit[] {
