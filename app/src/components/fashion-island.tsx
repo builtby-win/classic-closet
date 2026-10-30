@@ -2384,8 +2384,8 @@ function CharacterEditor({ look, skins, onName, onSex, onSkin }: {
       <div className="setrow">
         <span>gender</span>
         <div className="seg">
-          <button className={look.sex === 'm' ? 'on' : ''} onClick={() => onSex('m')}>♂ Male</button>
-          <button className={look.sex === 'f' ? 'on' : ''} onClick={() => onSex('f')}>♀ Female</button>
+          <button className={look.sex === 'm' ? 'on' : ''} onClick={() => onSex('m')}><GenderIcon sex="m" />Male</button>
+          <button className={look.sex === 'f' ? 'on' : ''} onClick={() => onSex('f')}><GenderIcon sex="f" />Female</button>
         </div>
       </div>
       <div className="setrow">
