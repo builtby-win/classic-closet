@@ -661,9 +661,9 @@
 .tile-badge svg { width: 12px; height: 12px; flex: none; }
 .tile.on::after { content: ''; position: absolute; bottom: 4px; right: 4px; width: 16px; height: 16px; border-radius: 50%; background: var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m3.5 8.5 3 3 6-7'/%3E%3C/svg%3E") center/10px no-repeat; box-shadow: 0 1px 2px rgba(0,0,0,0.3); z-index: 3; pointer-events: none; }
 .tile.mini.on::after { width: 12px; height: 12px; bottom: 2px; right: 2px; background-size: 8px; }
-.tile .tile-expiration, .tile.on .tile-expiration { background: #ffb020; border-color: #ffb020; color: #1a1200 !important; width: auto; min-width: 16px; height: 16px; padding: 0 4px; font-size: 8.5px; font-weight: 700; letter-spacing: -0.01em; line-height: 16px; border-radius: 4px; box-sizing: border-box; white-space: nowrap; }
+.tile .tile-expiration, .tile.on .tile-expiration { flex: none; background: #ffb020; border-color: #ffb020; color: #1a1200 !important; width: auto; min-width: 16px; height: 16px; padding: 0 4px; font-size: 8.5px; font-weight: 700; letter-spacing: -0.01em; line-height: 16px; border-radius: 4px; box-sizing: border-box; white-space: nowrap; }
 .tile .tile-expiration.expired, .tile.on .tile-expiration.expired { width: 18px; height: 18px; padding: 0; background: #ff8a80; border-color: #ff8a80; color: #2a0500 !important; }
-.tile.mini .tile-expiration, .tile.mini.on .tile-expiration { height: 13px; min-width: 15px; padding: 0 3px; font-size: 8px; font-weight: 700; border-radius: 3px; line-height: 13px; color: #1a1200 !important; }
+.tile.mini .tile-expiration, .tile.mini.on .tile-expiration { width: auto; flex: none; height: 13px; min-width: 15px; padding: 0 3px; font-size: 8px; font-weight: 700; border-radius: 3px; line-height: 13px; color: #1a1200 !important; }
 .tile.mini .tile-expiration.expired, .tile.mini.on .tile-expiration.expired { width: 14px; height: 14px; padding: 0; color: #2a0500 !important; }
 .tile-expiration svg { width: 12px; height: 12px; }
 .tile.mini .tile-expiration svg { width: 10px; height: 10px; }
@@ -969,6 +969,8 @@
   color: var(--dim);
   border-radius: calc(var(--radius-sm) - 2px);
   cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
   font: 600 12px/1 'Inter', system-ui, sans-serif;
   transition: all 0.15s ease;
   user-select: none;
@@ -992,9 +994,10 @@
   box-shadow: 0 1px 3px rgba(0,0,0,0.2);
 }
 .gender-toggle-btn .gender-sym {
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1;
+  width: 16px;
+  height: 16px;
+  flex: none;
+  display: block;
 }
 @media (max-width: 520px) {
   .gender-toggle-btn .gender-label {

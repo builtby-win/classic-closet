@@ -53,6 +53,7 @@ import {
   type Sex,
 } from '../lib/fashion';
 import catalogData from '../data/catalog.json';
+import { GenderIcon } from './gender-icon';
 import LayeredCharacterCanvas from './layered-character-canvas';
 import GamePad from './game-pad';
 import DropModal, { type DropEntry } from './drop-modal';
@@ -1423,7 +1424,7 @@ export default function FashionIsland() {
                 aria-pressed={look.sex === 'm'}
                 title="Switch to Male character and items"
               >
-                <span className="gender-sym">♂</span>
+                <GenderIcon sex="m" />
                 <span className="gender-label">Male</span>
               </button>
               <button
@@ -1433,7 +1434,7 @@ export default function FashionIsland() {
                 aria-pressed={look.sex === 'f'}
                 title="Switch to Female character and items"
               >
-                <span className="gender-sym">♀</span>
+                <GenderIcon sex="f" />
                 <span className="gender-label">Female</span>
               </button>
             </div>
