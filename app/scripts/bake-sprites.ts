@@ -67,6 +67,9 @@ async function fetchItemData(id: number, src?: 'GMS' | 'OSMS' | 'MCW' | 'MCW1', 
       if (!res.ok) continue;
       const raw = await res.json();
       if (raw?.frameBooks && Object.keys(raw.frameBooks).length) return raw;
+      // Some cash weapons (Glowing Pumpkin Basket) ship only per-weapon-type books: base art is the first type's.
+      const typeBook = Object.keys(WEAPON_TYPE_SUB).map((code) => raw?.frameBooksPerWeaponType?.[code]).find((book) => book && Object.keys(book).length);
+      if (typeBook) return { ...raw, frameBooks: typeBook };
     } catch {
       // retry with backoff
     }

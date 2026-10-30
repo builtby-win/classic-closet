@@ -162,9 +162,9 @@ test('a new cash weapon keeps the held type when it fits, else falls back with a
   assert.deepEqual(resolveWield(crossbow, undefined, items[1702445]!), { wield: 'Crossbow' });
   // From another skin wielded as a crossbow, the type carries on to the next skin that fits it.
   assert.deepEqual(resolveWield(items[1702445], 'Crossbow', items[1702468]!), { wield: 'Crossbow' });
-  // The pumpkin basket ships one frame book but Nexon lists every family, so a held bow/crossbow keeps its type.
-  assert.deepEqual(resolveWield(bow, undefined, items[1702806]!), { wield: 'Bow' });
-  assert.deepEqual(resolveWield(crossbow, undefined, items[1702806]!), { wield: 'Crossbow' });
+  // The pumpkin basket ships a frame book for every family, so a held bow/crossbow keeps its type.
+  assert.deepEqual(resolveWield(bow, undefined, items[1702092]!), { wield: 'Bow' });
+  assert.deepEqual(resolveWield(crossbow, undefined, items[1702092]!), { wield: 'Crossbow' });
   assert.deepEqual(resolveWield(sword, undefined, items[1702036]!), { notice: { types: ['Spear', 'Pole Arm'], applied: 'Spear', held: 'One-Handed Sword' } });
   assert.deepEqual(resolveWield(crossbow, undefined, items[1702036]!).notice?.held, 'Crossbow');
   // Swapping between one-handed types, a matching single-type skin, or nothing held never prompts.
