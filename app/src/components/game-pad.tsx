@@ -60,9 +60,9 @@ function PadButton({ input, controller, className, label, hotkey, children }: {
 export default function GamePad({ controller, onExit, wield }: { controller: PlayController; onExit: () => void; wield?: { choices: string[]; value: string; onChange: (wield: string) => void } }) {
   const swipeY = useRef<number | null>(null);
   const [skills, setSkills] = useState<BakedSkill[]>([]);
-  const [picked, setPicked] = useState(0);
+  const [pickedId, setPickedId] = useState(() => window.localStorage.getItem('mf-skill') ?? '');
   const [menuOpen, setMenuOpen] = useState(false);
-  const skill = skills[picked];
+  const skill = skills.find((s) => s.id === pickedId) ?? skills[0];
   const [swipe, setSwipe] = useState(() => {
     const saved = Number(window.localStorage.getItem('mf-swipe'));
     return Number.isInteger(saved) && saved >= 0 && saved < SWIPE_LEVELS.length ? saved : 0;
@@ -149,9 +149,9 @@ export default function GamePad({ controller, onExit, wield }: { controller: Pla
               <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M5 8 L12 17 L19 8 Z" fill="#fff" stroke="#1d2b4a" strokeWidth="2.5" strokeLinejoin="round" /></svg>
             </button>}
             {menuOpen && <ul className="pad-skill-menu" role="menu">
-              {skills.map((option, index) => (
+              {skills.map((option) => (
                 <li key={option.id} role="none">
-                  <button type="button" role="menuitemradio" aria-checked={index === picked} onClick={() => { setPicked(index); setMenuOpen(false); }}>
+                  <button type="button" role="menuitemradio" aria-checked={option.id === skill.id} onClick={() => { setPickedId(option.id); window.localStorage.setItem('mf-skill', option.id); setMenuOpen(false); }}>
                     <img src={option.icon} alt="" draggable={false} />{option.name}
                   </button>
                 </li>
