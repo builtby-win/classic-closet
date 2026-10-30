@@ -34,6 +34,11 @@ import {
   TWO_HAND_SUBS,
   weaponPoses,
   weaponSubOf,
+  weaponVariant,
+  wieldChoice,
+  resolveWield,
+  wieldOptions,
+  oneHandedWield,
   RANDOM_EQUIP_SLOTS,
   type BannerMeta,
   type ItemMeta,
@@ -49,6 +54,7 @@ import catalogData from '../data/catalog.json';
 import LayeredCharacterCanvas from './layered-character-canvas';
 import GamePad from './game-pad';
 import DropModal, { type DropEntry } from './drop-modal';
+import WieldPicker from './wield-picker';
 import { announcements, attainableNow, dropInfo, formatHM, loadSeen, saveSeen, unseen } from '../lib/drops';
 import { autoSwipeLevel } from '../lib/afterimage';
 import { PlayController, PLAY_POSES, SPRITE_CANVAS } from '../lib/play-controller';
@@ -150,7 +156,7 @@ function normalizeStance(look: Look): Look {
   // pose round-trips as its own param). Steer stand/walk poses to the worn
   // weapon's frames; action poses carry their own frames and are left alone.
   if (look.anim !== 'stand1' && look.anim !== 'stand2' && look.anim !== 'walk1' && look.anim !== 'walk2') return look;
-  const sub = weaponSubOf(getItem(CATALOG, look.items.Weapon));
+  const sub = weaponSubOf(getItem(CATALOG, look.items.Weapon), look.wield);
   const stance = stanceForWeapon(sub ?? 'One-Handed Sword', look.anim);
   return stance ? { ...look, anim: stance.anim, frame: stance.frame } : look;
 }
@@ -265,6 +271,27 @@ export default function FashionIsland() {
     setLook((l) => ({ ...l, ...p }));
   }, []);
 
+  // A wield choice only means something to a skin that ships art for it; drop it once that skin is gone.
+  useEffect(() => {
+    if (look.wield && !Object.hasOwn(getItem(CATALOG, look.items.Weapon)?.wtypes ?? {}, look.wield)) patch({ wield: undefined });
+  }, [look.wield, look.items.Weapon, patch]);
+
+  // Shown when a cash weapon skin can't be wielded as the type the player was using.
+  const [wieldNotice, setWieldNotice] = useState<{ id: number; name: string; types: string[]; applied: string; held: string } | null>(null);
+
+  const chooseWield = useCallback((wield: string) => {
+    setWieldNotice(null);
+    setLook((l) => {
+      const sub = weaponSubOf(getItem(CATALOG, l.items.Weapon), wield);
+      const items = applyPick(l.items, 'Weapon', l.items.Weapon ?? null, sub, wield);
+      const stance = stanceForWeapon(sub, l.anim);
+      if (stance) return { ...l, wield, items, anim: stance.anim, frame: stance.frame };
+      // An attack the new weapon type lacks falls back to its idle stance.
+      const poses = weaponPoses(sub);
+      return poses.some((p) => p.anim === l.anim) ? { ...l, wield, items } : { ...l, wield, items, anim: poses[0]!.anim, frame: 0 };
+    });
+  }, []);
+
   const chooseClass = useCallback((next: string) => {
     setJob(next);
     const weapon = randomClassicWeapon(look.sex, next === 'All' ? 'Beginner' : next);
@@ -310,9 +337,22 @@ export default function FashionIsland() {
     const cosmetic = sub === 'Hair' || sub === 'Face';
     if (cosmetic && currentId === selectedId) return;
     const unequipping = !cosmetic && currentId === id;
-    const nextItems = cosmetic ? look.items : applyPick(look.items, slot, unequipping ? null : id, sub);
+    const pickedWeapon = slot === 'Weapon' && !unequipping ? getItem(CATALOG, id) : undefined;
+    const resolved = pickedWeapon ? resolveWield(getItem(CATALOG, look.items.Weapon), look.wield, pickedWeapon) : undefined;
+    const nextWield = slot === 'Weapon' ? resolved?.wield : slot === 'Shield' && !unequipping ? oneHandedWield(getItem(CATALOG, look.items.Weapon), look.wield) ?? look.wield : look.wield;
+    setWieldNotice(pickedWeapon && resolved?.notice ? { id, name: pickedWeapon.name, ...resolved.notice } : null);
+    const nextItems = cosmetic ? look.items : applyPick(look.items, slot, unequipping ? null : id, sub, nextWield);
     const removed = Object.keys(look.items).filter((key) => nextItems[key] === undefined || (key === 'Weapon' && nextItems[key] !== look.items[key]));
     const slotNames: Record<string, string> = { Top: 'shirt', Bottom: 'pants', Overall: 'overall', Shield: 'shield', Weapon: 'two-handed weapon' };
+    // A shield that forces a two-handed weapon off puts a one-handed one in its place; say which, not just "removed".
+    const swapped = slot === 'Shield' && look.items.Weapon != null && nextItems.Weapon != null && nextItems.Weapon !== look.items.Weapon
+      ? `Swapped ${getItem(CATALOG, look.items.Weapon)?.name ?? 'weapon'} for ${getItem(CATALOG, nextItems.Weapon)?.name ?? 'a one-handed weapon'} (a shield needs a free hand)`
+      : '';
+    const dropped = swapped ? removed.filter((key) => key !== 'Weapon') : removed;
+    // A multi-type skin kept by the shield drops from its two-handed type to a one-handed one, which changes its stance.
+    const rewielded = slot === 'Shield' && !unequipping && nextWield && nextWield !== look.wield && nextItems.Weapon != null && nextItems.Weapon === look.items.Weapon
+      ? `Switched ${getItem(CATALOG, nextItems.Weapon)?.name ?? 'weapon'} to ${nextWield}`
+      : '';
     // Grey-out tap: wearing an off-job classic switches the global filter to
     // that item's job so the outfit stays coherent for the new job.
     const picked = !cosmetic && !unequipping ? getItem(CATALOG, id) : undefined;
@@ -323,7 +363,7 @@ export default function FashionIsland() {
       id: selectedId,
       name: getItem(CATALOG, selectedId)?.name ?? sub,
       action: unequipping ? 'Removed' : 'Equipped',
-      replaced: !unequipping && (removed.length || switching) ? [removed.length ? `Removed ${removed.map((key) => slotNames[key] ?? key.toLowerCase()).join(' and ')}` : '', switching ? `Switched class to ${switching}` : ''].filter(Boolean).join(' · ') : '',
+      replaced: !unequipping && (removed.length || rewielded || switching) ? [swapped, rewielded, dropped.length ? `Removed ${dropped.map((key) => slotNames[key] ?? key.toLowerCase()).join(' and ')}` : '', switching ? `Switched class to ${switching}` : ''].filter(Boolean).join(' · ') : '',
       sequence: ++toastSequence.current,
     });
     if (sub === 'Hair') patch({ hair: id, hairCol: id % 10 });
@@ -332,15 +372,15 @@ export default function FashionIsland() {
       const weaponSub = unequipping && slot === 'Weapon'
         ? undefined
         : sub === 'Shield'
-          ? weaponSubOf(getItem(CATALOG, nextItems.Weapon))
-          : slot === 'Weapon' ? weaponSubOf(getItem(CATALOG, id)) ?? sub : sub;
+          ? weaponSubOf(getItem(CATALOG, nextItems.Weapon), nextWield)
+          : slot === 'Weapon' ? weaponSubOf(getItem(CATALOG, id), nextWield) ?? sub : sub;
       // Tapping the worn weapon off falls back to bare hands; stand2/walk2
       // have no unarmed frames, so steer back to stand1/walk1.
       const bareHands = unequipping && slot === 'Weapon' && (look.anim === 'stand2' || look.anim === 'walk2')
         ? { anim: look.anim === 'stand2' ? 'stand1' : 'walk1', frame: 0 }
         : null;
       const stance = stanceForWeapon(weaponSub, look.anim) ?? bareHands;
-      patch(stance ? { items: nextItems, anim: stance.anim, frame: stance.frame } : { items: nextItems });
+      patch({ items: nextItems, ...(slot === 'Weapon' || slot === 'Shield' ? { wield: nextWield } : {}), ...(stance ? { anim: stance.anim, frame: stance.frame } : {}) });
     }
   }, [look, patch, job]);
 
@@ -1112,7 +1152,9 @@ export default function FashionIsland() {
     .map(([k, v]) => ({ slot: k, id: v, meta: getItem(CATALOG, v) }));
 
   // Collect any non-attainable worn items
-  const poses = weaponPoses(weaponSubOf(getItem(CATALOG, look.items.Weapon)));
+  const poses = weaponPoses(weaponSubOf(getItem(CATALOG, look.items.Weapon), look.wield));
+  const wieldChoices = wieldOptions(getItem(CATALOG, look.items.Weapon));
+  const wornWield = wieldChoice(getItem(CATALOG, look.items.Weapon), look.wield);
   // Keep a pose the worn weapon lacks (stale shared link) selectable instead of a blank picker.
   if (!poses.some((p) => p.anim === look.anim)) poses.push({ anim: look.anim, label: look.anim });
   const frameCount = look.anim === 'jump' ? 1 : look.anim in ATTACK_FRAMES ? ATTACK_FRAMES[look.anim]! : look.anim.startsWith('stand') ? 3 : Infinity;
@@ -1193,7 +1235,7 @@ export default function FashionIsland() {
     setSettingsOpen(false);
     const next = new PlayController(element, () => {
       const weapon = getItem(CATALOG, lookRef.current.items.Weapon);
-      return { id: lookRef.current.items.Weapon ?? undefined, sub: weaponSubOf(weapon), level: autoSwipeLevel(weapon?.requiredLevel) };
+      return { id: lookRef.current.items.Weapon ?? undefined, variant: weaponVariant(weapon, lookRef.current.wield), sub: weaponSubOf(weapon, lookRef.current.wield), level: autoSwipeLevel(weapon?.requiredLevel) };
     });
     setController(next);
     return next;
@@ -1231,7 +1273,7 @@ export default function FashionIsland() {
   }, [controller]);
   // Decode the worn look's walk/duck/attack frames up front so the first steps don't stutter.
   useEffect(() => {
-    if (controller) void warmPoses(look, PLAY_POSES);
+    if (controller) void warmPoses(look, PLAY_POSES, SPRITE_CANVAS);
   }, [controller, look]);
 
   // Drag the sheet down: it follows the finger while the stage grows to show the whole
@@ -1394,6 +1436,13 @@ export default function FashionIsland() {
             <span className={'name-tag' + (look.name ? '' : ' empty')}>{look.name ? String(look.name) : 'Your name'}</span>
           </div>
           {undoLook && <div className="undo-bar" role="status"><span>Outfit changed</span><button type="button" onClick={(e) => { e.stopPropagation(); setLook(undoLook); setUndoLook(null); }}>Undo</button><button type="button" aria-label="Dismiss" onClick={(e) => { e.stopPropagation(); setUndoLook(null); }}>×</button></div>}
+          {wieldNotice && wieldNotice.id === look.items.Weapon && (
+            <div className="wield-notice" role="status">
+              <span>{wieldNotice.name} only fits {wieldNotice.types.join(', ')}, not {wieldNotice.held}. Wielding as <b>{wieldNotice.applied}</b>.</span>
+              {wieldNotice.types.filter((type) => type !== wieldNotice.applied).map((type) => <button key={type} type="button" onClick={(e) => { e.stopPropagation(); chooseWield(type); }}>{type}</button>)}
+              <button type="button" aria-label="Dismiss" onClick={(e) => { e.stopPropagation(); setWieldNotice(null); }}>×</button>
+            </div>
+          )}
           <div className="equip-toast-slot" role="status" aria-live="polite" aria-atomic="true">
             {equipToast && <div className="equip-toast" key={equipToast.sequence}>
               <img src={iconURL(equipToast.id)} alt="" onError={(e) => { const next = iconFallbackURL(e.currentTarget.src); if (next) e.currentTarget.src = next; }} />
@@ -1620,6 +1669,7 @@ export default function FashionIsland() {
                       </div>
                       <button className="slot-seeall" aria-label={`See all ${slot.label}`} onClick={() => { openCat(slot.id); setCatQ(q); }}>See all →</button>
                     </div>
+                    {slot.id === 'Weapon' && wieldChoices.length > 1 && <WieldPicker choices={wieldChoices} value={wornWield} onChange={chooseWield} />}
                     {(slot.id === 'Hair' || slot.id === 'Face') && <div className="rail-colors" role="group" aria-label={slot.id === 'Hair' ? 'Hair color' : 'Eye color'}>
                       {(slot.id === 'Hair' ? HAIR_COLORS : EYE_COLORS).map((color, i) => <ColorSwatch key={color} color={color} dot={(slot.id === 'Hair' ? HAIR_DOTS : EYE_DOTS)[i]} selected={(slot.id === 'Hair' ? look.hairCol : faceColorIndex(look.face)) === i} onClick={() => slot.id === 'Hair' ? patch({ hair: Math.floor(look.hair / 10) * 10 + i, hairCol: i }) : patch({ face: faceVariantId(look.face >= 21000 ? 'f' : 'm', faceStyleId(look.face), i) })} />)}
                     </div>}
@@ -1928,6 +1978,7 @@ export default function FashionIsland() {
                 ))}
               </div>
             )}
+            {catSec === 'Weapon' && wieldChoices.length > 1 && <WieldPicker choices={wieldChoices} value={wornWield} onChange={chooseWield} />}
             {catSec === 'Hair' && (
               <div id="drawer-color">
                 <span id="drawer-color-label">Hair color · {HAIR_COLORS[look.hairCol]}</span>

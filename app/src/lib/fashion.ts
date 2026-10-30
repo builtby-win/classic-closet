@@ -196,6 +196,13 @@ export function wieldOptions(item: { wtypes?: Record<string, number> } | undefin
   return item?.wtypes ? Object.keys(item.wtypes) : [];
 }
 
+/** Compact chip label for a wield type. */
+const WIELD_LABELS: Record<string, string> = {
+  'One-Handed Sword': '1H Sword', 'One-Handed Axe': '1H Axe', 'One-Handed Blunt Weapon': '1H Blunt',
+  'Two-Handed Sword': '2H Sword', 'Two-Handed Axe': '2H Axe', 'Two-Handed Blunt': '2H Blunt', 'Pole Arm': 'Polearm',
+};
+export const wieldLabel = (sub: string): string => WIELD_LABELS[sub] ?? sub;
+
 /** The option a wield picker shows: the active type, or for a skin still on its generic base art, the first type sharing that art. */
 export function wieldChoice(item: { sub: string; wsub?: string; wtypes?: Record<string, number> } | undefined, wield?: string): string {
   const options = wieldOptions(item);
