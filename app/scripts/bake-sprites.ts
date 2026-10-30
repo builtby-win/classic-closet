@@ -8,6 +8,7 @@ import { writeFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { bakeBaseBodies } from './bake-base-layers';
+import { unreviewedItems } from './lib/sprite-review';
 import { EMOTES, EYE_COLORS, faceVariantId } from '../src/lib/fashion';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -482,6 +483,8 @@ async function main() {
   }
   console.log(`Pruned ${prunedStyles} unreleased styles, ${prunedFaces} unreleased faces and ${prunedEquips} unreleased equips with incomplete art.`);
   console.log(`Done! ${count} items processed.`);
+  const needReview = unreviewedItems().length;
+  if (needReview) console.warn(`\n${needReview} baked sprite(s) need human review before shipping: pnpm check-sprites`);
 }
 
 main().catch((error) => {

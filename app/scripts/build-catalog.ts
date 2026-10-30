@@ -15,6 +15,7 @@
  * Run:
  *   pnpm catalog
  */
+import { createHash } from 'node:crypto';
 import { writeFileSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -324,6 +325,35 @@ function pinRecord(id: number, forcedSrc?: PinSource): { item: RawItem | GmsItem
   return null;
 }
 
+/** Same-name GMS records in one slot and gender (hidden siblings included): retail reuses names
+ *  for different art (1702806 lantern vs 1702092 pumpkin, both "Glowing Pumpkin Basket"). Gender
+ *  splits are fine. Collisions are checked by icon hash before the catalog is written. */
+const nameCollisions: Array<{ name: string; a: GmsItem; b: GmsItem }> = [];
+function recordNameCollisions(name: string, picked: GmsItem[], hiddenSiblings: GmsItem[]): void {
+  const slot = (g: GmsItem) => `${g.typeInfo.subCategory}/${g.requiredGender}`;
+  const seen = new Map<string, GmsItem>();
+  for (const g of [...picked, ...hiddenSiblings]) {
+    const twin = seen.get(slot(g));
+    if (twin && twin.id !== g.id && !nameCollisions.some((c) => c.a.id === twin.id && c.b.id === g.id)) nameCollisions.push({ name, a: twin, b: g });
+    seen.set(slot(g), g);
+  }
+}
+
+async function iconHash(id: number): Promise<string> {
+  const raw = await fetch(`${GMS_API}/item/${id}`).then((r) => r.json()) as { metaInfo?: { iconRaw?: string } };
+  if (!raw.metaInfo?.iconRaw) throw new Error(`no icon to compare for GMS ${id}`);
+  return createHash('md5').update(raw.metaInfo.iconRaw).digest('hex');
+}
+
+/** Same-name items with different art must be pinned by a human, never picked by name. */
+async function assertNoAmbiguousNames(): Promise<void> {
+  for (const { name, a, b } of nameCollisions) {
+    if ((await iconHash(a.id)) !== (await iconHash(b.id))) {
+      throw new Error(`ambiguous crate item name "${name}": GMS ${a.id} and ${b.id} are both ${a.typeInfo.subCategory} with different art. Pin the right id in data/nexon-overlay.json -> pins (verify art in the cash shop first).`);
+    }
+  }
+}
+
 function resolveCrateItem(name: string): Array<{ item: RawItem | GmsItem; src: AssetSource | undefined }> {
   const pin = overlayPins.get(name.toLowerCase());
   if (pin != null) {
@@ -337,15 +367,17 @@ function resolveCrateItem(name: string): Array<{ item: RawItem | GmsItem; src: A
     if (hiddenIds.has(mcw.id)) { console.warn(`crate item hidden: ${name} -> ${mcw.id} (${hiddenIds.get(mcw.id)})`); hiddenNameHits.add(name); return []; }
     return [{ item: mcw, src: mcw.src }];
   }
-  const candidates = (gmsByNameAll.get(name.toLowerCase()) ?? [])
-    .filter((g) => g.typeInfo.overallCategory === 'Equip')
+  const sameName = (gmsByNameAll.get(name.toLowerCase()) ?? []).filter((g) => g.typeInfo.overallCategory === 'Equip');
+  const candidates = sameName
     .filter((g) => {
       if (hiddenIds.has(g.id)) { console.warn(`crate item hidden: ${name} -> ${g.id} (${hiddenIds.get(g.id)})`); hiddenNameHits.add(name); return false; }
       return true;
     });
   if (candidates.length) {
     const cash = candidates.filter((g) => g.isCash);
-    return (cash.length ? cash : candidates).map((g) => ({ item: g, src: 'GMS' as const }));
+    const picked = cash.length ? cash : candidates;
+    recordNameCollisions(name, picked, sameName.filter((g) => hiddenIds.has(g.id)));
+    return picked.map((g) => ({ item: g, src: 'GMS' as const }));
   }
   return [];
 }
@@ -991,6 +1023,8 @@ for (const grp of Object.values(fastCatalog.indexes.groups)) {
 }
 
 fastCatalog.indexes.search.sort((a, b) => a.name.localeCompare(b.name));
+
+await assertNoAmbiguousNames();
 
 const out = join(ROOT, 'src', 'data', 'catalog.json');
 writeFileSync(out, JSON.stringify(fastCatalog));
