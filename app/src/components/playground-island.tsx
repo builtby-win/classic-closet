@@ -35,6 +35,7 @@ import {
   TWO_HAND_SUBS,
   weaponPoses,
   weaponSubOf,
+  weaponInGroup,
   weaponVariant,
   wieldChoice,
   resolveWield,
@@ -54,7 +55,7 @@ import catalogData from '../data/catalog.json';
 import LayeredCharacterCanvas from './layered-character-canvas';
 import GamePad from './game-pad';
 import DropModal, { type DropEntry } from './drop-modal';
-import WieldPicker from './wield-picker';
+import WieldPicker, { WeaponGroupFilter } from './wield-picker';
 import { announcements, attainableNow, dropInfo, formatHM, loadSeen, saveSeen, unseen } from '../lib/drops';
 import { autoSwipeLevel } from '../lib/afterimage';
 import { PlayController, PLAY_POSES, SPRITE_CANVAS } from '../lib/play-controller';
@@ -63,6 +64,7 @@ import { warmPoses } from '../lib/layered-client-renderer';
 import './fashion.css';
 import './playground.css';
 import CompareView from './compare-view';
+import EmoteCarousel from './emote-carousel';
 import OutfitsPanel from './outfits-panel';
 import { outfitKey, snapshot, useSavedOutfits, type Outfit } from '../lib/outfits';
 
@@ -225,6 +227,7 @@ export default function PlaygroundIsland() {
   const [job, setJob] = useState('All');
   const JOBS = ['All', 'Warrior', 'Magician', 'Bowman', 'Thief'];
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [emoteOpen, setEmoteOpen] = useState(false);
   const [controller, setController] = useState<PlayController | null>(null);
   const lookRef = useRef(look);
   lookRef.current = look;
@@ -242,6 +245,7 @@ export default function PlaygroundIsland() {
   }, []);
   useEffect(() => { drawAvatar(); }, [settingsOpen, drawAvatar]);
   const [catSec, setCatSec] = useState<SectionId | null>(null);
+  const [weaponGroup, setWeaponGroup] = useState<string | null>(null);
   const [catQ, setCatQ] = useState('');
   const [expandedCats, setExpandedCats] = useState<Record<string, boolean>>({});
   const [rendering, setRendering] = useState(false);
@@ -564,7 +568,8 @@ export default function PlaygroundIsland() {
     const r = equipSections.find((section) => section.id === catSec)?.ids ?? getGroupEquips(catSec);
     // When a job is selected, that job's gear is sorted up to the top
     // while common and off-job gear remain accessible below.
-    const filtered = needle ? r.filter((id) => matchesFuzzy(CATALOG.items[id]?.name, id, needle)) : r;
+    const matched = needle ? r.filter((id) => matchesFuzzy(CATALOG.items[id]?.name, id, needle)) : r;
+    const filtered = catSec === 'Weapon' && weaponGroup ? matched.filter((id) => weaponInGroup(CATALOG.items[id], weaponGroup)) : matched;
     const levelOf = (id: number) => CATALOG.items[id]?.requiredLevel ?? -1;
     const nameOf = (id: number) => CATALOG.items[id]?.name ?? '';
     const mismatchOf = (id: number) => !matchesJob(CATALOG.items[id], job);
@@ -583,7 +588,7 @@ export default function PlaygroundIsland() {
         levelOf(a.id) - levelOf(b.id) ||
         nameOf(a.id).localeCompare(nameOf(b.id))
       );
-  }, [catSec, catQ, getGroupEquips, equipSections, job, look.sex]);
+  }, [catSec, catQ, getGroupEquips, equipSections, job, look.sex, weaponGroup]);
 
 
   // Equip drawers: partition the flat row list into banner sections so NX
@@ -1297,7 +1302,7 @@ export default function PlaygroundIsland() {
   // Desktop: WASD / arrows start play mode straight away (like the cash shop preview);
   // the pressed key is carried into the new controller so the first step isn't lost.
   const idleKeys = useRef({ blocked: false, start: startPlay });
-  idleKeys.current = { blocked: !!controller || settingsOpen || ratesOpen, start: startPlay };
+  idleKeys.current = { blocked: !!controller || settingsOpen || ratesOpen || emoteOpen, start: startPlay };
   useEffect(() => {
     const desktop = window.matchMedia('(min-width: 900px)');
     const onKeyDown = (event: KeyboardEvent) => {
@@ -1505,6 +1510,12 @@ export default function PlaygroundIsland() {
           )}
           {!controller && (
             <div className="pg-bar">
+              {!comparing && (
+                <button type="button" className={'pg-toggle pg-emote-btn' + (look.emote ? ' has-emote' : '')} onClick={() => setEmoteOpen(true)}
+                  aria-haspopup="true" aria-label="Face emotes" title="Face emotes">
+                  <span aria-hidden="true">{EMOTES.find((emote) => emote.id === look.emote)?.glyph ?? '🙂'}</span>
+                </button>
+              )}
               {recents.length > 0 && (
                 <div className="pg-recent" role="toolbar" aria-label="Recently changed items">
                   {recents.map((id) => {
@@ -1528,6 +1539,9 @@ export default function PlaygroundIsland() {
                 <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2.5" /><path d="M12 4v16" /><path d="m9 9.5-2.5 2.5L9 14.5" /><path d="m15 9.5 2.5 2.5-2.5 2.5" /></svg>
               </button>
             </div>
+          )}
+          {emoteOpen && !comparing && !controller && (
+            <EmoteCarousel value={look.emote} onPick={(emote) => patch({ emote })} onClose={() => setEmoteOpen(false)} />
           )}
           {undoLook && <div className="undo-bar" role="status"><span>Outfit changed</span><button type="button" onClick={(e) => { e.stopPropagation(); setLook(undoLook); setUndoLook(null); }}>Undo</button><button type="button" aria-label="Dismiss" onClick={(e) => { e.stopPropagation(); setUndoLook(null); }}>×</button></div>}
           {wieldNotice && wieldNotice.id === look.items.Weapon && (
@@ -1781,17 +1795,6 @@ export default function PlaygroundIsland() {
                     {(slot.id === 'Hair' || slot.id === 'Face') && <div className="rail-colors" role="group" aria-label={slot.id === 'Hair' ? 'Hair color' : 'Eye color'}>
                       {(slot.id === 'Hair' ? HAIR_COLORS : EYE_COLORS).map((color, i) => <ColorSwatch key={color} color={color} dot={(slot.id === 'Hair' ? HAIR_DOTS : EYE_DOTS)[i]} selected={(slot.id === 'Hair' ? look.hairCol : faceColorIndex(look.face)) === i} onClick={() => slot.id === 'Hair' ? patch({ hair: Math.floor(look.hair / 10) * 10 + i, hairCol: i }) : patch({ face: faceVariantId(look.face >= 21000 ? 'f' : 'm', faceStyleId(look.face), i) })} />)}
                     </div>}
-                    {slot.id === 'Face' && (
-                      <div className="rail-emotes" role="group" aria-label="Face emote">
-                        {EMOTES.map((emote) => (
-                          <button key={emote.id} type="button" className={emote.key ? undefined : 'unreleased'} aria-pressed={look.emote === emote.id}
-                            title={emote.key ? `${emote.key} · ${emote.label}` : `${emote.label} (unreleased)`}
-                            onClick={() => patch({ emote: look.emote === emote.id ? undefined : emote.id })}>
-                            {emote.key && <kbd>{emote.key}</kbd>}{emote.label}
-                          </button>
-                        ))}
-                      </div>
-                    )}
                     <div className="slot-tiles">
                       {(() => {
                         // Pin the worn tile into the featured six so the saved
@@ -2107,6 +2110,7 @@ export default function PlaygroundIsland() {
                 ))}
               </div>
             )}
+            {catSec === 'Weapon' && <WeaponGroupFilter value={weaponGroup} onChange={setWeaponGroup} />}
             {catSec === 'Weapon' && wieldChoices.length > 1 && <WieldPicker choices={wieldChoices} value={wornWield} onChange={chooseWield} />}
             {catSec === 'Hair' && (
               <div id="drawer-color">

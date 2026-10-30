@@ -203,6 +203,24 @@ const WIELD_LABELS: Record<string, string> = {
 };
 export const wieldLabel = (sub: string): string => WIELD_LABELS[sub] ?? sub;
 
+/** Stance groups the Weapon drawer filters by; types in a group share a stance and hand use. */
+export const WEAPON_GROUPS: { id: string; label: string; subs: string[] }[] = [
+  { id: '1h', label: '1H', subs: ['One-Handed Sword', 'One-Handed Axe', 'One-Handed Blunt Weapon', 'Dagger', 'Wand', 'Staff'] },
+  { id: '2h', label: '2H', subs: ['Two-Handed Sword', 'Two-Handed Axe', 'Two-Handed Blunt'] },
+  { id: 'pole', label: 'Spear / Polearm', subs: ['Spear', 'Pole Arm'] },
+  { id: 'bow', label: 'Bow', subs: ['Bow'] },
+  { id: 'xbow', label: 'Crossbow', subs: ['Crossbow'] },
+  { id: 'claw', label: 'Claw', subs: ['Claw'] },
+];
+
+/** Whether a weapon (or a cash skin that can be wielded as one of the group's types) belongs to a stance group. */
+export function weaponInGroup(item: { sub: string; wsub?: string; wtypes?: Record<string, number> } | undefined, groupId: string): boolean {
+  const group = WEAPON_GROUPS.find((g) => g.id === groupId);
+  if (!item || !group) return false;
+  const subs = item.wtypes ? Object.keys(item.wtypes) : [item.wsub ?? item.sub];
+  return subs.some((sub) => group.subs.includes(sub));
+}
+
 /** The option a wield picker shows: the active type, or for a skin still on its generic base art, the first type sharing that art. */
 export function wieldChoice(item: { sub: string; wsub?: string; wtypes?: Record<string, number> } | undefined, wield?: string): string {
   const options = wieldOptions(item);
@@ -362,35 +380,37 @@ export interface Look {
 export interface Emote {
   id: string;
   label: string;
+  /** Emoji shown in the picker. */
+  glyph: string;
   /** Hotkey in the Classic client; absent for emotes the client does not ship yet. */
   key?: string;
 }
 
 /** Face expressions baked per face. The first seven are the F1–F7 hotkeys; the rest are not in Classic yet. */
 export const EMOTES: Emote[] = [
-  { id: 'hit', label: 'Hit', key: 'F1' },
-  { id: 'smile', label: 'Smile', key: 'F2' },
-  { id: 'troubled', label: 'Troubled', key: 'F3' },
-  { id: 'cry', label: 'Cry', key: 'F4' },
-  { id: 'angry', label: 'Angry', key: 'F5' },
-  { id: 'bewildered', label: 'Bewildered', key: 'F6' },
-  { id: 'stunned', label: 'Stunned', key: 'F7' },
-  { id: 'blaze', label: 'Blaze' },
-  { id: 'bowing', label: 'Bowing' },
-  { id: 'cheers', label: 'Cheers' },
-  { id: 'chu', label: 'Chu' },
-  { id: 'dam', label: 'Dam' },
-  { id: 'despair', label: 'Despair' },
-  { id: 'glitter', label: 'Glitter' },
-  { id: 'hot', label: 'Hot' },
-  { id: 'hum', label: 'Hum' },
-  { id: 'love', label: 'Love' },
-  { id: 'oops', label: 'Oops' },
-  { id: 'pain', label: 'Pain' },
-  { id: 'qBlue', label: 'Blue Question' },
-  { id: 'shine', label: 'Shine' },
-  { id: 'vomit', label: 'Vomit' },
-  { id: 'wink', label: 'Wink' },
+  { id: 'hit', glyph: '😵', label: 'Hit', key: 'F1' },
+  { id: 'smile', glyph: '😊', label: 'Smile', key: 'F2' },
+  { id: 'troubled', glyph: '😟', label: 'Troubled', key: 'F3' },
+  { id: 'cry', glyph: '😢', label: 'Cry', key: 'F4' },
+  { id: 'angry', glyph: '😠', label: 'Angry', key: 'F5' },
+  { id: 'bewildered', glyph: '😳', label: 'Bewildered', key: 'F6' },
+  { id: 'stunned', glyph: '😲', label: 'Stunned', key: 'F7' },
+  { id: 'blaze', glyph: '🔥', label: 'Blaze' },
+  { id: 'bowing', glyph: '🙇', label: 'Bowing' },
+  { id: 'cheers', glyph: '🍻', label: 'Cheers' },
+  { id: 'chu', glyph: '😘', label: 'Chu' },
+  { id: 'dam', glyph: '💢', label: 'Dam' },
+  { id: 'despair', glyph: '😩', label: 'Despair' },
+  { id: 'glitter', glyph: '✨', label: 'Glitter' },
+  { id: 'hot', glyph: '🥵', label: 'Hot' },
+  { id: 'hum', glyph: '🎵', label: 'Hum' },
+  { id: 'love', glyph: '😍', label: 'Love' },
+  { id: 'oops', glyph: '😅', label: 'Oops' },
+  { id: 'pain', glyph: '🤕', label: 'Pain' },
+  { id: 'qBlue', glyph: '❓', label: 'Blue Question' },
+  { id: 'shine', glyph: '🌟', label: 'Shine' },
+  { id: 'vomit', glyph: '🤮', label: 'Vomit' },
+  { id: 'wink', glyph: '😉', label: 'Wink' },
 ];
 
 export function isEmote(id: string | undefined): id is string {

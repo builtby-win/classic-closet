@@ -1545,6 +1545,7 @@
 .slot-worn { font-size:11px; color:var(--txt); display:inline-flex; align-items:center; gap:4px; }
 .slot-remove { width:20px; height:20px; border:1px solid var(--line); border-radius:50%; background:var(--surface-2); color:var(--dim); cursor:pointer; line-height:1; padding:0; }
 .wield-picker { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin:2px 0 8px; font-size:11px; color:var(--dim); }
+.wield-picker .job-pill { flex:none; padding:5px 10px; }
 .undo-bar { position:absolute; top:89%; left:50%; transform:translateX(-50%); z-index:4; display:flex; align-items:center; gap:10px; padding:8px 12px; border:1px solid var(--line); border-radius:999px; background:var(--surface-2); box-shadow:0 8px 24px rgba(0,0,0,.5); font-size:12px; white-space:nowrap; }
 .undo-bar button { border:0; background:none; color:var(--accent); font:inherit; font-weight:700; cursor:pointer; padding:4px 6px; }
 .wield-notice { position:absolute; bottom:12%; left:50%; transform:translateX(-50%); z-index:4; display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:6px 8px; width:max-content; max-width:min(92%,460px); padding:8px 12px; border:1px solid var(--line); border-radius:14px; background:var(--surface-2); box-shadow:0 8px 24px rgba(0,0,0,.5); font-size:12px; }

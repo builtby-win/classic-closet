@@ -34,6 +34,7 @@ import {
   TWO_HAND_SUBS,
   weaponPoses,
   weaponSubOf,
+  weaponInGroup,
   weaponVariant,
   wieldChoice,
   resolveWield,
@@ -54,7 +55,7 @@ import catalogData from '../data/catalog.json';
 import LayeredCharacterCanvas from './layered-character-canvas';
 import GamePad from './game-pad';
 import DropModal, { type DropEntry } from './drop-modal';
-import WieldPicker from './wield-picker';
+import WieldPicker, { WeaponGroupFilter } from './wield-picker';
 import { announcements, attainableNow, dropInfo, formatHM, loadSeen, saveSeen, unseen } from '../lib/drops';
 import { autoSwipeLevel } from '../lib/afterimage';
 import { PlayController, PLAY_POSES, SPRITE_CANVAS } from '../lib/play-controller';
@@ -238,6 +239,7 @@ export default function FashionIsland() {
   }, []);
   useEffect(() => { drawAvatar(); }, [settingsOpen, drawAvatar]);
   const [catSec, setCatSec] = useState<SectionId | null>(null);
+  const [weaponGroup, setWeaponGroup] = useState<string | null>(null);
   const [catQ, setCatQ] = useState('');
   const [expandedCats, setExpandedCats] = useState<Record<string, boolean>>({});
   const [rendering, setRendering] = useState(false);
@@ -557,7 +559,8 @@ export default function FashionIsland() {
     const r = equipSections.find((section) => section.id === catSec)?.ids ?? getGroupEquips(catSec);
     // When a job is selected, that job's gear is sorted up to the top
     // while common and off-job gear remain accessible below.
-    const filtered = needle ? r.filter((id) => matchesFuzzy(CATALOG.items[id]?.name, id, needle)) : r;
+    const matched = needle ? r.filter((id) => matchesFuzzy(CATALOG.items[id]?.name, id, needle)) : r;
+    const filtered = catSec === 'Weapon' && weaponGroup ? matched.filter((id) => weaponInGroup(CATALOG.items[id], weaponGroup)) : matched;
     const levelOf = (id: number) => CATALOG.items[id]?.requiredLevel ?? -1;
     const nameOf = (id: number) => CATALOG.items[id]?.name ?? '';
     const mismatchOf = (id: number) => !matchesJob(CATALOG.items[id], job);
@@ -576,7 +579,7 @@ export default function FashionIsland() {
         levelOf(a.id) - levelOf(b.id) ||
         nameOf(a.id).localeCompare(nameOf(b.id))
       );
-  }, [catSec, catQ, getGroupEquips, equipSections, job, look.sex]);
+  }, [catSec, catQ, getGroupEquips, equipSections, job, look.sex, weaponGroup]);
 
 
   // Equip drawers: partition the flat row list into banner sections so NX
@@ -1978,6 +1981,7 @@ export default function FashionIsland() {
                 ))}
               </div>
             )}
+            {catSec === 'Weapon' && <WeaponGroupFilter value={weaponGroup} onChange={setWeaponGroup} />}
             {catSec === 'Weapon' && wieldChoices.length > 1 && <WieldPicker choices={wieldChoices} value={wornWield} onChange={chooseWield} />}
             {catSec === 'Hair' && (
               <div id="drawer-color">
