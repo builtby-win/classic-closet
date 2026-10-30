@@ -47,6 +47,9 @@ export interface ItemMeta {
   /** Cash weapon skins that ship frames for a single weapon family only
    *  (Plastic Slingshot → Bow, Toy Rifle → Crossbow); baked by bake-sprites. */
   wsub?: string;
+  /** Cash weapon skins that ship different art per wieldable weapon type: sub → variant file code
+   *  (`/sprites/items/<id>.w<code>.json`; 0 = the skin's base art). Only set when there are 2+ types. */
+  wtypes?: Record<string, number>;
 }
 
 export interface SearchEntry {
@@ -174,10 +177,59 @@ export function weaponPoses(sub: string | undefined): { anim: string; label: str
   return [{ anim: stand, label: 'Standing' }, { anim: 'alert', label: 'Alert' }, { anim: 'jump', label: 'Jumping' }, ...attackPoses];
 }
 
-/** Weapon family that decides stance, motions and hand usage: a cash skin
- *  that only fits one weapon type behaves as that type, else its own sub. */
-export function weaponSubOf(item: { sub: string; wsub?: string } | undefined): string | undefined {
-  return item ? item.wsub ?? item.sub : undefined;
+/** Weapon family that decides stance, motions and hand usage: the weapon type a cash
+ *  skin is wielded as (`wield`, when the skin ships art for it), else a skin that only
+ *  fits one type behaves as that type, else its own sub. */
+export function weaponSubOf(item: { sub: string; wsub?: string; wtypes?: Record<string, number> } | undefined, wield?: string): string | undefined {
+  if (!item) return undefined;
+  return wield && item.wtypes && Object.hasOwn(item.wtypes, wield) ? wield : item.wsub ?? item.sub;
+}
+
+/** Variant art file for the worn weapon (`<id>.w<code>.json`), or 0 for the item's base art. */
+export function weaponVariant(item: { sub: string; wsub?: string; wtypes?: Record<string, number> } | undefined, wield?: string): number {
+  const sub = weaponSubOf(item, wield);
+  return sub && item?.wtypes && Object.hasOwn(item.wtypes, sub) ? item.wtypes[sub]! : 0;
+}
+
+/** Weapon types a cash skin can be wielded as; empty when it has no choice. */
+export function wieldOptions(item: { wtypes?: Record<string, number> } | undefined): string[] {
+  return item?.wtypes ? Object.keys(item.wtypes) : [];
+}
+
+/** The option a wield picker shows: the active type, or for a skin still on its generic base art, the first type sharing that art. */
+export function wieldChoice(item: { sub: string; wsub?: string; wtypes?: Record<string, number> } | undefined, wield?: string): string {
+  const options = wieldOptions(item);
+  const sub = weaponSubOf(item, wield);
+  return (sub && options.includes(sub) ? sub : options.find((option) => item?.wtypes?.[option] === 0) ?? options[0]) ?? '';
+}
+
+/** All one-handed types share a stance and hand use, so swapping between them is never worth a prompt. */
+const isOneHanded = (sub: string): boolean => sub.startsWith('One-Handed') || sub === 'Dagger' || sub === 'Wand' || sub === 'Staff';
+
+/** The one-handed type a worn multi-type skin can drop to when `wield` is two-handed, so a shield can join it
+ *  without replacing the skin; undefined when it isn't wielded two-handed or has no one-handed art. */
+export function oneHandedWield(item: { sub: string; wsub?: string; wtypes?: Record<string, number> } | undefined, wield?: string): string | undefined {
+  const sub = weaponSubOf(item, wield);
+  if (!sub || !TWO_HAND_SUBS[sub]) return undefined;
+  const options = wieldOptions(item).filter((option) => isOneHanded(option));
+  const own = weaponSubOf(item);
+  return own && options.includes(own) ? own : options[0];
+}
+
+/** What wearing `picked` does to the wield type. A cash skin keeps the type the player was
+ *  already wielding when it ships art for it; otherwise it takes its default type and `notice`
+ *  says which types it does fit, so the player can pick another. */
+export function resolveWield(
+  held: { sub: string; wsub?: string; wtypes?: Record<string, number> } | undefined,
+  heldWield: string | undefined,
+  picked: { sub: string; wsub?: string; wtypes?: Record<string, number> },
+): { wield?: string; notice?: { types: string[]; applied: string; held: string } } {
+  const heldType = weaponSubOf(held, heldWield);
+  if (picked.wtypes && heldType && Object.hasOwn(picked.wtypes, heldType)) return { wield: heldType };
+  const applied = weaponSubOf(picked);
+  if (picked.sub !== 'Cash' || !heldType || heldType === 'Cash' || !applied || applied === 'Cash' || applied === heldType) return {};
+  if (isOneHanded(heldType) && isOneHanded(applied)) return {};
+  return { notice: { types: picked.wtypes ? Object.keys(picked.wtypes) : [applied], applied, held: heldType } };
 }
 
 /** Poses play mode uses for the worn weapon (`attack` is the signature one, `attacks` the baked variants a plain attack picks from); bare hands swing like a 1H weapon. */
@@ -292,6 +344,50 @@ export interface Look {
   anim: string;
   frame: number;
   items: Partial<Record<string, number>>;
+  /** Weapon type a multi-type cash weapon skin is wielded as; only meaningful when the worn weapon lists it in `wtypes`. */
+  wield?: string;
+  /** Face expression (an `EMOTES` id) shown instead of the default face. */
+  emote?: string;
+  /** Render-only: which frame of a multi-frame emote to draw. Never saved or encoded. */
+  emoteFrame?: number;
+}
+
+export interface Emote {
+  id: string;
+  label: string;
+  /** Hotkey in the Classic client; absent for emotes the client does not ship yet. */
+  key?: string;
+}
+
+/** Face expressions baked per face. The first seven are the F1–F7 hotkeys; the rest are not in Classic yet. */
+export const EMOTES: Emote[] = [
+  { id: 'hit', label: 'Hit', key: 'F1' },
+  { id: 'smile', label: 'Smile', key: 'F2' },
+  { id: 'troubled', label: 'Troubled', key: 'F3' },
+  { id: 'cry', label: 'Cry', key: 'F4' },
+  { id: 'angry', label: 'Angry', key: 'F5' },
+  { id: 'bewildered', label: 'Bewildered', key: 'F6' },
+  { id: 'stunned', label: 'Stunned', key: 'F7' },
+  { id: 'blaze', label: 'Blaze' },
+  { id: 'bowing', label: 'Bowing' },
+  { id: 'cheers', label: 'Cheers' },
+  { id: 'chu', label: 'Chu' },
+  { id: 'dam', label: 'Dam' },
+  { id: 'despair', label: 'Despair' },
+  { id: 'glitter', label: 'Glitter' },
+  { id: 'hot', label: 'Hot' },
+  { id: 'hum', label: 'Hum' },
+  { id: 'love', label: 'Love' },
+  { id: 'oops', label: 'Oops' },
+  { id: 'pain', label: 'Pain' },
+  { id: 'qBlue', label: 'Blue Question' },
+  { id: 'shine', label: 'Shine' },
+  { id: 'vomit', label: 'Vomit' },
+  { id: 'wink', label: 'Wink' },
+];
+
+export function isEmote(id: string | undefined): id is string {
+  return id != null && EMOTES.some((emote) => emote.id === id);
 }
 
 export const DEFAULT_LOOK: Look = {
@@ -491,7 +587,7 @@ export function iconFallbackURL(url: string): string | null {
  *  shield, and tapping a shield while a two-handed weapon is worn swaps to a
  *  one-handed weapon (classic behavior: shields need a free hand).
  */
-export function applyPick(items: Look['items'], slot: string, id: number | null, sub?: string): Look['items'] {
+export function applyPick(items: Look['items'], slot: string, id: number | null, sub?: string, wield?: string): Look['items'] {
   const next = { ...items };
   if (slot === 'Overall' && id) {
     delete next.Top;
@@ -500,12 +596,12 @@ export function applyPick(items: Look['items'], slot: string, id: number | null,
   if ((slot === 'Top' || slot === 'Bottom') && id) {
     delete next.Overall;
   }
-  const pickSub = slot === 'Weapon' && id ? weaponSubOf(CATALOG.items[id]) ?? sub : sub;
+  const pickSub = slot === 'Weapon' && id ? weaponSubOf(CATALOG.items[id], wield) ?? sub : sub;
   if (slot === 'Weapon' && id && pickSub && TWO_HAND_SUBS[pickSub]) {
     delete next.Shield;
   }
   if (slot === 'Shield' && id) {
-    const weaponSub = weaponSubOf(CATALOG.items[next.Weapon ?? -1]);
+    const weaponSub = weaponSubOf(CATALOG.items[next.Weapon ?? -1], wield);
     if (weaponSub && TWO_HAND_SUBS[weaponSub]) {
       // Swap to a one-handed weapon so the shield has a free hand: prefer the
       // starter Sword, else the first 1H classic-equip in the catalog.
@@ -548,6 +644,8 @@ export function encodeLook(look: Look): string {
   params.set('face', String(look.face));
   params.set('anim', look.anim);
   params.set('frame', String(look.frame));
+  if (isEmote(look.emote)) params.set('emote', look.emote);
+  if (look.wield && look.items.Weapon != null && Object.hasOwn(CATALOG.items[look.items.Weapon]?.wtypes ?? {}, look.wield)) params.set('wield', look.wield);
   for (const [slot, id] of Object.entries(look.items)) {
     params.set(slot, String(id));
   }
@@ -581,9 +679,12 @@ export function decodeLook(input?: string): Partial<Look> | null {
       if (params.has('face')) partial.face = Number(params.get('face')) || 20805;
       if (params.has('anim')) partial.anim = params.get('anim') || 'stand1';
       if (params.has('frame')) partial.frame = Number(params.get('frame')) || 0;
+      if (params.has('wield')) partial.wield = params.get('wield') ?? undefined;
+      const emote = params.get('emote') ?? undefined;
+      if (isEmote(emote)) partial.emote = emote;
       // Equip slots (Hat, Top, Bottom, Overall, Shoes, Weapon, …) round-trip as
       // their own params — anything else here is an equip id.
-      const KNOWN: Record<string, true> = { name: true, sex: true, skin: true, hair: true, hairCol: true, face: true, anim: true, frame: true, look: true };
+      const KNOWN: Record<string, true> = { name: true, sex: true, skin: true, hair: true, hairCol: true, face: true, anim: true, frame: true, wield: true, emote: true, look: true };
       const items: Partial<Record<string, number>> = {};
       for (const [k, v] of params) {
         if (KNOWN[k]) continue;
