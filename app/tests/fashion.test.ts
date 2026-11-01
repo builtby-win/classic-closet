@@ -166,7 +166,16 @@ test('a new cash weapon keeps the held type when it fits, else falls back with a
   assert.deepEqual(resolveWield(bow, undefined, items[1702092]!), { wield: 'Bow' });
   assert.deepEqual(resolveWield(crossbow, undefined, items[1702092]!), { wield: 'Crossbow' });
   assert.deepEqual(resolveWield(sword, undefined, items[1702036]!), { notice: { types: ['Spear', 'Pole Arm'], applied: 'Spear', held: 'One-Handed Sword' } });
-  assert.deepEqual(resolveWield(crossbow, undefined, items[1702036]!).notice?.held, 'Crossbow');
+  // Same idle pose, no prompt: crossbow and spear are both stand2/walk2, and
+  // 1H, claw and bow are all stand1/walk1.
+  assert.deepEqual(resolveWield(crossbow, undefined, items[1702036]!), {});
+  assert.deepEqual(resolveWield(sword, undefined, items[1702009]!), {});
+  assert.deepEqual(resolveWield(items[1702009], undefined, sword), {});
+  assert.deepEqual(resolveWield(sword, undefined, items[1702003]!), {});
+  assert.deepEqual(resolveWield(items[1702003], undefined, { sub: 'Cash', wsub: 'One-Handed Sword' }), {});
+  // The Angel Wand fits every family, so the held type carries on with no notice.
+  assert.deepEqual(resolveWield(crossbow, undefined, items[1702004]!), { wield: 'Crossbow' });
+  assert.deepEqual(resolveWield(sword, undefined, items[1702004]!), { wield: 'One-Handed Sword' });
   // Swapping between one-handed types, a matching single-type skin, or nothing held never prompts.
   assert.deepEqual(resolveWield(axe, undefined, { sub: 'Cash', wsub: 'One-Handed Sword' }), {});
   assert.deepEqual(resolveWield(bow, undefined, items[1702003]!), {});

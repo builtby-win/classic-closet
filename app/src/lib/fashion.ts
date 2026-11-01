@@ -239,6 +239,14 @@ export function wieldChoice(item: { sub: string; wsub?: string; wtypes?: Record<
 /** All one-handed types share a stance and hand use, so swapping between them is never worth a prompt. */
 const isOneHanded = (sub: string): boolean => sub.startsWith('One-Handed') || sub === 'Dagger' || sub === 'Wand' || sub === 'Staff';
 
+/** Idle-pose signature: swaps inside one signature (1H, claw and bow are all
+ *  stand1/walk1) never change the pose, so they never prompt — only a swap to a
+ *  stand2 family (2H sword, spear, crossbow, …) or back does. */
+const stanceKey = (sub: string): string => {
+  const motion = WEAPON_STANCE[sub];
+  return motion ? `${motion.stand}/${motion.walk}` : sub;
+};
+
 /** The one-handed type a worn multi-type skin can drop to when `wield` is two-handed, so a shield can join it
  *  without replacing the skin; undefined when it isn't wielded two-handed or has no one-handed art. */
 export function oneHandedWield(item: { sub: string; wsub?: string; wtypes?: Record<string, number> } | undefined, wield?: string): string | undefined {
@@ -261,7 +269,7 @@ export function resolveWield(
   if (picked.wtypes && heldType && Object.hasOwn(picked.wtypes, heldType)) return { wield: heldType };
   const applied = weaponSubOf(picked);
   if (picked.sub !== 'Cash' || !heldType || heldType === 'Cash' || !applied || applied === 'Cash' || applied === heldType) return {};
-  if (isOneHanded(heldType) && isOneHanded(applied)) return {};
+  if (stanceKey(heldType) === stanceKey(applied)) return {};
   return { notice: { types: picked.wtypes ? Object.keys(picked.wtypes) : [applied], applied, held: heldType } };
 }
 

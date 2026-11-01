@@ -14,7 +14,13 @@
     { "name": "Glowing Pumpkin Basket", "id": 1702092, "src": "GMS", "note": "GMS 270 holds two cash items with this name: 1702806 is a hanging pumpkin lantern, 1702092 is the orange pumpkin basket Classic sells (icon and frames match MCW/1 1702096). Name lookup used to pick the lantern." }
   ],
   "items": [],
-  "weaponFits": [],
+  "weaponFits": [
+    {
+      "id": 1702004,
+      "types": ["One-Handed Sword", "One-Handed Axe", "One-Handed Blunt Weapon", "Dagger", "Wand", "Staff", "Two-Handed Sword", "Two-Handed Axe", "Two-Handed Blunt", "Spear", "Pole Arm", "Bow", "Crossbow", "Claw"],
+      "note": "Angel Wand (Founder's crate 1.00%): GMS 270 description reads 'can be equipped over any weapon'; base frame book ships stand1/stand2 + every attack, so all families share base art (all variant codes 0)."
+    }
+  ],
   "hide": [
     { "id": 1057069, "wrongIconMd5": "b03d3124807da61347acad45dd76f6ed", "note": "Race Queen Uniform (Mystery Fashion Crate 2.50%): MCW serves stale retail BLUE art (worn render verified vs red/white Nexon set 2026-10-21); GMS 270 has nothing. True Classic art in no dataset yet. Drop when a source grows the red/white art." }
   ]
