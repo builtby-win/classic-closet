@@ -8,10 +8,11 @@ const EMOTE_FRAME_MS = 250;
 interface LayeredCharacterCanvasProps {
   look: Look;
   onRendered?: (canvas?: HTMLCanvasElement) => void;
+  onLoading?: () => void;
 }
 
 /** Canvas view for the independent, local-only layer compositor. */
-export default function LayeredCharacterCanvas({ look: savedLook, onRendered }: LayeredCharacterCanvasProps) {
+export default function LayeredCharacterCanvas({ look: savedLook, onRendered, onLoading }: LayeredCharacterCanvasProps) {
   // Multi-frame emotes (at most two frames) alternate while one is picked; the saved look never carries the frame.
   const [emoteFrame, setEmoteFrame] = useState(0);
   useEffect(() => {
@@ -25,9 +26,11 @@ export default function LayeredCharacterCanvas({ look: savedLook, onRendered }: 
   const baseLook = useMemo(() => (savedLook.emote ? { ...savedLook, emoteFrame } : savedLook), [savedLook, emoteFrame]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const callbackRef = useRef(onRendered);
+  const loadingRef = useRef(onLoading);
   useEffect(() => {
     callbackRef.current = onRendered;
-  }, [onRendered]);
+    loadingRef.current = onLoading;
+  }, [onRendered, onLoading]);
 
   // Play mode overrides only the pose, and only here, so the saved look is untouched. The play-pose store is
   // read outside React: a pose change blits an already-composited frame synchronously instead of re-rendering.
@@ -40,7 +43,7 @@ export default function LayeredCharacterCanvas({ look: savedLook, onRendered }: 
     let latest = 0;
     let renderState = '';
 
-    const apply = (frame: PosedFrame, look: Look, playing: boolean) => {
+    const apply = (frame: PosedFrame, look: Look) => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(frame.canvas, 0, 0);
       setPlayOrigin(frame.origin);
@@ -52,7 +55,7 @@ export default function LayeredCharacterCanvas({ look: savedLook, onRendered }: 
         canvas.dataset.missingAssets = frame.missing.join(',');
         canvas.dataset.unresolvedLayers = frame.unresolved.join(',');
       }
-      if (!playing) callbackRef.current?.(canvas);
+      callbackRef.current?.(canvas);
     };
 
     const show = () => {
@@ -61,14 +64,15 @@ export default function LayeredCharacterCanvas({ look: savedLook, onRendered }: 
       const mine = ++latest;
       const ready = readyPosedFrame(identity, look, canvas.width);
       if (ready) {
-        apply(ready, look, !!pose);
+        apply(ready, look);
         return;
       }
       renderState = 'loading';
+      loadingRef.current?.();
       canvas.dataset.renderState = 'loading';
       canvas.dataset.pose = `${look.anim}:${look.frame}`;
       posedFrame(identity, look, canvas.width).then((frame) => {
-        if (!cancelled && mine === latest) apply(frame, look, !!pose);
+        if (!cancelled && mine === latest) apply(frame, look);
       }).catch((error: unknown) => {
         if (cancelled || mine !== latest) return;
         renderState = 'error';

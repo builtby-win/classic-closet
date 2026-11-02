@@ -265,12 +265,6 @@ export default function FashionIsland() {
       .catch(() => {});
   }, []);
 
-  useEffect(() => {
-    // New look kicked off a fresh async canvas render — show the spinner
-    // until LayeredCharacterCanvas reports back via onRendered.
-    setRendering(true);
-  }, [look]);
-
   const patch = useCallback((p: Partial<Look>) => {
     setLook((l) => ({ ...l, ...p }));
   }, []);
@@ -1444,7 +1438,7 @@ export default function FashionIsland() {
           </div>
         </div>
         <div id="canvas">
-          <LayeredCharacterCanvas look={look} onRendered={(canvas) => { setRendering(false); drawAvatar(canvas); }} />
+          <LayeredCharacterCanvas look={look} onLoading={() => setRendering(true)} onRendered={(canvas) => { setRendering(false); drawAvatar(canvas); }} />
           {rendering && <div id="spin" />}
           <div className="name-row">
             <span className={'name-tag' + (look.name ? '' : ' empty')}>{look.name ? String(look.name) : 'Your name'}</span>

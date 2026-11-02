@@ -272,12 +272,6 @@ export default function PlaygroundIsland() {
       .catch(() => {});
   }, []);
 
-  useEffect(() => {
-    // New look kicked off a fresh async canvas render — show the spinner
-    // until LayeredCharacterCanvas reports back via onRendered.
-    setRendering(true);
-  }, [look]);
-
   const patch = useCallback((p: Partial<Look>) => {
     setLook((l) => ({ ...l, ...p }));
   }, []);
@@ -1502,7 +1496,7 @@ export default function PlaygroundIsland() {
           </div>
         </div>
         <div id="canvas">
-          <LayeredCharacterCanvas look={look} onRendered={(canvas) => { setRendering(false); drawAvatar(canvas); }} />
+          <LayeredCharacterCanvas look={look} onLoading={() => setRendering(true)} onRendered={(canvas) => { setRendering(false); drawAvatar(canvas); }} />
           {rendering && <div id="spin" />}
           {pin && comparing && (
             <CompareView
