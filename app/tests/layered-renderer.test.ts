@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { composeLayers, drawComposition, type SourceLayer } from '../src/lib/layered-renderer';
@@ -260,6 +261,38 @@ test('draws eye decorations over the face', () => {
   const face = result.layers.find((layer) => layer.key === 'face')!;
   const glasses = result.layers.find((layer) => layer.key === 'glasses')!;
   assert.ok(result.layers.indexOf(face) < result.layers.indexOf(glasses));
+});
+
+test('draws baked face accessories in front of the head, Dollish Pink behind the face and Battle Scar over it', () => {
+  const baked = (id: number) => {
+    const record = JSON.parse(readFileSync(new URL(`../public/sprites/items/${id}.json`, import.meta.url), 'utf8')) as {
+      vslot: string; islot: string;
+      frames: Record<string, Array<{ origin: { x: number; y: number }; mapOffset: Record<string, { x: number; y: number }>; position: string }>>;
+    };
+    const effect = record.frames['default:0']![0]!;
+    return {
+      key: String(id), itemKey: String(id), part: 'FaceAcc', name: effect.position, image,
+      width: 10, height: 10, origin: effect.origin, map: effect.mapOffset, z: effect.position,
+      islot: record.islot, vslot: record.vslot,
+    } satisfies SourceLayer;
+  };
+  const face: SourceLayer = {
+    key: 'face', itemKey: '20006', part: 'Face', name: 'face', image,
+    width: 26, height: 16, origin: { x: 13, y: 8 },
+    map: { brow: { x: -1, y: -13 } }, z: 'face', islot: 'Fc', vslot: 'Fc',
+  };
+  const order = (id: number) => {
+    const result = composeLayers([...sourceBase(), face, baked(id)]);
+    assert.deepEqual(result.unresolved, []);
+    assert.ok(result.layers.every((layer) => layer.zIndex >= 0));
+    return result.layers.map((layer) => layer.key);
+  };
+
+  const pink = order(1012083);
+  assert.ok(pink.indexOf('base:Head:head') < pink.indexOf('1012083'));
+  assert.ok(pink.indexOf('1012083') < pink.indexOf('face'));
+  const scar = order(1017000);
+  assert.ok(scar.indexOf('face') < scar.indexOf('1017000'));
 });
 
 test('centers the complete base character without following equipment bounds', () => {
