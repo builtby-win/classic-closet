@@ -237,7 +237,7 @@ export async function renderLayeredCharacter(
   if (look.face) selections.push({ id: look.face, part: 'Face', face: true });
   if (look.hair) selections.push({ id: look.hair, part: 'Hair', hair: true });
   for (const [slot, id] of Object.entries(look.items)) {
-    if (id != null) selections.push({ id, part: slot });
+    if (id != null && slot !== 'Pet Equipment') selections.push({ id, part: slot });
   }
 
   const weaponId = look.items.Weapon;

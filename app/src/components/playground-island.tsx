@@ -472,7 +472,8 @@ export default function PlaygroundIsland() {
       const g = CATALOG.indexes.groups[groupKey];
       if (!g) return [];
       const altSex: Sex = look.sex === 'm' ? 'f' : 'm';
-      return [...g.u, ...g[look.sex], ...g[altSex]];
+      // Pet gear has no pet to sit on here; drawn on the character it floats at the body origin.
+      return [...g.u, ...g[look.sex], ...g[altSex]].filter((id) => CATALOG.items[id]?.sub !== 'Pet Equipment');
     },
     [look.sex],
   );
