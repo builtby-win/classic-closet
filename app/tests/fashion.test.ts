@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { DEFAULT_LOOK, EYE_COLORS, faceColorIndex, faceStyleId, formatAttainableInfo, fuzzyScore, matchesFuzzy, renderURL, assetSource, iconURL, matchesJob, randomLook, equipSlot, type Sex, applyPick, stanceForWeapon, weaponSubOf, weaponVariant, wieldOptions, wieldChoice, oneHandedWield, resolveWield, encodeLook, decodeLook, iconFallbackURL, TWO_HAND_SUBS, RANDOM_EQUIP_SLOTS, saveLookToStorage, loadLookForSex, mirrorStyleForSex, firstBannerStyle, defaultHairForSex, defaultFaceForSex, EMOTES } from '../src/lib/fashion';
 import catalog from '../src/data/catalog.json';
+import { dropInfo } from '../src/lib/drops';
 
 test('mixed render preserves Classic body and equips with retail cosmetics', () => {
   const url = new URL(renderURL({ ...DEFAULT_LOOK, hair: 32397, face: 20033, items: { Hat: 1007116, Overall: 1057049, Shoes: 1077017, Weapon: 1702010 } }));
@@ -299,6 +300,29 @@ test('Halloween crate indexes its drops and bannerId', () => {
   }
   assert.equal(catalog.banners['halloween-crate-oct26'].end, '2026-11-04');
   assert.equal(catalog.banners['style-oct28'].end, '2026-11-11');
+});
+
+test('Nov 4 Mystery crate indexes only its own pool and is upcoming before the switch', () => {
+  const group = catalog.indexes.groups['mystery-crate-2'];
+  const ids = [...group.u, ...group.m, ...group.f];
+  assert.ok(ids.length >= 50, `expected >=50 Nov 4 crate entries, got ${ids.length}`);
+  for (const id of ids) {
+    const item = catalog.items[id as unknown as keyof typeof catalog.items];
+    assert.equal(item.bannerId, 'mystery-crate-nov4');
+    assert.equal(item.group, 'mystery-crate-2');
+  }
+  const names = (key: 'mystery-crate' | 'mystery-crate-2') =>
+    new Set([...catalog.indexes.groups[key].u, ...catalog.indexes.groups[key].m, ...catalog.indexes.groups[key].f]
+      .map((id) => catalog.items[id as unknown as keyof typeof catalog.items].name));
+  // The old pool (live until Nov 4) must not absorb the "Coming Soon" table of the same rate post.
+  assert.ok(names('mystery-crate-2').has('Woodsman Hat'));
+  assert.ok(!names('mystery-crate').has('Woodsman Hat'));
+  assert.ok(!names('mystery-crate-2').has('Toy Rifle'));
+  const banner = catalog.banners['mystery-crate-nov4'];
+  assert.equal(banner.startAt, '2026-11-04T08:00:00Z');
+  assert.equal(banner.endAt, '2026-11-18T08:00:00Z');
+  assert.equal(dropInfo(banner, Date.parse('2026-11-04T07:59:00Z')).state, 'upcoming');
+  assert.equal(dropInfo(banner, Date.parse('2026-11-04T08:00:00Z')).state !== 'upcoming', true);
 });
 
 test('both male and female items are accessible and sort matching sex first', () => {

@@ -99,6 +99,7 @@ const AVATAR_CROP = { x: AVATAR_INSET + 34, y: AVATAR_INSET + 20, size: 60 };
 const CRATE_CHIPS = [
   { bannerId: 'halloween-crate-oct26', group: 'halloween-crate', icon: '🎃', label: 'Halloween' },
   { bannerId: 'mystery-crate-nov26', group: 'mystery-crate', icon: '📦', label: 'Mystery' },
+  { bannerId: 'mystery-crate-nov4', group: 'mystery-crate-2', icon: '🧸', label: 'Mystery · Nov 4' },
   { bannerId: 'founder-crate-oct26', group: 'founder-crate', icon: '🎖️', label: "Founder's" },
 ] as const;
 /** Tiles a closet rail scrolls through before it hands off to "See all". */
@@ -483,7 +484,7 @@ export default function PlaygroundIsland() {
   useEffect(() => setDropNow(Date.now()), []);
 
   const equipSections = useMemo(() => {
-    const ids = [...new Set(['founder-crate', 'halloween-crate', 'mystery-crate', 'aurora-crate', 'cover-10day', 'classic-equips', 'unreleased'].flatMap(getGroupEquips))]
+    const ids = [...new Set(['founder-crate', 'halloween-crate', 'mystery-crate', 'mystery-crate-2', 'aurora-crate', 'cover-10day', 'classic-equips', 'unreleased'].flatMap(getGroupEquips))]
       .filter((id) => !!CATALOG.items[id]);
     return EQUIP_SECTIONS.map((section) => ({
       ...section,
@@ -619,8 +620,8 @@ export default function PlaygroundIsland() {
       buckets.set(key, list);
     }
     const order = job !== 'All'
-      ? ['classic-equips', 'founder-crate', 'halloween-crate', 'mystery-crate', 'cover-10day', 'aurora-crate', 'expired', 'unreleased', 'off-job']
-      : ['founder-crate', 'halloween-crate', 'mystery-crate', 'cover-10day', 'aurora-crate', 'classic-equips', 'expired', 'unreleased'];
+      ? ['classic-equips', 'founder-crate', 'halloween-crate', 'mystery-crate', 'mystery-crate-2', 'cover-10day', 'aurora-crate', 'expired', 'unreleased', 'off-job']
+      : ['founder-crate', 'halloween-crate', 'mystery-crate', 'mystery-crate-2', 'cover-10day', 'aurora-crate', 'classic-equips', 'expired', 'unreleased'];
     const groups = order
       .filter((key) => (buckets.get(key)?.length ?? 0) > 0)
       .map((key) => {
@@ -631,6 +632,7 @@ export default function PlaygroundIsland() {
         const label = key === 'founder-crate' ? "Founder's Mystery Crate"
           : key === 'halloween-crate' ? 'Halloween Mystery Crate'
           : key === 'mystery-crate' ? 'Mystery Fashion Crate'
+          : key === 'mystery-crate-2' ? 'Mystery Fashion Crate · Nov 4'
           : key === 'cover-10day' ? '10-Day Covers'
           : key === 'aurora-crate' ? 'Aurora Stamp Shop'
           : key === 'off-job' ? `Off-job · ${job}` : key === 'expired' ? 'Past rotation' : key === 'unreleased' ? 'Not released yet' : 'Job Equips';
@@ -858,6 +860,26 @@ export default function PlaygroundIsland() {
         daysLeft: days,
         ...bannerPhase(mc),
         items: crateItems('mystery-crate'),
+      });
+    }
+
+    // 1b. Mystery Fashion Crate (Nov 4 pool)
+    const mc2 = CATALOG.banners['mystery-crate-nov4'];
+    if (mc2) {
+      const days = getDays(mc2.end);
+      list.push({
+        id: mc2.id,
+        label: mc2.label,
+        type: 'crate',
+        typeLabel: 'Mystery Crate · Nov 4',
+        start: mc2.start,
+        end: mc2.end,
+        note: mc2.note,
+        post: mc2.post,
+        rates: mc2.rates,
+        daysLeft: days,
+        ...bannerPhase(mc2),
+        items: crateItems('mystery-crate-2'),
       });
     }
 
@@ -1471,6 +1493,8 @@ export default function PlaygroundIsland() {
             ? 'Halloween Crate'
           : catSec === 'mystery-crate'
             ? 'Mystery Crate'
+          : catSec === 'mystery-crate-2'
+            ? 'Mystery Crate · Nov 4'
           : catSec === 'aurora-crate'
             ? 'Aurora Crate'
             : '10-Day Covers · 700–1,200 NX');
@@ -2432,7 +2456,7 @@ function Tile(props: {
   const isUnreleased = props.bannerId === 'unreleased';
   // Only choice-based acquisition gets a method badge. Random/mystery is the
   // default and the % badge already signals chance, so no dice badge.
-  const randomOnly = props.coupon === 'mystery' || props.bannerId === 'founder-crate-oct26' || props.bannerId === 'mystery-crate-nov26' || props.bannerId === 'halloween-crate-oct26' || props.bannerId === 'beta-style-sep26';
+  const randomOnly = props.coupon === 'mystery' || props.bannerId === 'founder-crate-oct26' || props.bannerId === 'mystery-crate-nov26' || props.bannerId === 'mystery-crate-nov4' || props.bannerId === 'halloween-crate-oct26' || props.bannerId === 'beta-style-sep26';
   const showSelect = !randomOnly && !props.rateBadge && !props.rate && (props.coupon === 'signature' || !!banner);
   const isCover = props.bannerId === 'covers-10day-nov26';
   const drop = banner ? dropInfo(banner, Date.now()) : null;

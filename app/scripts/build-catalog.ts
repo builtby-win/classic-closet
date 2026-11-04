@@ -19,6 +19,7 @@ import { createHash } from 'node:crypto';
 import { writeFileSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { frozenRates, parseRateTable, type RatePart } from './rate-table';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const API = 'https://maplestory.io/api/MCW/CBT2';
@@ -151,39 +152,22 @@ export interface FastCatalog {
   };
 }
 
-function stripHtml(body: string): string[] {
-  return body
-    .replace(/<[^>]+>/g, '|')
-    .split('|')
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
-
-async function rateTable(postId: number): Promise<Map<string, string>> {
-  try {
-    const post = (await fetch(`${CMS}/${postId}`).then((r) => r.json())) as { body: string };
-    const segs = stripHtml(post.body);
-    const pairs = new Map<string, string>();
-    segs.forEach((s, j) => {
-      if (/^[\d.]+%$/.test(s) && j > 0 && !/^[\d.]+%$/.test(segs[j - 1])) {
-        pairs.set(segs[j - 1], s);
-      }
-    });
-    return pairs;
-  } catch (e) {
-    console.warn(`Failed to fetch rate table ${postId}:`, e);
-    return new Map();
-  }
+async function rateTable(postId: number, part?: RatePart): Promise<Map<string, string>> {
+  const post = (await fetch(`${CMS}/${postId}`).then((r) => r.json())) as { body: string };
+  return parseRateTable(post.body, part);
 }
 
 const rotationsPath = join(ROOT, 'data', 'rotations.json');
 const rotations: RotationsFile = JSON.parse(readFileSync(rotationsPath, 'utf8'));
 
 const founderRates = await rateTable(45538);
-const mysteryRates = await rateTable(46331);
+// Post 46331 is edited in place each cycle, so its two tables are frozen per banner.
+const snapshotsPath = join(ROOT, 'data', 'rate-snapshots.json');
+const mysteryRates = await frozenRates(snapshotsPath, 'mystery-crate-nov26', () => rateTable(46331, 'current'));
+const mystery2Rates = await frozenRates(snapshotsPath, 'mystery-crate-nov4', () => rateTable(46331, 'upcoming'));
 const halloweenRates = await rateTable(46524);
 const auroraRates = await rateTable(45659);
-console.log(`rates fetched: founder=${founderRates.size} mystery=${mysteryRates.size} halloween=${halloweenRates.size} aurora=${auroraRates.size}`);
+console.log(`rates fetched: founder=${founderRates.size} mystery=${mysteryRates.size} mystery2=${mystery2Rates.size} halloween=${halloweenRates.size} aurora=${auroraRates.size}`);
 
 const [osmsItemsFile, osmsBeauty, count] = await Promise.all([
   fetch(`${OSMS_DATA}/items.json`).then((r) => {
@@ -469,6 +453,7 @@ const fastCatalog: FastCatalog = {
     groups: {
       'founder-crate': { m: [], f: [], u: [] },
       'mystery-crate': { m: [], f: [], u: [] },
+      'mystery-crate-2': { m: [], f: [], u: [] },
       'halloween-crate': { m: [], f: [], u: [] },
       'aurora-crate': { m: [], f: [], u: [] },
       'cover-10day': { m: [], f: [], u: [] },
@@ -701,6 +686,35 @@ for (const banner of rotations.current) {
           src,
         };
         fastCatalog.indexes.groups['mystery-crate'][sex].push(hit.id);
+        fastCatalog.indexes.search.push({
+          id: hit.id,
+          name: hit.name,
+          sub: hit.typeInfo.subCategory,
+          sex,
+        });
+      }
+    }
+  }
+
+  // Equips (Nov 4 Mystery Fashion Crate, "Coming Soon" table of post 46331)
+  if (banner.id === 'mystery-crate-nov4') {
+    for (const [name, rate] of mystery2Rates) {
+      const resolved = resolveCrateItem(name);
+      if (!resolved.length) logCrateMiss(name);
+      for (const { item: hit, src } of resolved) {
+        if (hit.typeInfo.overallCategory !== 'Equip') continue;
+        const sex = sexOf(hit);
+        fastCatalog.items[hit.id] = {
+          name: hit.name,
+          sub: hit.typeInfo.subCategory,
+          sex,
+          bannerId: banner.id,
+          attainable: true,
+          group: 'mystery-crate-2',
+          rate,
+          src,
+        };
+        fastCatalog.indexes.groups['mystery-crate-2'][sex].push(hit.id);
         fastCatalog.indexes.search.push({
           id: hit.id,
           name: hit.name,
