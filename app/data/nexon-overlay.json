@@ -2,6 +2,8 @@
   "$schema": "./nexon-overlay.schema.json",
   "_comment": "Hand-verified Nexon name -> item ID pins. Used when a rate-table name has no exact dataset match (Classic-exclusive or renamed retail item). NEVER guess: verify sub/cash/art in game or maplestory.io first. Applied by pnpm catalog with top priority.",
   "pins": [
+    { "name": "Blue Snow Flower Wear", "id": 1050187, "note": "GMS 270 holds two same-name cash items with pixel-identical icons (1050187 and 1050354); keep one so the 2.00% rate is not double-counted. Lower id kept; Classic id unverifiable (neither in MCW). Reviewed 2026-11-03." },
+    { "name": "Amorian Pink Skirt", "id": 1061143, "note": "GMS 270 holds two same-name cash items with pixel-identical icons (1061143 and 1062080); keep one so the 2.00% rate is not double-counted. Lower id kept; Classic id unverifiable (neither in MCW). Reviewed 2026-11-03." },
     { "name": "Buddy Overall Jeans (Blue)", "id": 1050146, "note": "Gender split: m variant of Buddy Overall Jeans (GMS cash Overall). Blue art verified vs Nexon grand-launch set render (-m-). (Red) = 1051170." },
     { "name": "Buddy Overall Jeans (Red)", "id": 1051170, "note": "Gender split: f variant of Buddy Overall Jeans (GMS cash Overall). Red art verified vs Nexon grand-launch set render (-f-). (Blue) = 1050146." },
     { "name": "Green Camping Hat", "id": 1007002, "src": "MCW", "note": "Same numeric id is a different retail item in GMS 270 (divergent icons); Classic art is MCW. Strict MCW bake." },
@@ -11,7 +13,8 @@
     { "name": "Beige Checkered Hat", "id": 1007090, "src": "MCW", "note": "Same numeric id is a different retail item in GMS 270 (divergent icons); Classic art is MCW. Strict MCW bake." },
     { "name": "Detective Hat", "id": 1007105, "src": "MCW", "note": "Same numeric id is a different retail item in GMS 270 (divergent icons); Classic art is MCW. Strict MCW bake." },
     { "name": "Race Ace Cap", "id": 1007111, "src": "MCW", "note": "Same numeric id is a different retail item in GMS 270 (divergent icons); Classic art is MCW. Strict MCW bake." },
-    { "name": "Glowing Pumpkin Basket", "id": 1702092, "src": "GMS", "note": "GMS 270 holds two cash items with this name: 1702806 is a hanging pumpkin lantern, 1702092 is the orange pumpkin basket Classic sells (icon and frames match MCW/1 1702096). Name lookup used to pick the lantern." }
+    { "name": "Glowing Pumpkin Basket", "id": 1702092, "src": "GMS", "note": "GMS 270 holds two cash items with this name: 1702806 is a hanging pumpkin lantern, 1702092 is the orange pumpkin basket Classic sells (icon and frames match MCW/1 1702096). Name lookup used to pick the lantern." },
+    { "name": "Devil Horns", "id": 1003022, "src": "GMS", "note": "GMS 270 holds two cash hats with this name: 1003022 is the purple horns Classic sells (icon matches Nexon Oct-28 set render devil-horns-grey-skull-overall), 1006227 is the red horns not in any Classic rate table. Name lookup seeded both." }
   ],
   "items": [],
   "weaponFits": [

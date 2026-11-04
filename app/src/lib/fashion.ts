@@ -95,6 +95,7 @@ export type SectionId =
   | 'FaceSignature'
   | 'founder-crate'
   | 'mystery-crate'
+  | 'mystery-crate-2'
   | 'halloween-crate'
   | 'aurora-crate'
   | 'cover-10day'
@@ -313,19 +314,20 @@ export function stanceForWeapon(sub: string | undefined, currentAnim: string): {
 }
 
 /** Banner/group sort for equip drawers: sales still on first (by urgency), classic next, lapsed sales last.
- *  Halloween/Mystery crates end Nov 4 → covers end Nov 18 → Aurora stamp ends Jan 13. */
+ *  Halloween/Mystery crates end Nov 4 → Nov 4 Mystery crate ends Nov 18 → covers end Nov 18 → Aurora stamp ends Jan 13. */
 export const GROUP_RANK: Record<string, number> = {
   'founder-crate': 0,
   'halloween-crate': 1,
   'mystery-crate': 2,
-  'cover-10day': 3,
-  'aurora-crate': 4,
-  'style-coupon': 5,
-  'classic-equips': 6,
+  'mystery-crate-2': 3,
+  'cover-10day': 4,
+  'aurora-crate': 5,
+  'style-coupon': 6,
+  'classic-equips': 7,
 };
 
 /** Rank for a lapsed sale: after every live group and classic equips. */
-const EXPIRED_RANK = 7;
+const EXPIRED_RANK = 8;
 
 /** `now` (client clock) demotes items whose sale window has ended; without it the baked order applies. */
 export function bannerRank(item: ItemMeta | HairStyleMeta | undefined, now?: number | null): number {
@@ -334,13 +336,14 @@ export function bannerRank(item: ItemMeta | HairStyleMeta | undefined, now?: num
   if (now != null && group && group !== 'classic-equips' && group !== 'unreleased'
     && !attainableNow(item.attainable !== false, getBanner(CATALOG, item.bannerId), now)) return EXPIRED_RANK;
   if (group && group in GROUP_RANK) return GROUP_RANK[group]!;
-  return 6;
+  return 7;
 }
 
 /** Short group tag for badges */
 export const GROUP_SHORT: Record<string, string> = {
   'founder-crate': 'Founder',
   'mystery-crate': 'Mystery',
+  'mystery-crate-2': 'Mystery',
   'halloween-crate': 'Halloween',
   'aurora-crate': 'Aurora',
   'style-coupon': 'Style',
