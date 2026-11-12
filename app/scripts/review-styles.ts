@@ -15,7 +15,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { DEFAULT_LOOK, renderURL } from '../src/lib/fashion';
+import { DEFAULT_LOOK, defaultFaceForSex, defaultHairForSex, renderURL } from '../src/lib/fashion';
 
 interface Entry { name: string; sex: 'm' | 'f'; style?: number; id?: number; src?: string }
 interface Banner { id: string; hairs?: Entry[]; faces?: Entry[] }
@@ -56,18 +56,23 @@ for (const t of tokens) {
 const tiles = (kind: 'hairs' | 'faces') => (banner[kind] ?? []).map((e) => {
   const id = kind === 'hairs' ? e.style! * 10 : e.id!;
   const url = sections[`${kind}:${e.sex}:${e.name}`]?.shift();
-  const render = renderURL({ ...DEFAULT_LOOK, hair: kind === 'hairs' ? id : DEFAULT_LOOK.hair, face: kind === 'faces' ? id : DEFAULT_LOOK.face });
-  return `<div class="t${url ? '' : ' miss'}"><div class="pair">${url ? `<img src="${esc(url)}">` : '<i>no Nexon image</i>'}<img src="${esc(render)}">${kind === 'faces' ? (existsSync(join(ROOT, 'public', 'sprites', 'faces', `${id}.png`)) ? `<img class="baked" src="/baked/${id}.png">` : '<i>no baked PNG</i>') : ''}</div><b>${esc(e.name)}</b> <small>${id} · ${e.sex}${e.src ? ` · ${e.src}` : ''}</small></div>`;
+  // Bare head: no equips, so the hair is never hidden by a hat. Both sexes' defaults for the other slot.
+  const renders = (['m', 'f'] as const).map((sx) => renderURL({
+    ...DEFAULT_LOOK, sex: sx, items: {},
+    hair: kind === 'hairs' ? id : defaultHairForSex(sx),
+    face: kind === 'faces' ? id : defaultFaceForSex(sx),
+  }));
+  return `<div class="t${url ? '' : ' miss'}"><div class="pair">${url ? `<img src="${esc(url)}">` : '<i>no Nexon image</i>'}${renders.map((r, k) => `<img title="${k ? 'female' : 'male'} default body" src="${esc(r)}">`).join('')}${kind === 'faces' ? (existsSync(join(ROOT, 'public', 'sprites', 'faces', `${id}.png`)) ? `<img class="baked" src="/baked/${id}.png">` : '<i>no baked PNG</i>') : ''}</div><b>${esc(e.name)}</b> <small>${id} · ${e.sex}${e.src ? ` · ${e.src}` : ''}</small></div>`;
 }).join('');
 
 const page = `<meta charset=utf-8><title>${esc(bannerId)} review</title><style>
 body{font:14px system-ui;background:#111;color:#eee;margin:20px}
-.t{display:inline-block;width:340px;margin:8px;vertical-align:top;text-align:center}
+.t{display:inline-block;width:520px;margin:8px;vertical-align:top;text-align:center}
 .pair{display:flex;gap:6px;justify-content:center;align-items:center;height:210px}
 .pair img{max-width:160px;max-height:200px;background:#fff;object-fit:contain}
 .pair img.baked{image-rendering:pixelated;max-width:96px}
 .miss{color:#f66}small{color:#999}</style>
-<h1>${esc(bannerId)}: Nexon image | remote maplestory.io render of the id | baked sprite (faces only, the file being approved)</h1>
+<h1>${esc(bannerId)}: Nexon image | remote maplestory.io render, no equips, male then female default | baked sprite (faces only, the file being approved)</h1>
 <h2>Hairs</h2>${tiles('hairs')}<h2>Faces</h2>${tiles('faces')}`;
 
 const server = createServer((req, res) => {
