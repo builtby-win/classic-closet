@@ -878,7 +878,7 @@ for (const banner of rotations.past || []) {
     }
     if (h.unverified) continue;
     if (style != null && !activeHairStyleIds.has(style)) {
-      const src = cosmeticSource(style * 10, 'Hair');
+      const src = resolveCosmeticSrc(h, style * 10, 'Hair', cosmeticSource(style * 10, 'Hair'));
       if (src === null) throw new Error(`No sprite source for past hair: ${h.name}`);
       fastCatalog.styles[style] = {
         name: h.name,
@@ -904,7 +904,7 @@ for (const banner of rotations.past || []) {
     const faceId = f.id ?? findItem(f.name, 'Face')?.item.id;
     if (f.unverified) continue;
     if (faceId != null && !activeFaceIds.has(faceId)) {
-      const src = cosmeticSource(faceId, 'Face');
+      const src = resolveCosmeticSrc(f, faceId, 'Face', cosmeticSource(faceId, 'Face'));
       if (src === null) throw new Error(`No sprite source for past face: ${f.name}`);
       fastCatalog.items[faceId] = {
         name: f.name,

@@ -5,11 +5,11 @@ import catalog from '../src/data/catalog.json';
 import { dropInfo } from '../src/lib/drops';
 
 test('mixed render preserves Classic body and equips with retail cosmetics', () => {
-  const url = new URL(renderURL({ ...DEFAULT_LOOK, hair: 32397, face: 20033, items: { Hat: 1007116, Overall: 1057049, Shoes: 1077017, Weapon: 1702010 } }));
+  const url = new URL(renderURL({ ...DEFAULT_LOOK, hair: 32397, face: 20000, items: { Hat: 1007116, Overall: 1057049, Shoes: 1077017, Weapon: 1702010 } }));
   const entries = JSON.parse(`[${decodeURIComponent(url.pathname.split('/')[3])}]`);
   assert.deepEqual(entries, [
     ...[2000, 12000].map(itemId => ({ itemId, region: 'MCW', version: 'CBT2' })),
-    ...[20033, 32397].map(itemId => ({ itemId, region: 'GMS', version: '270' })),
+    ...[20000, 32397].map(itemId => ({ itemId, region: 'GMS', version: '270' })),
     ...[1007116, 1057049, 1077017, 1702010].map(itemId => ({ itemId, region: 'MCW', version: 'CBT2' })),
   ]);
   assert.ok(url.pathname.endsWith('/stand1/0'));
@@ -239,27 +239,27 @@ test('fuzzy search matches substrings, typos, and ids', () => {
   assert.ok(matchesFuzzy('Antagonist', 30130, ''));
 });
 
-test('Puppy Eyes Face is active, attainable, and properly resolved across eye colors', () => {
-  const face = catalog.items[20029 as unknown as keyof typeof catalog.items];
-  assert.ok(face, '20029 Puppy Eyes Face must be present in catalog');
-  assert.equal(face.name, 'Puppy Eyes Face');
+test('Round-Eyed Face is active, attainable, and properly resolved across eye colors', () => {
+  const face = catalog.items[20030 as unknown as keyof typeof catalog.items];
+  assert.ok(face, '20030 Round-Eyed Face must be present in catalog');
+  assert.equal(face.name, 'Round-Eyed Face');
   assert.equal(face.sex, 'm');
-  assert.equal(face.bannerId, 'style-oct28');
+  assert.equal(face.bannerId, 'style-nov11');
   assert.equal(face.attainable, true);
   assert.equal(face.coupon, 'mystery');
   assert.equal(face.rate, '16.67%');
 
   // Must be in active male faces index
-  assert.ok(catalog.indexes.faces.m.active.includes(20029));
+  assert.ok(catalog.indexes.faces.m.active.includes(20030));
 
-  // Resolved across eye colors (e.g. 20329 with colored eyes)
-  const infoBlack = formatAttainableInfo(catalog as any, 20029, Date.parse('2026-10-30T00:00:00Z'));
+  // Resolved across eye colors (e.g. 20330 with colored eyes)
+  const infoBlack = formatAttainableInfo(catalog as any, 20030, Date.parse('2026-11-12T00:00:00Z'));
   assert.equal(infoBlack.isAttainable, true);
-  assert.equal(infoBlack.bannerLabel, 'Mystery & Signature Style Coupons');
+  assert.equal(infoBlack.bannerLabel, 'Mystery Style Coupons');
 
-  const infoColored = formatAttainableInfo(catalog as any, 20329, Date.parse('2026-10-30T00:00:00Z'));
+  const infoColored = formatAttainableInfo(catalog as any, 20330, Date.parse('2026-11-12T00:00:00Z'));
   assert.equal(infoColored.isAttainable, true);
-  assert.equal(infoColored.bannerLabel, 'Mystery & Signature Style Coupons');
+  assert.equal(infoColored.bannerLabel, 'Mystery Style Coupons');
 });
 
 test('MCW/1-only cosmetics render and icon from MCW/1', () => {
