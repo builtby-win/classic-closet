@@ -46,6 +46,9 @@ flowchart TD
   - **Past Rotations**: Past styles remain browseable and wearable in the customizer, but are clearly tagged as **Not Attainable**, displaying when they were last attainable (e.g. `Last available: Aug 15 – Sep 15, 2026`).
   - **Unannounced Styles**: Arbitrary unannounced dump styles are not shown as "classic" or "always available".
 - **Banner Updates**: Managed via `data/rotations.json` and the repository skill `.agents/skills/update-banners/SKILL.md` (`pnpm update-banners`).
+  - Nov 18 release: `mystery-crate-nov18` / `mystery-crate-3` freezes all 50 rewards from the upcoming table in CMS 46331 (100.00% total). Sale: after Nov 18 maintenance through Dec 2, 07:59 UTC; 3,500 NX or 11 for 35,000 NX; 7-day crate duration.
+  - 10-day equip covers remain on sale until further notice (`end: null`); the purchased covers still last 10 days.
+  - The announced Alabaster, Clay, and Green skin colors have no verified IDs/art in the currently available Classic datasets or reference body bake. Do not substitute existing skins or invent IDs.
 
 ## Data pipeline
 

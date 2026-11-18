@@ -16,6 +16,7 @@ import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { iconFallbackURL } from '../src/lib/fashion';
 
 interface CatalogItem { name: string; sub: string; sex: string; src?: string }
 interface Catalog { items: Record<string, CatalogItem>; indexes: { groups: Record<string, Record<'m' | 'f' | 'u', number[]>> } }
@@ -33,6 +34,7 @@ for (const id of [...groupIds.u, ...groupIds.m, ...groupIds.f]) {
   const name = catalog.items[id]!.name;
   idsByName.set(name, [...(idsByName.get(name) ?? []), id]);
 }
+const allNames = new Set(Object.values(catalog.items).map((it) => it.name));
 
 const ICON_VERSION: Record<string, string> = { MCW: 'MCW/CBT2', GMS: 'GMS/270', MCW1: 'MCW/1' };
 const iconUrl = (id: number) => `https://maplestory.io/api/${ICON_VERSION[catalog.items[id]!.src ?? ''] ?? 'MCW/CBT2'}/item/${id}/icon`;
@@ -47,13 +49,16 @@ const parts = body.split(/(<img[^>]*>)/);
 let sets = '';
 for (let k = 1; k < parts.length; k += 2) {
   const url = /src="([^"]+)"/.exec(parts[k]!)?.[1];
-  if (!url || !/cash-shop-update/.test(url) || /in-post-banner/.test(url)) continue;
+  // Only per-set outfit images: skip hero banners (WxH-prefixed .jpg), crate icons, in-post banners.
+  if (!url || !/cash-shop-update/.test(url) || /in-post-banner|\/\d+x\d+-|\.jpe?g(\?|$)|-icon-|permit/.test(url)) continue;
   const text = decode(parts[k + 1]!.split('<img')[0]!.replace(/<[^>]+>/g, ' ')).split('See all the reward')[0]!;
   const names = text
     .split(/(?<=\.)\s+/)
     .map((s) => s.replace(/\s+\./g, '.').trim())
     .filter((s) => s && !/^(All|Both|Item)\b/.test(s) && !/can only be|can be equipped/.test(s))
-    .flatMap((s) => s.replace(/\.$/, '').split(/,\s*(?:and\s+)?|\s+and\s+/))
+    .flatMap((s) => s.replace(/\.$/, '').split(/,\s*(?:and\s+)?/))
+    // "A and B" is two items unless the whole thing is a known catalog name (e.g. "Moon and Sun Cape").
+    .flatMap((s) => (allNames.has(s.replace(/\s+/g, ' ').trim()) ? [s] : s.split(/\s+and\s+/)))
     .map((s) => s.replace(/\s+/g, ' ').trim())
     .filter(Boolean);
   if (!names.length) continue;
@@ -63,7 +68,10 @@ for (let k = 1; k < parts.length; k += 2) {
       if (!ids) return [`<div class="t miss"><b>${esc(name)}</b><br>NOT IN CATALOG</div>`];
       return ids.map((id) => {
         const it = catalog.items[id]!;
-        return `<div class="t"><img src="${iconUrl(id)}"><br><b>${esc(name)}</b><br><small>${id} · ${it.sub} · ${it.sex}</small></div>`;
+        const url = iconUrl(id);
+        const fallbacks: string[] = [];
+        for (let next = iconFallbackURL(url); next; next = iconFallbackURL(next)) fallbacks.push(next);
+        return `<div class="t"><img src="${url}" data-fallbacks="${esc(JSON.stringify(fallbacks))}" onerror="const urls=JSON.parse(this.dataset.fallbacks);const next=urls.shift();this.dataset.fallbacks=JSON.stringify(urls);if(next)this.src=next;else this.onerror=null;"><br><b>${esc(name)}</b><br><small>${id} · ${it.sub} · ${it.sex}</small></div>`;
       });
     })
     .join('');

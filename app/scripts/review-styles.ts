@@ -1,0 +1,86 @@
+/**
+ * Visual review page for a style-coupon banner: Nexon's per-style post images next
+ * to the app's own render (same maplestory.io source/ids as the catalog) so a human
+ * can verify every hair/face id. Renders are remote source-id previews; faces also
+ * show the local baked PNG that sprite approval hashes.
+ *
+ * Usage:
+ *   pnpm review-styles <saleId> <bannerId>
+ *   e.g. pnpm review-styles 47069 style-nov11
+ *
+ * Listens on a free port (never collides with a running dev server) and opens it.
+ */
+import { execSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
+import { createServer } from 'node:http';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { DEFAULT_LOOK, defaultFaceForSex, defaultHairForSex, renderURL } from '../src/lib/fashion';
+
+interface Entry { name: string; sex: 'm' | 'f'; style?: number; id?: number; src?: string }
+interface Banner { id: string; hairs?: Entry[]; faces?: Entry[] }
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const [saleId, bannerId] = process.argv.slice(2);
+if (!saleId || !bannerId) throw new Error('usage: pnpm review-styles <saleId> <bannerId>');
+
+const rotations = JSON.parse(readFileSync(join(ROOT, 'data', 'rotations.json'), 'utf8')) as { current: Banner[]; past: Banner[] };
+const banner = [...rotations.current, ...rotations.past].find((b) => b.id === bannerId);
+if (!banner) throw new Error(`unknown banner "${bannerId}"`);
+
+const esc = (s: string) => s.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
+const decode = (s: string) => s.replace(/&amp;/g, '&').replace(/&#0?39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/&nbsp;/g, ' ');
+
+const post = (await fetch(`https://g.nexonstatic.com/maplestory/cms/v1/news/${saleId}`).then((r) => r.json())) as { body: string };
+const end = post.body.indexOf('ONGOING SALES');
+const body = post.body.slice(0, end >= 0 ? end : undefined);
+
+// Headings "Male Hair Styles" etc. scope the <img>Name</p> tiles that follow.
+const tokens = body.split(/(<h3[^>]*>.*?<\/h3>|<img[^>]*>[^<]*)/s);
+let sex: 'm' | 'f' = 'm';
+let kind: 'hairs' | 'faces' = 'hairs';
+const sections: Record<string, string[]> = {};
+for (const t of tokens) {
+  const h = /<h3[^>]*>(.*?)<\/h3>/s.exec(t)?.[1]?.replace(/<[^>]+>/g, '');
+  if (h) {
+    const m = /(Male|Female)\s+(Hair|Face)/.exec(h);
+    if (m) { sex = m[1] === 'Male' ? 'm' : 'f'; kind = m[2] === 'Hair' ? 'hairs' : 'faces'; }
+    continue;
+  }
+  const img = /<img[^>]*src="([^"]+)"[^>]*>([^<]*)/.exec(t);
+  if (!img || !img[2]?.trim()) continue;
+  const key = `${kind}:${sex}:${decode(img[2]).trim()}`;
+  (sections[key] ??= []).push(img[1]!);
+}
+
+const tiles = (kind: 'hairs' | 'faces') => (banner[kind] ?? []).map((e) => {
+  const id = kind === 'hairs' ? e.style! * 10 : e.id!;
+  const url = sections[`${kind}:${e.sex}:${e.name}`]?.shift();
+  // Bare head: no equips, so the hair is never hidden by a hat. Both sexes' defaults for the other slot.
+  const renders = (['m', 'f'] as const).map((sx) => renderURL({
+    ...DEFAULT_LOOK, sex: sx, items: {},
+    hair: kind === 'hairs' ? id : defaultHairForSex(sx),
+    face: kind === 'faces' ? id : defaultFaceForSex(sx),
+  }));
+  return `<div class="t${url ? '' : ' miss'}"><div class="pair">${url ? `<img src="${esc(url)}">` : '<i>no Nexon image</i>'}${renders.map((r, k) => `<img title="${k ? 'female' : 'male'} default body" src="${esc(r)}">`).join('')}${kind === 'faces' ? (existsSync(join(ROOT, 'public', 'sprites', 'faces', `${id}.png`)) ? `<img class="baked" src="/baked/${id}.png">` : '<i>no baked PNG</i>') : ''}</div><b>${esc(e.name)}</b> <small>${id} · ${e.sex}${e.src ? ` · ${e.src}` : ''}</small></div>`;
+}).join('');
+
+const page = `<meta charset=utf-8><title>${esc(bannerId)} review</title><style>
+body{font:14px system-ui;background:#111;color:#eee;margin:20px}
+.t{display:inline-block;width:520px;margin:8px;vertical-align:top;text-align:center}
+.pair{display:flex;gap:6px;justify-content:center;align-items:center;height:210px}
+.pair img{max-width:160px;max-height:200px;background:#fff;object-fit:contain}
+.pair img.baked{image-rendering:pixelated;max-width:96px}
+.miss{color:#f66}small{color:#999}</style>
+<h1>${esc(bannerId)}: Nexon image | remote maplestory.io render, no equips, male then female default | baked sprite (faces only, the file being approved)</h1>
+<h2>Hairs</h2>${tiles('hairs')}<h2>Faces</h2>${tiles('faces')}`;
+
+const server = createServer((req, res) => {
+  const baked = /^\/baked\/(\d+\.png)$/.exec(req.url ?? '')?.[1];
+  if (baked) return res.writeHead(200, { 'content-type': 'image/png' }).end(readFileSync(join(ROOT, 'public', 'sprites', 'faces', baked)));
+  res.writeHead(200, { 'content-type': 'text/html' }).end(page);
+}).listen(0, () => {
+  const { port } = server.address() as { port: number };
+  console.log(`review page: http://localhost:${port}/ (ctrl-c to stop)`);
+  execSync(`open http://localhost:${port}/`);
+});

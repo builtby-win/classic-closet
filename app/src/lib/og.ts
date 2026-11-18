@@ -48,8 +48,8 @@ export const GMS_EQUIP_IDS: ReadonlySet<number> = new Set([
 /** Cosmetics that exist only in MCW/1 (catalog src MCW1): GMS 270 holds different
  *  items under these ids. Hair is keyed by style (id / 10, any color); faces by
  *  their base id (family base + style, any eye color). */
-export const MCW1_HAIR_STYLES: ReadonlySet<number> = new Set([3086, 3087, 3088, 3183, 3184, 3185]);
-export const MCW1_FACE_IDS: ReadonlySet<number> = new Set([20028, 20029, 21030, 21031, 21032, 21033]);
+export const MCW1_HAIR_STYLES: ReadonlySet<number> = new Set([3086, 3087, 3088, 3089, 3090, 3183, 3184, 3185, 3186, 3187]);
+export const MCW1_FACE_IDS: ReadonlySet<number> = new Set([20028, 20029, 20030, 20031, 20032, 20033, 20034, 20035, 21030, 21031, 21032, 21033, 21034, 21035, 21036, 21037]);
 
 /** Region routing for a single numeric asset id. Handles every hair color
  *  variant (style * 10 + 0-7), every eye color (base + color * 100 + style),

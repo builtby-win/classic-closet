@@ -94,6 +94,7 @@ const CRATE_CHIPS = [
   { bannerId: 'halloween-crate-oct26', group: 'halloween-crate', icon: '🎃', label: 'Halloween' },
   { bannerId: 'mystery-crate-nov26', group: 'mystery-crate', icon: '📦', label: 'Mystery' },
   { bannerId: 'mystery-crate-nov4', group: 'mystery-crate-2', icon: '🧸', label: 'Mystery · Nov 4' },
+  { bannerId: 'mystery-crate-nov18', group: 'mystery-crate-3', icon: '🎁', label: 'Mystery · Nov 18' },
   { bannerId: 'founder-crate-oct26', group: 'founder-crate', icon: '🎖️', label: "Founder's" },
 ] as const;
 /** Tiles a closet rail scrolls through before it hands off to "See all". */
@@ -131,7 +132,7 @@ function bannerPhase(banner: BannerMeta): { statusText: string; isActive: boolea
   }
   const days = info.endsInMs != null ? Math.ceil(info.endsInMs / 86_400_000) : null;
   return {
-    statusText: info.state === 'ended' ? 'Ended' : days != null && days > 1 ? `Active · ${days}d left` : days != null ? 'Ends today' : 'Active',
+    statusText: info.state === 'ended' ? 'Ended' : days != null && days > 1 ? `Active · ${days}d left` : days != null ? 'Ends today' : 'Active · no scheduled end',
     isActive: info.state === 'live',
     isUpcoming: false,
   };
@@ -145,7 +146,7 @@ function formatCountdown(banner: BannerMeta | undefined, attainable?: boolean): 
 function equipInfo(item: ResolvedItem | undefined): string | undefined {
   if (item?.group === 'cover-10day') {
     const end = getBanner(CATALOG, item.bannerId)?.end;
-    return `10-day duration${end ? ` · sale ends ${shortDate(end)}` : ''}`;
+    return `10-day duration${end ? ` · sale ends ${shortDate(end)}` : ' · no scheduled end'}`;
   }
   if (item?.group !== 'classic-equips') return undefined;
   const jobs = item.requiredJobs;
@@ -473,7 +474,7 @@ export default function FashionIsland() {
   );
 
   const equipSections = useMemo(() => {
-    const ids = [...new Set(['founder-crate', 'halloween-crate', 'mystery-crate', 'mystery-crate-2', 'aurora-crate', 'cover-10day', 'classic-equips', 'unreleased'].flatMap(getGroupEquips))]
+    const ids = [...new Set(['founder-crate', 'halloween-crate', 'mystery-crate', 'mystery-crate-2', 'mystery-crate-3', 'aurora-crate', 'cover-10day', 'classic-equips', 'unreleased'].flatMap(getGroupEquips))]
       .filter((id) => !!CATALOG.items[id]);
     return EQUIP_SECTIONS.map((section) => ({
       ...section,
@@ -605,19 +606,20 @@ export default function FashionIsland() {
       buckets.set(key, list);
     }
     const order = job !== 'All'
-      ? ['classic-equips', 'founder-crate', 'halloween-crate', 'mystery-crate', 'mystery-crate-2', 'cover-10day', 'aurora-crate', 'unreleased', 'off-job']
-      : ['founder-crate', 'halloween-crate', 'mystery-crate', 'mystery-crate-2', 'cover-10day', 'aurora-crate', 'classic-equips', 'unreleased'];
+      ? ['classic-equips', 'founder-crate', 'halloween-crate', 'mystery-crate', 'mystery-crate-2', 'mystery-crate-3', 'cover-10day', 'aurora-crate', 'unreleased', 'off-job']
+      : ['founder-crate', 'halloween-crate', 'mystery-crate', 'mystery-crate-2', 'mystery-crate-3', 'cover-10day', 'aurora-crate', 'classic-equips', 'unreleased'];
     const groups = order
       .filter((key) => (buckets.get(key)?.length ?? 0) > 0)
       .map((key) => {
         const rows = buckets.get(key)!;
         const bannerId = CATALOG.items[rows[0]!.id]?.bannerId;
         const banner = getBanner(CATALOG, bannerId);
-        const dates = banner?.start && banner?.end ? ` · ${shortDate(banner.start)}–${shortDate(banner.end)}` : '';
+        const dates = banner?.start && banner?.end ? ` · ${shortDate(banner.start)}–${shortDate(banner.end)}` : banner?.start ? ` · ${shortDate(banner.start)}–ongoing` : '';
         const label = key === 'founder-crate' ? "Founder's Mystery Crate"
           : key === 'halloween-crate' ? 'Halloween Mystery Crate'
           : key === 'mystery-crate' ? 'Mystery Fashion Crate'
           : key === 'mystery-crate-2' ? 'Mystery Fashion Crate · Nov 4'
+          : key === 'mystery-crate-3' ? 'Mystery Fashion Crate · Nov 18'
           : key === 'cover-10day' ? '10-Day Covers'
           : key === 'aurora-crate' ? 'Aurora Stamp Shop'
           : key === 'off-job' ? `Off-job · ${job}` : key === 'unreleased' ? 'Not released yet' : 'Job Equips';
@@ -865,6 +867,26 @@ export default function FashionIsland() {
         daysLeft: days,
         ...bannerPhase(mc2),
         items: crateItems('mystery-crate-2'),
+      });
+    }
+
+    // 1c. Mystery Fashion Crate (Nov 18 pool)
+    const mc3 = CATALOG.banners['mystery-crate-nov18'];
+    if (mc3) {
+      const days = getDays(mc3.end);
+      list.push({
+        id: mc3.id,
+        label: mc3.label,
+        type: 'crate',
+        typeLabel: 'Mystery Crate · Nov 18',
+        start: mc3.start,
+        end: mc3.end,
+        note: mc3.note,
+        post: mc3.post,
+        rates: mc3.rates,
+        daysLeft: days,
+        ...bannerPhase(mc3),
+        items: crateItems('mystery-crate-3'),
       });
     }
 
@@ -1423,6 +1445,8 @@ export default function FashionIsland() {
             ? 'Mystery Crate'
           : catSec === 'mystery-crate-2'
             ? 'Mystery Crate · Nov 4'
+          : catSec === 'mystery-crate-3'
+            ? 'Mystery Crate · Nov 18'
           : catSec === 'aurora-crate'
             ? 'Aurora Crate'
             : '10-Day Covers · 700–1,200 NX');
@@ -1814,8 +1838,8 @@ export default function FashionIsland() {
                         <span className={`banner-status-badge ${card.isActive ? 'active' : card.isUpcoming ? 'upcoming' : 'ended'}`}>
                           {card.statusText}
                         </span>
-                        {card.start && card.end && (
-                          <span className="banner-dates">🕒 {shortDate(card.start)} – {shortDate(card.end)}</span>
+                        {card.start && (
+                          <span className="banner-dates">🕒 {shortDate(card.start)} – {card.end ? shortDate(card.end) : 'ongoing'}</span>
                         )}
                       </div>
                       <div className="banner-card-actions">
@@ -2008,7 +2032,7 @@ export default function FashionIsland() {
               <p className="cat-sub compact">🎲 Mystery = random · 👆 Signature = you pick · 🕒 Limited-time · <button className="inline-link" onClick={() => setRatesOpen(true)}>rates</button></p>
             )}
             {catSec === 'cover-10day' && (
-              <p className="cat-sub">10-day duration · sale ends Nov 18 · <a href={NEWS_POST} target="_blank" rel="noreferrer">cash shop post</a></p>
+              <p className="cat-sub">10-day duration{(() => { const cover = CATALOG.banners['covers-10day-nov26']; return cover?.end ? ` · sale ends ${shortDate(cover.end)}` : ' · no scheduled end'; })()} · <a href={CATALOG.banners['covers-10day-nov26']?.post ?? NEWS_POST} target="_blank" rel="noreferrer">cash shop post</a></p>
             )}
             {EQUIP_SECTIONS.some((section) => section.id === catSec) && (
               <div id="drawer-filter" role="group" aria-label="Filter by class">
@@ -2237,14 +2261,14 @@ function BannerDetails({ id, coupon }: { id?: string; coupon?: string }) {
   if (!banner) return null;
   return <div className="banner-details">
     <div className="banner-essentials">
-      {banner.start && banner.end && <span>{shortDate(banner.start)} – {shortDate(banner.end)}</span>}
+      {banner.start && <span>{shortDate(banner.start)} – {banner.end ? shortDate(banner.end) : 'ongoing'}</span>}
       {banner.post && <a href={banner.post} target="_blank" rel="noreferrer">Official announcement ↗</a>}
     </div>
     <details className="banner-more">
       <summary>Details ⓘ</summary>
       <div className="banner-more-content">
         <strong>{banner.label}</strong>
-        {banner.start && banner.end && <p>{banner.start} – {banner.end} · limited rotation</p>}
+        {banner.start && <p>{banner.end ? `${banner.start} – ${banner.end} · limited rotation` : `From ${banner.start} · ongoing, no scheduled end`}</p>}
         {coupon === 'mystery' && <p>One random style per coupon. Each tile shows its chance.</p>}
         {coupon === 'signature' && <p>Choose your style from this rotation.</p>}
         {coupon === 'past' && <p>Past rotation: preview only; unavailable from current coupons.</p>}
@@ -2306,7 +2330,7 @@ function Tile(props: {
   const isUnreleased = props.bannerId === 'unreleased';
   // Only choice-based acquisition gets a method badge. Random/mystery is the
   // default and the % badge already signals chance, so no dice badge.
-  const randomOnly = props.coupon === 'mystery' || props.bannerId === 'founder-crate-oct26' || props.bannerId === 'mystery-crate-nov26' || props.bannerId === 'mystery-crate-nov4' || props.bannerId === 'halloween-crate-oct26' || props.bannerId === 'beta-style-sep26';
+  const randomOnly = props.coupon === 'mystery' || props.bannerId === 'founder-crate-oct26' || props.bannerId === 'mystery-crate-nov26' || props.bannerId === 'mystery-crate-nov4' || props.bannerId === 'mystery-crate-nov18' || props.bannerId === 'halloween-crate-oct26' || props.bannerId === 'beta-style-sep26';
   const showSelect = !randomOnly && !props.rateBadge && !props.rate && (props.coupon === 'signature' || !!banner);
   const isCover = props.bannerId === 'covers-10day-nov26';
   const drop = banner ? dropInfo(banner, Date.now()) : null;
@@ -2316,10 +2340,10 @@ function Tile(props: {
   const expiration = upcoming
     ? `Upcoming · starts ${banner!.start}`
     : isCover
-    ? `10-day duration · sale ends ${banner?.end ?? 'Nov 18'}`
+    ? `10-day duration${banner?.end ? ` · sale ends ${banner.end}` : ' · no scheduled end'}`
     : banner?.end
       ? `${notAttainable ? 'Expired' : 'Available until'} ${banner.end}`
-      : notAttainable ? 'Not currently attainable' : undefined;
+      : notAttainable ? 'Not currently attainable' : banner?.start ? 'Ongoing · no scheduled end' : undefined;
   const countdown = upcoming ? null : isNew ? 'NEW' : formatCountdown(banner, !notAttainable);
   const hasBadges = Boolean(expiration || showSelect);
 
