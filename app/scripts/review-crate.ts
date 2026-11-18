@@ -16,6 +16,7 @@ import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { iconFallbackURL } from '../src/lib/fashion';
 
 interface CatalogItem { name: string; sub: string; sex: string; src?: string }
 interface Catalog { items: Record<string, CatalogItem>; indexes: { groups: Record<string, Record<'m' | 'f' | 'u', number[]>> } }
@@ -67,7 +68,10 @@ for (let k = 1; k < parts.length; k += 2) {
       if (!ids) return [`<div class="t miss"><b>${esc(name)}</b><br>NOT IN CATALOG</div>`];
       return ids.map((id) => {
         const it = catalog.items[id]!;
-        return `<div class="t"><img src="${iconUrl(id)}"><br><b>${esc(name)}</b><br><small>${id} · ${it.sub} · ${it.sex}</small></div>`;
+        const url = iconUrl(id);
+        const fallbacks: string[] = [];
+        for (let next = iconFallbackURL(url); next; next = iconFallbackURL(next)) fallbacks.push(next);
+        return `<div class="t"><img src="${url}" data-fallbacks="${esc(JSON.stringify(fallbacks))}" onerror="const urls=JSON.parse(this.dataset.fallbacks);const next=urls.shift();this.dataset.fallbacks=JSON.stringify(urls);if(next)this.src=next;else this.onerror=null;"><br><b>${esc(name)}</b><br><small>${id} · ${it.sub} · ${it.sex}</small></div>`;
       });
     })
     .join('');
