@@ -25,6 +25,14 @@
       "rates": "https://g.nexonstatic.com/maplestory/cms/v1/general-posts/46331"
     },
     {
+      "id": "mystery-crate-nov18",
+      "label": "Mystery Fashion Crate",
+      "start": "2026-11-18",
+      "end": "2026-12-02",
+      "post": "https://www.nexon.com/maplestory/news/sale/47857/classic-world-cash-shop-update-nov-18",
+      "rates": "https://g.nexonstatic.com/maplestory/cms/v1/general-posts/46331"
+    },
+    {
       "id": "aurora-s1",
       "label": "Aurora Stamp Shop Season 1",
       "start": "2026-10-06",
@@ -58,8 +66,8 @@
       "id": "covers-10day-nov26",
       "label": "10-Day Equip Covers",
       "start": "2026-10-06",
-      "end": "2026-11-18",
-      "post": "https://www.nexon.com/maplestory/news/sale/45819/founder-s-access-cash-shop"
+      "end": null,
+      "post": "https://www.nexon.com/maplestory/news/sale/47857/classic-world-cash-shop-update-nov-18"
     }
   ],
   "current": [
@@ -138,6 +146,17 @@
       "rates": "https://g.nexonstatic.com/maplestory/cms/v1/general-posts/46331"
     },
     {
+      "id": "mystery-crate-nov18",
+      "type": "crate",
+      "label": "Mystery Fashion Crate",
+      "start": "2026-11-18",
+      "end": "2026-12-02",
+      "endAt": "2026-12-02T07:59:00Z",
+      "note": "3,500 NX · 11× 35,000 NX · 7-day duration · starts at end of maintenance · ends Dec 2, 07:59 UTC",
+      "post": "https://www.nexon.com/maplestory/news/sale/47857/classic-world-cash-shop-update-nov-18",
+      "rates": "https://g.nexonstatic.com/maplestory/cms/v1/general-posts/46331"
+    },
+    {
       "id": "halloween-crate-oct26",
       "type": "crate",
       "label": "Halloween Mystery Fashion Crate",
@@ -163,10 +182,9 @@
       "type": "covers",
       "label": "10-Day Equip Covers",
       "start": "2026-10-06",
-      "end": "2026-11-18",
-      "endAt": "2026-11-18T18:00:00Z",
-      "note": "700–1,200 NX · 10-day duration",
-      "post": "https://www.nexon.com/maplestory/news/sale/45819/founder-s-access-cash-shop"
+      "end": null,
+      "note": "700–1,200 NX · 10-day duration · available until further notice",
+      "post": "https://www.nexon.com/maplestory/news/sale/47857/classic-world-cash-shop-update-nov-18"
     }
   ],
   "past": [

@@ -33,6 +33,7 @@ for (const id of [...groupIds.u, ...groupIds.m, ...groupIds.f]) {
   const name = catalog.items[id]!.name;
   idsByName.set(name, [...(idsByName.get(name) ?? []), id]);
 }
+const allNames = new Set(Object.values(catalog.items).map((it) => it.name));
 
 const ICON_VERSION: Record<string, string> = { MCW: 'MCW/CBT2', GMS: 'GMS/270', MCW1: 'MCW/1' };
 const iconUrl = (id: number) => `https://maplestory.io/api/${ICON_VERSION[catalog.items[id]!.src ?? ''] ?? 'MCW/CBT2'}/item/${id}/icon`;
@@ -47,13 +48,16 @@ const parts = body.split(/(<img[^>]*>)/);
 let sets = '';
 for (let k = 1; k < parts.length; k += 2) {
   const url = /src="([^"]+)"/.exec(parts[k]!)?.[1];
-  if (!url || !/cash-shop-update/.test(url) || /in-post-banner/.test(url)) continue;
+  // Only per-set outfit images: skip hero banners (WxH-prefixed .jpg), crate icons, in-post banners.
+  if (!url || !/cash-shop-update/.test(url) || /in-post-banner|\/\d+x\d+-|\.jpe?g(\?|$)|-icon-|permit/.test(url)) continue;
   const text = decode(parts[k + 1]!.split('<img')[0]!.replace(/<[^>]+>/g, ' ')).split('See all the reward')[0]!;
   const names = text
     .split(/(?<=\.)\s+/)
     .map((s) => s.replace(/\s+\./g, '.').trim())
     .filter((s) => s && !/^(All|Both|Item)\b/.test(s) && !/can only be|can be equipped/.test(s))
-    .flatMap((s) => s.replace(/\.$/, '').split(/,\s*(?:and\s+)?|\s+and\s+/))
+    .flatMap((s) => s.replace(/\.$/, '').split(/,\s*(?:and\s+)?/))
+    // "A and B" is two items unless the whole thing is a known catalog name (e.g. "Moon and Sun Cape").
+    .flatMap((s) => (allNames.has(s.replace(/\s+/g, ' ').trim()) ? [s] : s.split(/\s+and\s+/)))
     .map((s) => s.replace(/\s+/g, ' ').trim())
     .filter(Boolean);
   if (!names.length) continue;

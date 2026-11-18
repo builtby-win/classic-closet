@@ -3,6 +3,7 @@ import test from 'node:test';
 import { DEFAULT_LOOK, EYE_COLORS, faceColorIndex, faceStyleId, formatAttainableInfo, fuzzyScore, matchesFuzzy, renderURL, assetSource, iconURL, matchesJob, randomLook, equipSlot, type Sex, applyPick, stanceForWeapon, weaponSubOf, weaponVariant, wieldOptions, wieldChoice, oneHandedWield, resolveWield, encodeLook, decodeLook, iconFallbackURL, TWO_HAND_SUBS, RANDOM_EQUIP_SLOTS, saveLookToStorage, loadLookForSex, mirrorStyleForSex, firstBannerStyle, defaultHairForSex, defaultFaceForSex, EMOTES } from '../src/lib/fashion';
 import catalog from '../src/data/catalog.json';
 import { dropInfo } from '../src/lib/drops';
+import type { FastCatalog } from '../src/lib/fashion';
 
 test('mixed render preserves Classic body and equips with retail cosmetics', () => {
   const url = new URL(renderURL({ ...DEFAULT_LOOK, hair: 32397, face: 20000, items: { Hat: 1007116, Overall: 1057049, Shoes: 1077017, Weapon: 1702010 } }));
@@ -323,6 +324,25 @@ test('Nov 4 Mystery crate indexes only its own pool and is upcoming before the s
   assert.equal(banner.endAt, '2026-11-18T08:00:00Z');
   assert.equal(dropInfo(banner, Date.parse('2026-11-04T07:59:00Z')).state, 'upcoming');
   assert.equal(dropInfo(banner, Date.parse('2026-11-04T08:00:00Z')).state !== 'upcoming', true);
+});
+
+test('open-ended banners read ongoing, never null/expired', () => {
+  const openEnded = { id: 'open', label: 'Open', start: '2026-11-18', end: null };
+  const info = dropInfo(openEnded, Date.parse('2027-06-01T00:00:00Z'));
+  assert.equal(info.state, 'live');
+  assert.equal(info.endsInMs, null);
+  assert.equal(info.endingSoon, false);
+  assert.equal(dropInfo(openEnded, Date.parse('2026-11-17T00:00:00Z')).state, 'upcoming');
+  const fixture: FastCatalog = {
+    banners: { open: openEnded },
+    styles: {},
+    items: { 1: { name: 'Open Item', sub: 'Hat', sex: 'u', bannerId: 'open', attainable: true, group: 'mystery-crate-3' } },
+    indexes: { hairs: { m: { active: [], past: [], unreleased: [] }, f: { active: [], past: [], unreleased: [] } }, faces: { m: { active: [], past: [], unreleased: [] }, f: { active: [], past: [], unreleased: [] } }, groups: {}, search: [] },
+  };
+  const text = formatAttainableInfo(fixture, 1, Date.parse('2027-06-01T00:00:00Z'));
+  assert.equal(text.isAttainable, true);
+  assert.equal(text.statusText, 'Ongoing · no scheduled end');
+  assert.equal(text.dateRangeText, '2026-11-18 – ongoing');
 });
 
 test('both male and female items are accessible and sort matching sex first', () => {

@@ -64,7 +64,7 @@ interface BannerDef {
   type?: string;
   label: string;
   start: string;
-  end: string;
+  end: string | null;
   /** Exact UTC instants when Nexon's switch hour matters (08:00 UTC); optional. */
   startAt?: string;
   endAt?: string;
@@ -165,9 +165,11 @@ const founderRates = await rateTable(45538);
 const snapshotsPath = join(ROOT, 'data', 'rate-snapshots.json');
 const mysteryRates = await frozenRates(snapshotsPath, 'mystery-crate-nov26', () => rateTable(46331, 'current'));
 const mystery2Rates = await frozenRates(snapshotsPath, 'mystery-crate-nov4', () => rateTable(46331, 'upcoming'));
+// Nov 18 table: the current table of 46331 is now Nov 4's, so the snapshot (frozen from the pre-switch "upcoming" table) is authoritative.
+const mystery3Rates = await frozenRates(snapshotsPath, 'mystery-crate-nov18', () => rateTable(46331, 'upcoming'));
 const halloweenRates = await rateTable(46524);
 const auroraRates = await rateTable(45659);
-console.log(`rates fetched: founder=${founderRates.size} mystery=${mysteryRates.size} mystery2=${mystery2Rates.size} halloween=${halloweenRates.size} aurora=${auroraRates.size}`);
+console.log(`rates fetched: founder=${founderRates.size} mystery=${mysteryRates.size} mystery2=${mystery2Rates.size} mystery3=${mystery3Rates.size} halloween=${halloweenRates.size} aurora=${auroraRates.size}`);
 
 const [osmsItemsFile, osmsBeauty, count] = await Promise.all([
   fetch(`${OSMS_DATA}/items.json`).then((r) => {
@@ -184,8 +186,10 @@ const mcwDump: RawItem[] = await fetch(`${API}/item/list?count=${count}`).then((
 const mcwById = new Map(mcwDump.map(item => [item.id, item]));
 // MCW/1 is the Classic launch dataset: newer than CBT2, and the only place some
 // cosmetics live while GMS 270 reuses their ids for different retail items.
-const mcw1Count = await fetch('https://maplestory.io/api/MCW/1/item/count').then((r) => r.json()) as number;
-const mcw1ById = new Map((await fetch(`https://maplestory.io/api/MCW/1/item/list?count=${mcw1Count}`).then((r) => r.json()) as RawItem[]).map((item) => [item.id, item]));
+const mcw1ById = new Map((await fetch('https://maplestory.io/api/MCW/1/item/list').then((r) => {
+  if (!r.ok) throw new Error(`MCW/1 items fetch failed: ${r.status}`);
+  return r.json() as Promise<RawItem[]>;
+})).map((item) => [item.id, item]));
 const osmsGear: RawItem[] = osmsItemsFile.items
   .filter((item) => item.category === 'Equipment')
   .map((item) => {
@@ -454,6 +458,7 @@ const fastCatalog: FastCatalog = {
       'founder-crate': { m: [], f: [], u: [] },
       'mystery-crate': { m: [], f: [], u: [] },
       'mystery-crate-2': { m: [], f: [], u: [] },
+      'mystery-crate-3': { m: [], f: [], u: [] },
       'halloween-crate': { m: [], f: [], u: [] },
       'aurora-crate': { m: [], f: [], u: [] },
       'cover-10day': { m: [], f: [], u: [] },
@@ -715,6 +720,35 @@ for (const banner of rotations.current) {
           src,
         };
         fastCatalog.indexes.groups['mystery-crate-2'][sex].push(hit.id);
+        fastCatalog.indexes.search.push({
+          id: hit.id,
+          name: hit.name,
+          sub: hit.typeInfo.subCategory,
+          sex,
+        });
+      }
+    }
+  }
+
+  // Equips (Nov 18 Mystery Fashion Crate, "Coming Soon" table of post 46331 captured before the switch)
+  if (banner.id === 'mystery-crate-nov18') {
+    for (const [name, rate] of mystery3Rates) {
+      const resolved = resolveCrateItem(name);
+      if (!resolved.length) logCrateMiss(name);
+      for (const { item: hit, src } of resolved) {
+        if (hit.typeInfo.overallCategory !== 'Equip') continue;
+        const sex = sexOf(hit);
+        fastCatalog.items[hit.id] = {
+          name: hit.name,
+          sub: hit.typeInfo.subCategory,
+          sex,
+          bannerId: banner.id,
+          attainable: true,
+          group: 'mystery-crate-3',
+          rate,
+          src,
+        };
+        fastCatalog.indexes.groups['mystery-crate-3'][sex].push(hit.id);
         fastCatalog.indexes.search.push({
           id: hit.id,
           name: hit.name,
