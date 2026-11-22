@@ -55,7 +55,7 @@ export default function DyeStation({ slots, dyes, onChange, onCompare, onClose }
   };
 
   return (
-    <aside id="dye-station" role="dialog" aria-label="Dye station">
+    <section id="dye-station" aria-label="Dye station">
       <header className="dye-head">
         <h2>Dye station</h2>
         <button type="button" className="dye-close" aria-label="Close dye station" onClick={onClose}>×</button>
@@ -83,8 +83,7 @@ export default function DyeStation({ slots, dyes, onChange, onCompare, onClose }
           <span>Previous</span>
           {past.map((d) => <button key={`${d.tone}:${d.chroma}:${d.brightness}`} type="button" onClick={() => apply(selected.id, d)}>{signed(d.tone)} / {signed(d.chroma)} / {signed(d.brightness)}</button>)}
         </div>}
-        <details className="dye-fine">
-          <summary>Fine-tune</summary>
+        <div className="dye-fine">
           {AXES.map(({ key, label, min, max }) => (
             <label key={key} className="dye-axis">
               <span>{label}</span>
@@ -94,9 +93,9 @@ export default function DyeStation({ slots, dyes, onChange, onCompare, onClose }
           ))}
           <input className="dye-paste" placeholder="Paste in-game: Tone: +277, Chroma: +72, Brightness: +56" value={paste} aria-label="Paste in-game dye tooltip"
             onChange={(e) => { setPaste(e.target.value); const parsed = parseTooltip(e.target.value); if (parsed) apply(selected.id, parsed); }} />
-        </details>
+        </div>
       </>}
       <small className="dye-note">Preview only; the game's roll and exact colors differ.</small>
-    </aside>
+    </section>
   );
 }
