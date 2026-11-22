@@ -1743,3 +1743,9 @@
 .dye-paste { width: 100%; box-sizing: border-box; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); color: var(--txt); font-size: 12px; }
 .dye-note { color: var(--dim); font-size: 11px; }
 .crate-chip.crate-dye { border-color: var(--accent); color: var(--accent); flex: none; }
+
+/* Wide screens: the dye station sits in the empty stage space and leaves the closet usable. */
+@media (min-width: 1100px) {
+  #dye-station { position: fixed; inset: 76px auto auto 24px; max-height: calc(100dvh - 100px); width: 340px; border: 1px solid var(--line); border-radius: 18px; box-shadow: 0 16px 48px rgba(0,0,0,0.5); }
+  #stage.dyeing { padding-left: 388px; }
+}
