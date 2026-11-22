@@ -58,7 +58,7 @@ import LayeredCharacterCanvas from './layered-character-canvas';
 import GamePad from './game-pad';
 import DropModal, { type DropEntry } from './drop-modal';
 import WieldPicker, { WeaponGroupFilter } from './wield-picker';
-import DyeCard from './dye-card';
+import DyeStation from './dye-station';
 import type { Dye } from '../lib/dye';
 import { announcements, attainableNow, dropInfo, formatHM, loadSeen, saveSeen, unseen } from '../lib/drops';
 import { autoSwipeLevel } from '../lib/afterimage';
@@ -233,6 +233,8 @@ export default function PlaygroundIsland() {
   const [job, setJob] = useState('All');
   const JOBS = ['All', 'Warrior', 'Magician', 'Bowman', 'Thief'];
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [dyeOpen, setDyeOpen] = useState(false);
+  const [dyeCompare, setDyeCompare] = useState(false);
   const [emoteOpen, setEmoteOpen] = useState(false);
   const emoteSprites = useEmoteSprites(look.face);
   const [controller, setController] = useState<PlayController | null>(null);
@@ -1566,10 +1568,11 @@ export default function PlaygroundIsland() {
             <button id="share" className="labeled-btn" onClick={shareLook} aria-label="Share this look" title={shared ? 'Shared!' : copied ? 'Link copied!' : 'Share this look'}><Icon name={copied || shared ? 'check' : 'share'} /><span>{copied || shared ? 'Copied' : 'Share'}</span></button>
             <button id="play" className="labeled-btn" onClick={() => controller ? stopPlay() : startPlay()} aria-label={controller ? 'Back to closet' : 'Move your character'} aria-pressed={!!controller} title="Move your character"><Icon name="play" /><span>{controller ? 'Closet' : 'Play'}</span></button>
             <button id="shuffle" className="labeled-btn" onClick={() => { saveUndo(); setLook(randomLook(look.sex, Math.random, excludedSlots, nxOnly, job === 'All' ? 'Beginner' : job)); }} aria-label="Randomize outfit"><Icon name="shuffle" /><span>Random</span></button>
+            <button id="dye" className="labeled-btn" onClick={() => { setSettingsOpen(false); setDyeOpen((v) => !v); }} aria-label="Dye station" aria-pressed={dyeOpen} title="Dye your items"><Icon name="dye" /><span>Dye</span></button>
           </div>
         </div>
         <div id="canvas">
-          <LayeredCharacterCanvas look={look} onLoading={() => setRendering(true)} onRendered={(canvas) => { setRendering(false); drawAvatar(canvas); }} />
+          <LayeredCharacterCanvas look={dyeCompare ? { ...look, dyes: undefined } : look} onLoading={() => setRendering(true)} onRendered={(canvas) => { setRendering(false); drawAvatar(canvas); }} />
           {rendering && <div id="spin" />}
           {pin && comparing && (
             <CompareView
@@ -1650,6 +1653,15 @@ export default function PlaygroundIsland() {
       {dropsOpen && shownDropEntries.length > 0 && (
         <DropModal entries={shownDropEntries} onTry={tryDrop} onOpen={openDrop} onClose={closeDrops} />
       )}
+      {dyeOpen && (
+        <DyeStation
+          slots={wornEquipList.flatMap((e) => (e.id != null && e.meta ? [{ slot: e.slot, id: e.id, name: e.meta.name }] : []))}
+          dyes={look.dyes}
+          onChange={setDye}
+          onCompare={setDyeCompare}
+          onClose={() => { setDyeOpen(false); setDyeCompare(false); }}
+        />
+      )}
       {settingsOpen && (
         <div className="settings-scrim" aria-hidden="true" onClick={() => setSettingsOpen(false)} />
       )}
@@ -1698,11 +1710,6 @@ export default function PlaygroundIsland() {
               </select>
             </div>
           </section>
-          <DyeCard
-            slots={wornEquipList.flatMap((e) => (e.id != null && e.meta ? [{ slot: e.slot, id: e.id, name: e.meta.name }] : []))}
-            dyes={look.dyes}
-            onChange={setDye}
-          />
           <details className="set-card randomizer-options">
             <summary>Randomizer options</summary>
             <div className="randomizer-slots">
@@ -2608,8 +2615,9 @@ function CharacterEditor({ look, skins, onName, onSex, onSkin }: {
   );
 }
 
-function Icon({ name }: { name: 'settings' | 'shuffle' | 'search' | 'close' | 'share' | 'check' | 'play' | 'back' }) {
+function Icon({ name }: { name: 'settings' | 'shuffle' | 'search' | 'close' | 'share' | 'check' | 'play' | 'back' | 'dye' }) {
   return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    {name === 'dye' && <path d="M12 3s6 6.4 6 11a6 6 0 0 1-12 0c0-4.600 6-11 6-11Z" />}
     {name === 'settings' && <><path d="m9 3-.6 2.5-2.2 1.3-2.5-.7-2 3.5 1.9 1.8v2.6l-1.9 1.8 2 3.5 2.5-.7 2.2 1.3L9 22h4l.6-2.6 2.2-1.3 2.5.7 2-3.5-1.9-1.8v-2.6l1.9-1.8-2-3.5-2.5.7-2.2-1.3L13 3Z" /><circle cx="11" cy="12.5" r="3" /></>}
     {name === 'shuffle' && <><rect x="3" y="3" width="18" height="18" rx="4" /><path d="M7 7h.01M17 7h.01M12 12h.01M7 17h.01M17 17h.01" strokeWidth="3" /></>}
     {name === 'search' && <><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 5 5" /></>}
