@@ -881,7 +881,7 @@
 
 /* ── Play mode: pad + rail tucked away ── */
 #play[aria-pressed="true"] { color: var(--accent); border-color: var(--accent) !important; background: var(--accent-soft); }
-#rail-grip { display: none; flex: none; flex-direction: column; align-items: center; gap: 3px; padding: 6px 0 0; touch-action: none; }
+#rail-grip { display: none; flex: none; flex-direction: column; align-items: center; gap: 3px; padding: 10px 0 6px; touch-action: none; }
 #rail-grip small, #pad-grip small { color: var(--dim); font-size: 10px; font-weight: 600; letter-spacing: 0.02em; }
 #rail-grip span { width: 36px; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.18); }
 #preview { will-change: transform; }
@@ -1742,3 +1742,4 @@
 .dye-axis output { text-align: right; font-variant-numeric: tabular-nums; color: var(--txt); }
 .dye-paste { width: 100%; box-sizing: border-box; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); color: var(--txt); font-size: 12px; }
 .dye-note { color: var(--dim); font-size: 11px; }
+.crate-chip.crate-dye { border-color: var(--accent); color: var(--accent); flex: none; }

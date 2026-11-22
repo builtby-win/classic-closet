@@ -1431,6 +1431,8 @@ export default function PlaygroundIsland() {
     };
     const onStart = (event: TouchEvent) => {
       if (!phone.matches || dragGate.current.locked || event.touches.length !== 1) return;
+      // Only the grip at the top of the sheet starts the pull; list scrolling never does.
+      if (!(event.target as HTMLElement).closest('#rail-grip')) return;
       const scroller = (event.target as HTMLElement).closest('#slot-list, #drawer');
       const stage = root.querySelector<HTMLElement>('#stage');
       const touch = event.touches[0]!;
@@ -1479,6 +1481,7 @@ export default function PlaygroundIsland() {
 
   const crateBar = (
     <div id="crate-bar" role="group" aria-label="Filter by crate">
+      <button type="button" className="crate-chip crate-dye" onClick={() => { setSettingsOpen(false); setDyeOpen(true); }}><span aria-hidden="true">💧</span> Dye</button>
       <button type="button" className={'crate-chip' + (!crateFilter ? ' on' : '')} aria-pressed={!crateFilter} onClick={() => setCrateFilter(null)}>All</button>
       {CRATE_CHIPS.flatMap((chip) => {
         const banner = CATALOG.banners[chip.bannerId];
@@ -1568,7 +1571,6 @@ export default function PlaygroundIsland() {
             <button id="share" className="labeled-btn" onClick={shareLook} aria-label="Share this look" title={shared ? 'Shared!' : copied ? 'Link copied!' : 'Share this look'}><Icon name={copied || shared ? 'check' : 'share'} /><span>{copied || shared ? 'Copied' : 'Share'}</span></button>
             <button id="play" className="labeled-btn" onClick={() => controller ? stopPlay() : startPlay()} aria-label={controller ? 'Back to closet' : 'Move your character'} aria-pressed={!!controller} title="Move your character"><Icon name="play" /><span>{controller ? 'Closet' : 'Play'}</span></button>
             <button id="shuffle" className="labeled-btn" onClick={() => { saveUndo(); setLook(randomLook(look.sex, Math.random, excludedSlots, nxOnly, job === 'All' ? 'Beginner' : job)); }} aria-label="Randomize outfit"><Icon name="shuffle" /><span>Random</span></button>
-            <button id="dye" className="labeled-btn" onClick={() => { setSettingsOpen(false); setDyeOpen((v) => !v); }} aria-label="Dye station" aria-pressed={dyeOpen} title="Dye your items"><Icon name="dye" /><span>Dye</span></button>
           </div>
         </div>
         <div id="canvas">
