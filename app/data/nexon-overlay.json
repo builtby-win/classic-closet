@@ -14,7 +14,8 @@
     { "name": "Detective Hat", "id": 1007105, "src": "MCW", "note": "Same numeric id is a different retail item in GMS 270 (divergent icons); Classic art is MCW. Strict MCW bake." },
     { "name": "Race Ace Cap", "id": 1007111, "src": "MCW", "note": "Same numeric id is a different retail item in GMS 270 (divergent icons); Classic art is MCW. Strict MCW bake." },
     { "name": "Glowing Pumpkin Basket", "id": 1702092, "src": "GMS", "note": "GMS 270 holds two cash items with this name: 1702806 is a hanging pumpkin lantern, 1702092 is the orange pumpkin basket Classic sells (icon and frames match MCW/1 1702096). Name lookup used to pick the lantern." },
-    { "name": "Devil Horns", "id": 1003022, "src": "GMS", "note": "GMS 270 holds two cash hats with this name: 1003022 is the purple horns Classic sells (icon matches Nexon Oct-28 set render devil-horns-grey-skull-overall), 1006227 is the red horns not in any Classic rate table. Name lookup seeded both." }
+    { "name": "Devil Horns", "id": 1003022, "src": "GMS", "note": "GMS 270 holds two cash hats with this name: 1003022 is the purple horns Classic sells (icon matches Nexon Oct-28 set render devil-horns-grey-skull-overall), 1006227 is the red horns not in any Classic rate table. Name lookup seeded both." },
+    { "name": "Winged Cap", "id": 1002449, "src": "GMS", "note": "GMS 270 holds two same-name cash hats (1002449 and 1003918). Per user report 1002449 is the Classic one; 1003918 does not exist in Classic. Pinned so the 2.00% rate is not double-counted." }
   ],
   "weaponFits": [
     {
