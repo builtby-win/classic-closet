@@ -58,6 +58,8 @@ import LayeredCharacterCanvas from './layered-character-canvas';
 import GamePad from './game-pad';
 import DropModal, { type DropEntry } from './drop-modal';
 import WieldPicker, { WeaponGroupFilter } from './wield-picker';
+import DyeCard from './dye-card';
+import type { Dye } from '../lib/dye';
 import { announcements, attainableNow, dropInfo, formatHM, loadSeen, saveSeen, unseen } from '../lib/drops';
 import { autoSwipeLevel } from '../lib/afterimage';
 import { PlayController, PLAY_POSES, SPRITE_CANVAS } from '../lib/play-controller';
@@ -276,6 +278,15 @@ export default function PlaygroundIsland() {
 
   const patch = useCallback((p: Partial<Look>) => {
     setLook((l) => ({ ...l, ...p }));
+  }, []);
+
+  const setDye = useCallback((id: number, dye: Dye | null) => {
+    setLook((l) => {
+      const dyes = { ...l.dyes };
+      if (dye) dyes[String(id)] = dye;
+      else delete dyes[String(id)];
+      return { ...l, dyes: Object.keys(dyes).length ? dyes : undefined };
+    });
   }, []);
 
   // A wield choice only means something to a skin that ships art for it; drop it once that skin is gone.
@@ -1687,6 +1698,11 @@ export default function PlaygroundIsland() {
               </select>
             </div>
           </section>
+          <DyeCard
+            slots={wornEquipList.flatMap((e) => (e.id != null && e.meta ? [{ slot: e.slot, id: e.id, name: e.meta.name }] : []))}
+            dyes={look.dyes}
+            onChange={setDye}
+          />
           <details className="set-card randomizer-options">
             <summary>Randomizer options</summary>
             <div className="randomizer-slots">
