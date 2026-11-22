@@ -1653,15 +1653,6 @@ export default function PlaygroundIsland() {
       {dropsOpen && shownDropEntries.length > 0 && (
         <DropModal entries={shownDropEntries} onTry={tryDrop} onOpen={openDrop} onClose={closeDrops} />
       )}
-      {dyeOpen && (
-        <DyeStation
-          slots={wornEquipList.flatMap((e) => (e.id != null && e.meta ? [{ slot: e.slot, id: e.id, name: e.meta.name }] : []))}
-          dyes={look.dyes}
-          onChange={setDye}
-          onCompare={setDyeCompare}
-          onClose={() => { setDyeOpen(false); setDyeCompare(false); }}
-        />
-      )}
       {settingsOpen && (
         <div className="settings-scrim" aria-hidden="true" onClick={() => setSettingsOpen(false)} />
       )}
@@ -1731,6 +1722,15 @@ export default function PlaygroundIsland() {
 
     <div id="rail" ref={railRef}>
       <div id="rail-grip" aria-hidden="true"><span /><small>Drag down to play</small></div>
+      {dyeOpen && (
+        <DyeStation
+          slots={wornEquipList.flatMap((e) => (e.id != null && e.meta ? [{ slot: e.slot, id: e.id, name: e.meta.name }] : []))}
+          dyes={look.dyes}
+          onChange={setDye}
+          onCompare={setDyeCompare}
+          onClose={() => { setDyeOpen(false); setDyeCompare(false); }}
+        />
+      )}
         <div id="rail-head">
           {searchScope === 'all' ? (
             <div className="head-search" role="search">
