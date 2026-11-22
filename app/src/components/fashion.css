@@ -1716,9 +1716,8 @@
 .slot-more span { font-size: 9px; font-weight: 700; color: var(--dim); text-transform: uppercase; letter-spacing: 0.04em; }
 .slot-more:hover { border-color: var(--accent); }
 
-#dye-station { position: fixed; z-index: 11; display: flex; flex-direction: column; gap: 10px; padding: 14px; background: var(--surface); border: 1px solid var(--line); box-shadow: 0 16px 48px rgba(0,0,0,0.5); overflow-y: auto; }
-@media (min-width: 900px) { #dye-station { top: 60px; right: 16px; width: 340px; max-height: calc(100dvh - 76px); border-radius: 18px; } }
-@media (max-width: 899px) { #dye-station { left: 0; right: 0; bottom: 0; max-height: 46dvh; border-radius: 18px 18px 0 0; padding-bottom: calc(14px + env(safe-area-inset-bottom)); } }
+/* Takes over the rail: same space as the closet on desktop, the sheet on mobile. */
+#dye-station { position: absolute; inset: 0; z-index: 7; display: flex; flex-direction: column; gap: 12px; padding: 16px; background: var(--surface); overflow-y: auto; overscroll-behavior: contain; }
 .dye-head { display: flex; align-items: center; justify-content: space-between; }
 .dye-head h2 { margin: 0; font-size: 15px; }
 .dye-close { background: none; border: 0; color: var(--dim); font-size: 22px; line-height: 1; cursor: pointer; }
@@ -1737,7 +1736,7 @@
 .dye-readout { font-size: 12px; color: var(--dim); font-variant-numeric: tabular-nums; }
 .dye-history { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 11px; color: var(--dim); }
 .dye-history button { padding: 4px 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface-2); color: var(--txt); font-size: 11px; font-variant-numeric: tabular-nums; cursor: pointer; }
-.dye-fine summary { cursor: pointer; font-size: 13px; color: var(--dim); margin-bottom: 8px; }
+.dye-fine { display: flex; flex-direction: column; gap: 6px; padding-top: 4px; border-top: 1px solid var(--line); }
 .dye-axis { display: grid; grid-template-columns: 76px 1fr 40px; gap: 8px; align-items: center; font-size: 12px; color: var(--dim); margin-bottom: 6px; }
 .dye-axis input { width: 100%; accent-color: var(--accent); }
 .dye-axis output { text-align: right; font-variant-numeric: tabular-nums; color: var(--txt); }
