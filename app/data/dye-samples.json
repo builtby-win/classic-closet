@@ -1,0 +1,162 @@
+[
+  {
+    "item": 1702003,
+    "name": "Plastic Slingshot",
+    "before": [
+      0,
+      -100,
+      -100
+    ],
+    "after": [
+      159,
+      -72,
+      -74
+    ],
+    "look": "near-black"
+  },
+  {
+    "item": 1042238,
+    "name": "Pink Bunny Sweater",
+    "before": [
+      0,
+      -100,
+      -100
+    ],
+    "after": [
+      350,
+      62,
+      98
+    ],
+    "look": "white"
+  },
+  {
+    "item": 1702017,
+    "name": "Pink Rabbit Puppet",
+    "before": [
+      0,
+      -100,
+      -100
+    ],
+    "after": [
+      312,
+      -74,
+      -4
+    ],
+    "look": "grey/pale"
+  },
+  {
+    "item": 1007077,
+    "name": "Angel Halo",
+    "before": [
+      0,
+      -100,
+      -100
+    ],
+    "after": [
+      136,
+      -45,
+      -51
+    ],
+    "look": "dark grey-teal"
+  },
+  {
+    "item": 1004028,
+    "name": "Orange Cat Beanie",
+    "before": [
+      0,
+      -100,
+      -100
+    ],
+    "after": [
+      188,
+      16,
+      97
+    ],
+    "look": "white"
+  },
+  {
+    "item": 1082171,
+    "name": "Blue Watch",
+    "before": [
+      260,
+      -17,
+      58
+    ],
+    "after": [
+      280,
+      -14,
+      62
+    ],
+    "look": "re-dye of an already dyed item; base art differs",
+    "note": "Before is a previous dye, so 0/-100/-100 is the undyed placeholder"
+  },
+  {
+    "item": 1002555,
+    "name": "Demon Goblin",
+    "before": [
+      207,
+      -53,
+      -84
+    ],
+    "after": [
+      357,
+      -95,
+      -29
+    ],
+    "look": "dark purple-grey -> grey",
+    "note": "Before is a prior dye"
+  },
+  {
+    "item": 1007111,
+    "name": "Race Ace Cap",
+    "before": [
+      268,
+      20,
+      35
+    ],
+    "after": [
+      256,
+      -14,
+      -5
+    ],
+    "look": "purple -> royal blue",
+    "note": "Before is a prior dye; base art is red"
+  },
+  {
+    "item": 1027004,
+    "name": "Black Sunglasses",
+    "before": [
+      0,
+      -100,
+      -100
+    ],
+    "after": [
+      282,
+      -93,
+      22
+    ],
+    "look": "virtually unchanged black"
+  },
+  {
+    "item": 1107007,
+    "name": "Michael Wings",
+    "dye": [
+      277,
+      72,
+      56
+    ],
+    "look": "unknown",
+    "note": "tooltip only; icon appears undyed"
+  },
+  {
+    "item": 1077029,
+    "name": "Slime Slippers",
+    "dye": [
+      221,
+      -68,
+      66
+    ],
+    "look": "unknown",
+    "note": "tooltip only; icon appears undyed"
+  }
+]

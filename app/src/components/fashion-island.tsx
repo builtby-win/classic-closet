@@ -1346,6 +1346,8 @@ export default function FashionIsland() {
     };
     const onStart = (event: TouchEvent) => {
       if (!phone.matches || dragGate.current.locked || event.touches.length !== 1) return;
+      // Only the grip at the top of the sheet starts the pull; list scrolling never does.
+      if (!(event.target as HTMLElement).closest('#rail-grip')) return;
       const scroller = (event.target as HTMLElement).closest('#slot-list, #drawer');
       const stage = root.querySelector<HTMLElement>('#stage');
       const touch = event.touches[0]!;
