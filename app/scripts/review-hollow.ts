@@ -84,18 +84,28 @@ const page = `<!doctype html><meta charset="utf-8"><title>Review Classic items</
 <h2>Select the items that are legit</h2><button id="save">Save to data/hollow-picks.json</button><span id="st"></span>${cards}
 <script>const C=${JSON.stringify(cands)};
 document.getElementById('save').onclick=async()=>{
- const picks=[...document.querySelectorAll('input:checked')].map(e=>C[e.dataset.i]);
- const r=await fetch('/save',{method:'POST',body:JSON.stringify({picks})});
+ const picks=[...document.querySelectorAll('input:checked')].map(e=>Number(e.dataset.i));
+ const r=await fetch('/save',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({picks})});
  document.getElementById('st').textContent=r.ok?'saved '+picks.length:'failed '+r.status};</script>`;
 
 const server = createServer((req, res) => {
   if (req.method === 'POST' && req.url === '/save') {
+    const origin = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+    if (req.headers.host !== origin.slice('http://'.length) || (req.headers.origin ?? origin) !== origin || req.headers['content-type'] !== 'application/json') {
+      res.writeHead(403).end('forbidden');
+      return;
+    }
     let data = '';
-    req.on('data', (d) => (data += d));
+    req.on('data', (d) => {
+      data += d;
+      if (data.length > 4096) req.destroy();
+    });
     req.on('end', () => {
       try {
-        const { picks } = JSON.parse(data) as { picks: Cand[] };
-        writeFileSync(OUT, `${JSON.stringify({ savedAt: new Date().toISOString(), picks }, null, 2)}\n`);
+        const { picks } = JSON.parse(data) as { picks: unknown };
+        if (!Array.isArray(picks) || !picks.every((i) => Number.isInteger(i) && i >= 0 && i < cands.length)) throw new Error('bad picks');
+        const chosen = [...new Set(picks as number[])].sort((a, b) => a - b).map((i) => cands[i]);
+        writeFileSync(OUT, `${JSON.stringify({ savedAt: new Date().toISOString(), picks: chosen }, null, 2)}\n`);
         res.writeHead(200).end('ok');
       } catch {
         res.writeHead(400).end('bad body');
@@ -104,8 +114,8 @@ const server = createServer((req, res) => {
     return;
   }
   res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }).end(page);
-}).listen(0, () => {
+}).listen(0, '127.0.0.1', () => {
   const port = (server.address() as { port: number }).port;
-  console.log(`review-hollow: http://localhost:${port}/  (${cands.length} candidates, picks -> data/hollow-picks.json)`);
-  execSync(`open http://localhost:${port}/`);
+  console.log(`review-hollow: http://127.0.0.1:${port}/  (${cands.length} candidates, picks -> data/hollow-picks.json)`);
+  execSync(`open http://127.0.0.1:${port}/`);
 });
