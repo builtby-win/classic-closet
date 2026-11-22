@@ -16,21 +16,6 @@
     { "name": "Glowing Pumpkin Basket", "id": 1702092, "src": "GMS", "note": "GMS 270 holds two cash items with this name: 1702806 is a hanging pumpkin lantern, 1702092 is the orange pumpkin basket Classic sells (icon and frames match MCW/1 1702096). Name lookup used to pick the lantern." },
     { "name": "Devil Horns", "id": 1003022, "src": "GMS", "note": "GMS 270 holds two cash hats with this name: 1003022 is the purple horns Classic sells (icon matches Nexon Oct-28 set render devil-horns-grey-skull-overall), 1006227 is the red horns not in any Classic rate table. Name lookup seeded both." }
   ],
-  "equips": [
-    {"name": "Bamboo Spear", "id": 1432009, "level": 45, "src": "GMS", "note": "Classic item missing from OSMS/CBT2. Art is GMS 270 same-name retail record, NOT verified against Classic art; level is MeowDB's Classic level (GMS retail level differs). Two same-name GMS records (1432009, 1432132) with identical data; lower id kept."},
-    {"name": "Bamboo Sword", "id": 1302022, "level": 45, "src": "GMS", "note": "Classic item missing from OSMS/CBT2. Art is GMS 270 same-name retail record, NOT verified against Classic art; level is MeowDB's Classic level (GMS retail level differs)."},
-    {"name": "Newspaper Sword", "id": 1302024, "level": 30, "src": "GMS", "note": "Classic item missing from OSMS/CBT2. Art is GMS 270 same-name retail record, NOT verified against Classic art; level is MeowDB's Classic level (GMS retail level differs)."},
-    {"name": "Frying Pan", "id": 1322027, "level": 55, "src": "GMS", "note": "Classic item missing from OSMS/CBT2. Art is GMS 270 same-name retail record, NOT verified against Classic art; level is MeowDB's Classic level (GMS retail level differs)."},
-    {"name": "Green Paint Brush", "id": 1312013, "level": 45, "src": "GMS", "note": "Classic item missing from OSMS/CBT2. Art is GMS 270 same-name retail record, NOT verified against Classic art; level is MeowDB's Classic level (GMS retail level differs)."},
-    {"name": "Black Paint Brush", "id": 1312014, "level": 55, "src": "GMS", "note": "Classic item missing from OSMS/CBT2. Art is GMS 270 same-name retail record, NOT verified against Classic art; level is MeowDB's Classic level (GMS retail level differs)."},
-    {"name": "Yellow Mop", "id": 1442021, "level": 45, "src": "GMS", "note": "Classic item missing from OSMS/CBT2. Art is GMS 270 same-name retail record, NOT verified against Classic art; level is MeowDB's Classic level (GMS retail level differs)."},
-    {"name": "White Mop", "id": 1442022, "level": 45, "src": "GMS", "note": "Classic item missing from OSMS/CBT2. Art is GMS 270 same-name retail record, NOT verified against Classic art; level is MeowDB's Classic level (GMS retail level differs)."},
-    {"name": "Beige Umbrella", "id": 1302029, "level": 45, "src": "GMS", "note": "Classic item missing from OSMS/CBT2. Art is GMS 270 same-name retail record, NOT verified against Classic art; level is MeowDB's Classic level (GMS retail level differs)."},
-    {"name": "Green Umbrella", "id": 1302027, "level": 55, "src": "GMS", "note": "Classic item missing from OSMS/CBT2. Art is GMS 270 same-name retail record, NOT verified against Classic art; level is MeowDB's Classic level (GMS retail level differs)."},
-    {"name": "Light Purple Umbrella", "id": 1302028, "level": 65, "src": "GMS", "note": "Classic item missing from OSMS/CBT2. Art is GMS 270 same-name retail record, NOT verified against Classic art; level is MeowDB's Classic level (GMS retail level differs)."},
-    {"name": "Red Umbrella", "id": 1302025, "level": 75, "src": "GMS", "note": "Classic item missing from OSMS/CBT2. Art is GMS 270 same-name retail record, NOT verified against Classic art; level is MeowDB's Classic level (GMS retail level differs)."},
-    {"name": "Black Umbrella", "id": 1302026, "level": 85, "src": "GMS", "note": "Classic item missing from OSMS/CBT2. Art is GMS 270 same-name retail record, NOT verified against Classic art; level is MeowDB's Classic level (GMS retail level differs)."}
-  ],
   "weaponFits": [
     {
       "id": 1702004,

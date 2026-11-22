@@ -23,7 +23,7 @@ import { frozenRates, parseRateTable, type RatePart } from './rate-table';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const API = 'https://maplestory.io/api/MCW/CBT2';
-const OSMS_REF = '63db09449642c4bf3414276223e4cb7d72af02d9';
+const OSMS_REF = 'a15181ca6547ba3f5e0799bcf48ed9959032c6f2';
 const OSMS_DATA = `https://raw.githubusercontent.com/ohmi69/osms_datamine_dashboard/${OSMS_REF}/data/current`;
 const CMS = 'https://g.nexonstatic.com/maplestory/cms/v1/general-posts';
 type AssetSource = 'OSMS' | 'GMS' | 'MCW' | 'MCW1';
@@ -292,7 +292,6 @@ try {
  */
 const overlay: {
   pins?: Array<{ name: string; id: number; note?: string; src?: PinSource }>;
-  equips?: Array<{ name: string; id: number; level: number; src: 'GMS'; note?: string }>;
   hide?: Array<{ id: number; note?: string; wrongIconMd5?: string }>;
 } = JSON.parse(
   readFileSync(join(ROOT, 'data', 'nexon-overlay.json'), 'utf8'),
@@ -884,28 +883,6 @@ for (const item of dump) {
   };
   fastCatalog.indexes.groups['classic-equips'][sex].push(item.id);
   fastCatalog.indexes.search.push({ id: item.id, name: item.name, sub: item.typeInfo.subCategory, sex });
-}
-
-// Classic equips absent from OSMS/CBT2, hand-listed in nexon-overlay.json -> equips.
-// Art comes from the same-name GMS record (src GMS); level is Classic's, not retail's.
-for (const entry of overlay.equips ?? []) {
-  if (fastCatalog.items[entry.id]) continue;
-  const rec = gmsById.get(entry.id);
-  if (!rec) throw new Error(`nexon-overlay equip points nowhere: ${entry.name} -> ${entry.id}`);
-  if (rec.name.toLowerCase() !== entry.name.toLowerCase()) throw new Error(`nexon-overlay equip name mismatch: ${entry.name} vs GMS ${rec.name} (${entry.id})`);
-  const sex = sexOf(rec);
-  fastCatalog.items[entry.id] = {
-    name: entry.name,
-    sub: rec.typeInfo.subCategory,
-    sex,
-    bannerId: '',
-    attainable: true,
-    group: 'classic-equips',
-    requiredLevel: entry.level,
-    src: entry.src,
-  };
-  fastCatalog.indexes.groups['classic-equips'][sex].push(entry.id);
-  fastCatalog.indexes.search.push({ id: entry.id, name: entry.name, sub: rec.typeInfo.subCategory, sex });
 }
 
 // Cash equips in the Classic data that no sale post has sold yet.
