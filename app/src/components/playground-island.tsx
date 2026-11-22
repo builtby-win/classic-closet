@@ -1542,7 +1542,7 @@ export default function PlaygroundIsland() {
 
   return (
     <div ref={rootRef} className={'mf' + (controller ? ' playing' : '')}>
-      <div id="stage" className={comparing ? 'comparing' : undefined}>
+      <div id="stage" className={[comparing && 'comparing', dyeOpen && 'dyeing'].filter(Boolean).join(' ') || undefined}>
         <div id="controls">
           <button id="avatar" onClick={() => setSettingsOpen(v => !v)} aria-label="Edit character" aria-expanded={settingsOpen} aria-controls="settings"><canvas ref={avatarRef} width={AVATAR_PX} height={AVATAR_PX} aria-hidden="true" /></button>
           <div className="controls-right">
