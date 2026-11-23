@@ -168,6 +168,7 @@ const mystery2Rates = await frozenRates(snapshotsPath, 'mystery-crate-nov4', () 
 // Nov 18 table: the current table of 46331 is now Nov 4's, so the snapshot (frozen from the pre-switch "upcoming" table) is authoritative.
 const mystery3Rates = await frozenRates(snapshotsPath, 'mystery-crate-nov18', () => rateTable(46331, 'upcoming'));
 const halloweenRates = await rateTable(46524);
+const blackFridayRates = await rateTable(48411);
 const auroraRates = await rateTable(45659);
 console.log(`rates fetched: founder=${founderRates.size} mystery=${mysteryRates.size} mystery2=${mystery2Rates.size} mystery3=${mystery3Rates.size} halloween=${halloweenRates.size} aurora=${auroraRates.size}`);
 
@@ -464,6 +465,7 @@ const fastCatalog: FastCatalog = {
       'mystery-crate-3': { m: [], f: [], u: [] },
       'halloween-crate': { m: [], f: [], u: [] },
       'aurora-crate': { m: [], f: [], u: [] },
+      'black-friday-crate': { m: [], f: [], u: [] },
       'cover-10day': { m: [], f: [], u: [] },
       'classic-equips': { m: [], f: [], u: [] },
       'unreleased': { m: [], f: [], u: [] },
@@ -752,6 +754,35 @@ for (const banner of rotations.current) {
           src,
         };
         fastCatalog.indexes.groups['mystery-crate-3'][sex].push(hit.id);
+        fastCatalog.indexes.search.push({
+          id: hit.id,
+          name: hit.name,
+          sub: hit.typeInfo.subCategory,
+          sex,
+        });
+      }
+    }
+  }
+
+  // Equips (Nov 25 Black Friday Mystery Fashion Crate, rates post 48411)
+  if (banner.id === 'black-friday-crate-nov25') {
+    for (const [name, rate] of blackFridayRates) {
+      const resolved = resolveCrateItem(name);
+      if (!resolved.length) logCrateMiss(name);
+      for (const { item: hit, src } of resolved) {
+        if (hit.typeInfo.overallCategory !== 'Equip') continue;
+        const sex = sexOf(hit);
+        fastCatalog.items[hit.id] = {
+          name: hit.name,
+          sub: hit.typeInfo.subCategory,
+          sex,
+          bannerId: banner.id,
+          attainable: true,
+          group: 'black-friday-crate',
+          rate,
+          src,
+        };
+        fastCatalog.indexes.groups['black-friday-crate'][sex].push(hit.id);
         fastCatalog.indexes.search.push({
           id: hit.id,
           name: hit.name,

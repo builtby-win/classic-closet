@@ -25,6 +25,14 @@
       "rates": "https://g.nexonstatic.com/maplestory/cms/v1/general-posts/46331"
     },
     {
+      "id": "black-friday-crate-nov25",
+      "label": "Black Friday Mystery Fashion Crate",
+      "start": "2026-11-25",
+      "end": "2026-12-02",
+      "post": "https://www.nexon.com/maplestory/news/sale/48409/classic-world-cash-shop-update-black-friday-and-nov-25",
+      "rates": "https://g.nexonstatic.com/maplestory/cms/v1/general-posts/48411"
+    },
+    {
       "id": "mystery-crate-nov18",
       "label": "Mystery Fashion Crate",
       "start": "2026-11-18",
@@ -155,6 +163,18 @@
       "note": "3,500 NX · 11× 35,000 NX · 7-day duration · starts at end of maintenance · ends Dec 2, 07:59 UTC",
       "post": "https://www.nexon.com/maplestory/news/sale/47857/classic-world-cash-shop-update-nov-18",
       "rates": "https://g.nexonstatic.com/maplestory/cms/v1/general-posts/46331"
+    },
+    {
+      "id": "black-friday-crate-nov25",
+      "type": "crate",
+      "label": "Black Friday Mystery Fashion Crate",
+      "start": "2026-11-25",
+      "end": "2026-12-02",
+      "startAt": "2026-11-25T08:00:00Z",
+      "endAt": "2026-12-02T07:59:00Z",
+      "note": "4,900 NX · 11× 49,000 NX · 7-day duration · Nov 25 08:00 – Dec 2 07:59 UTC",
+      "post": "https://www.nexon.com/maplestory/news/sale/48409/classic-world-cash-shop-update-black-friday-and-nov-25",
+      "rates": "https://g.nexonstatic.com/maplestory/cms/v1/general-posts/48411"
     },
     {
       "id": "halloween-crate-oct26",

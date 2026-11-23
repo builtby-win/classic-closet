@@ -98,6 +98,7 @@ export type SectionId =
   | 'mystery-crate'
   | 'mystery-crate-2'
   | 'mystery-crate-3'
+  | 'black-friday-crate'
   | 'halloween-crate'
   | 'aurora-crate'
   | 'cover-10day'
@@ -323,6 +324,7 @@ export const GROUP_RANK: Record<string, number> = {
   'mystery-crate': 2,
   'mystery-crate-2': 3,
   'mystery-crate-3': 4,
+  'black-friday-crate': 4,
   'cover-10day': 5,
   'aurora-crate': 6,
   'style-coupon': 7,
@@ -348,6 +350,7 @@ export const GROUP_SHORT: Record<string, string> = {
   'mystery-crate': 'Mystery',
   'mystery-crate-2': 'Mystery',
   'mystery-crate-3': 'Mystery',
+  'black-friday-crate': 'Black Friday',
   'halloween-crate': 'Halloween',
   'aurora-crate': 'Aurora',
   'style-coupon': 'Style',

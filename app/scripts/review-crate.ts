@@ -3,10 +3,11 @@
  * catalog icons each name resolved to, so a human can approve the resolution.
  *
  * Usage:
- *   pnpm review-crate <saleId> <group> [port]
+ *   pnpm review-crate <saleId> <group> [port] [stop-heading]
  *   e.g. pnpm review-crate 47031 mystery-crate-2
  *
- * Reads the sale post (CMS v1/news/<saleId>) up to its "ONGOING SALES" heading, pairs
+ * Reads the sale post (CMS v1/news/<saleId>) up to the first of "ONGOING SALES" or the optional
+ * stop-heading (use it when other sections, e.g. style coupons, follow the crate), pairs
  * every set image with the item names listed after it, and looks the names up in
  * the baked catalog group. Serves the page on localhost and opens it. Red tiles =
  * name in the post with no catalog id; a name with several tiles = several ids.
@@ -22,8 +23,8 @@ interface CatalogItem { name: string; sub: string; sex: string; src?: string }
 interface Catalog { items: Record<string, CatalogItem>; indexes: { groups: Record<string, Record<'m' | 'f' | 'u', number[]>> } }
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const [saleId, group, port = '8765'] = process.argv.slice(2);
-if (!saleId || !group) throw new Error('usage: pnpm review-crate <saleId> <group> [port]');
+const [saleId, group, port = '8765', until = 'ONGOING SALES'] = process.argv.slice(2);
+if (!saleId || !group) throw new Error('usage: pnpm review-crate <saleId> <group> [port] [stop-heading]');
 
 const catalog: Catalog = JSON.parse(readFileSync(join(ROOT, 'src', 'data', 'catalog.json'), 'utf8'));
 const groupIds = catalog.indexes.groups[group];
@@ -42,7 +43,8 @@ const esc = (s: string) => s.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 const decode = (s: string) => s.replace(/&amp;/g, '&').replace(/&#0?39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/&nbsp;/g, ' ');
 
 const post = (await fetch(`https://g.nexonstatic.com/maplestory/cms/v1/news/${saleId}`).then((r) => r.json())) as { body: string };
-const body = post.body.slice(0, post.body.indexOf('ONGOING SALES') >= 0 ? post.body.indexOf('ONGOING SALES') : undefined);
+const end = [post.body.indexOf(until), post.body.indexOf('ONGOING SALES')].filter((i) => i >= 0);
+const body = post.body.slice(0, end.length ? Math.min(...end) : undefined);
 
 // parts = [text, <img>, text, <img>, text, ...]; each set image is followed by its name list.
 const parts = body.split(/(<img[^>]*>)/);
