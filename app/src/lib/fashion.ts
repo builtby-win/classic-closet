@@ -1,5 +1,6 @@
 import catalogData from '../data/catalog.json';
 import { attainableNow, dropInfo } from './drops';
+import { clampDye, type Dye } from './dye';
 // Shared domain model for the fashion customizer.
 // Rendering is 100% remote (maplestory.io); this lib builds URLs + filters the baked catalog.
 
@@ -97,6 +98,7 @@ export type SectionId =
   | 'mystery-crate'
   | 'mystery-crate-2'
   | 'mystery-crate-3'
+  | 'black-friday-crate'
   | 'halloween-crate'
   | 'aurora-crate'
   | 'cover-10day'
@@ -322,6 +324,7 @@ export const GROUP_RANK: Record<string, number> = {
   'mystery-crate': 2,
   'mystery-crate-2': 3,
   'mystery-crate-3': 4,
+  'black-friday-crate': 4,
   'cover-10day': 5,
   'aurora-crate': 6,
   'style-coupon': 7,
@@ -347,6 +350,7 @@ export const GROUP_SHORT: Record<string, string> = {
   'mystery-crate': 'Mystery',
   'mystery-crate-2': 'Mystery',
   'mystery-crate-3': 'Mystery',
+  'black-friday-crate': 'Black Friday',
   'halloween-crate': 'Halloween',
   'aurora-crate': 'Aurora',
   'style-coupon': 'Style',
@@ -403,6 +407,8 @@ export interface Look {
   emote?: string;
   /** Render-only: which frame of a multi-frame emote to draw. Never saved or encoded. */
   emoteFrame?: number;
+  /** Mystery Palette dye per worn equipment id (hair and face use their own color variants). */
+  dyes?: Record<string, Dye>;
 }
 
 export interface Emote {
@@ -686,6 +692,24 @@ export function cleanName(raw: string): string {
   return raw.replace(/\s+/g, ' ').slice(0, NAME_MAX);
 }
 
+/** Dyes of worn equipment as `id:tone:chroma:brightness,…`; undyed and unworn items are omitted. */
+function encodeDyes(look: Look): string {
+  const worn = new Set(Object.values(look.items));
+  return Object.entries(look.dyes ?? {})
+    .filter(([id, d]) => worn.has(Number(id)) && (d.tone || d.chroma || d.brightness))
+    .map(([id, d]) => `${id}:${d.tone}:${d.chroma}:${d.brightness}`)
+    .join(',');
+}
+
+function decodeDyes(raw: string | null): Look['dyes'] | undefined {
+  const dyes: Record<string, Dye> = {};
+  for (const entry of (raw ?? '').split(',')) {
+    const [id, tone, chroma, brightness] = entry.split(':').map(Number);
+    if (id && [tone, chroma, brightness].every(Number.isFinite)) dyes[String(id)] = clampDye({ tone: tone!, chroma: chroma!, brightness: brightness! });
+  }
+  return Object.keys(dyes).length ? dyes : undefined;
+}
+
 /** Encode the look into readable query params. */
 export function encodeLook(look: Look): string {
   const params = new URLSearchParams();
@@ -698,6 +722,8 @@ export function encodeLook(look: Look): string {
   params.set('anim', look.anim);
   params.set('frame', String(look.frame));
   if (isEmote(look.emote)) params.set('emote', look.emote);
+  const dye = encodeDyes(look);
+  if (dye) params.set('dye', dye);
   if (look.wield && look.items.Weapon != null && Object.hasOwn(CATALOG.items[look.items.Weapon]?.wtypes ?? {}, look.wield)) params.set('wield', look.wield);
   for (const [slot, id] of Object.entries(look.items)) {
     params.set(slot, String(id));
@@ -737,7 +763,7 @@ export function decodeLook(input?: string): Partial<Look> | null {
       if (isEmote(emote)) partial.emote = emote;
       // Equip slots (Hat, Top, Bottom, Overall, Shoes, Weapon, …) round-trip as
       // their own params — anything else here is an equip id.
-      const KNOWN: Record<string, true> = { name: true, sex: true, skin: true, hair: true, hairCol: true, face: true, anim: true, frame: true, wield: true, emote: true, look: true };
+      const KNOWN: Record<string, true> = { name: true, sex: true, skin: true, hair: true, hairCol: true, face: true, anim: true, frame: true, wield: true, emote: true, look: true, dye: true };
       const items: Partial<Record<string, number>> = {};
       for (const [k, v] of params) {
         if (KNOWN[k]) continue;
@@ -745,6 +771,8 @@ export function decodeLook(input?: string): Partial<Look> | null {
         if (Number.isInteger(id) && id > 0) items[k] = id;
       }
       if (Object.keys(items).length) partial.items = items;
+      const dyes = decodeDyes(params.get('dye'));
+      if (dyes) partial.dyes = dyes;
       return partial;
     }
   }

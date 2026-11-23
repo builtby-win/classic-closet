@@ -1,5 +1,6 @@
 import { CLASSIC_ZMAP_ORDER, composeLayers, drawComposition, type Point, type SourceLayer } from './layered-renderer';
 import { CATALOG, weaponVariant, type Look } from './fashion';
+import { dyedSprite } from './dye';
 import { ATTACK_FRAMES } from './skills';
 
 interface BaseEffect {
@@ -262,12 +263,15 @@ export async function renderLayeredCharacter(
     for (let index = 0; index < effects.length; index++) {
       const effect = effects[index]!;
       try {
-        const image = await localImage(effect.image);
+        const source = await localImage(effect.image);
+        // Mystery Palette dye applies to worn equipment only; hair and face use color variants.
+        const dye = selection.face || selection.hair ? undefined : look.dyes?.[selection.id];
+        const image = dye ? dyedSprite(source, dye) : source;
         spriteLayers.push({
           key: `${selection.id}:${effect.position ?? 'default'}:${index}`,
           itemKey: String(selection.id), part: selection.part,
           name: effect.position ?? 'default', image,
-          width: image.naturalWidth, height: image.naturalHeight,
+          width: source.naturalWidth, height: source.naturalHeight,
           origin: effect.origin ?? { x: 0, y: 0 }, map: effectMap(effect),
           z: effect.position ?? 'body',
           islot: record.islot, vslot: record.vslot,

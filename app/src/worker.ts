@@ -1,23 +1,21 @@
-// Cloudflare Worker entrypoint for Classic Closet with Static Assets.
-// Serves static assets and rewrites OpenGraph / Twitter meta tags for
-// shared look links so LINE / iMessage / Slack unfurl the shared outfit
-// instead of the generic site card. Look parsing and region routing live
-// in lib/og.ts (shared with tests); this file only does HTML rewriting.
+// Cloudflare Worker entrypoint for Classic Closet (wrangler `main`). Wraps the
+// @astrojs/cloudflare handler, which serves the prerendered site via the
+// ASSETS binding and rewrites OpenGraph / Twitter meta tags for shared look
+// links so LINE / iMessage / Slack unfurl the shared outfit instead of the
+// generic site card. Look parsing and region routing live in lib/og.ts
+// (shared with tests); this file only does HTML rewriting.
 
+import { handle } from '@astrojs/cloudflare/handler';
 import { crawlerRenderURL, OG_SITE_URL, OG_TITLE_PREVIEW, parseLookParams } from './lib/og';
 
 declare const HTMLRewriter: any;
 
-interface Env {
-  ASSETS: {
-    fetch: (request: Request | string, init?: RequestInit) => Promise<Response>;
-  };
-}
+type Env = Parameters<typeof handle>[1];
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: Parameters<typeof handle>[2]): Promise<Response> {
     const url = new URL(request.url);
-    const response = await env.ASSETS.fetch(request);
+    const response = await handle(request, env, ctx);
     const headers = new Headers(response.headers);
     const contentType = headers.get('content-type') || '';
     if (!contentType.includes('text/html')) {

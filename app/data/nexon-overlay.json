@@ -14,9 +14,20 @@
     { "name": "Detective Hat", "id": 1007105, "src": "MCW", "note": "Same numeric id is a different retail item in GMS 270 (divergent icons); Classic art is MCW. Strict MCW bake." },
     { "name": "Race Ace Cap", "id": 1007111, "src": "MCW", "note": "Same numeric id is a different retail item in GMS 270 (divergent icons); Classic art is MCW. Strict MCW bake." },
     { "name": "Glowing Pumpkin Basket", "id": 1702092, "src": "GMS", "note": "GMS 270 holds two cash items with this name: 1702806 is a hanging pumpkin lantern, 1702092 is the orange pumpkin basket Classic sells (icon and frames match MCW/1 1702096). Name lookup used to pick the lantern." },
-    { "name": "Devil Horns", "id": 1003022, "src": "GMS", "note": "GMS 270 holds two cash hats with this name: 1003022 is the purple horns Classic sells (icon matches Nexon Oct-28 set render devil-horns-grey-skull-overall), 1006227 is the red horns not in any Classic rate table. Name lookup seeded both." }
+    { "name": "Devil Horns", "id": 1003022, "src": "GMS", "note": "GMS 270 holds two cash hats with this name: 1003022 is the purple horns Classic sells (icon matches Nexon Oct-28 set render devil-horns-grey-skull-overall), 1006227 is the red horns not in any Classic rate table. Name lookup seeded both." },
+    { "name": "Winged Cap", "id": 1002449, "src": "GMS", "note": "GMS 270 holds two same-name cash hats (1002449 and 1003918). Per user report 1002449 is the Classic one; 1003918 does not exist in Classic. Pinned so the 2.00% rate is not double-counted." },
+    { "name": "Elizabeth Hat", "id": 1001061, "src": "GMS", "note": "Black Friday crate. 1001061/1001062 are pixel-identical (lower id kept); 1006753 is a different, brown-blob sprite that does not match Nexon's Elizabeth set image. Reviewed 2026-11-22." },
+    { "name": "Red Hood Bandana", "id": 1001066, "src": "GMS", "note": "Black Friday crate. 1001066 and 1001082 have identical icons; lower id kept so the 2.00% rate is not double-counted." },
+    { "name": "Fluffy Cat Hood", "id": 1001090, "src": "GMS", "note": "Black Friday crate. 1001090 (gender 1) and 1003778 (gender 3) have identical icons; lower id kept so the 2.50% rate is not double-counted." },
+    { "name": "Lucia Hat", "id": 1003459, "src": "GMS", "note": "Black Friday crate. 1003459 and 1003536 have identical icons; lower id kept so the 2.50% rate is not double-counted." },
+    { "name": "Elizabeth Dress", "id": 1051211, "src": "GMS", "note": "Black Friday crate. 1051211 and 1051220 have identical icons; lower id kept so the 2.00% rate is not double-counted." },
+    { "name": "Little Red Riding Dress", "id": 1051253, "src": "GMS", "note": "Black Friday crate. 1051253 and 1051297 have identical icons; lower id kept so the 2.00% rate is not double-counted." },
+    { "name": "Fluffy Cat Outfit", "id": 1051345, "src": "GMS", "note": "Black Friday crate. 1051345 (gender 1) and 1052585 (gender 2) have identical icons; lower id kept so the 2.50% rate is not double-counted." },
+    { "name": "Red Ribbon Shoes", "id": 1071032, "src": "GMS", "note": "Black Friday crate. 1071032 and 1071040 have identical icons; lower id kept so the 3.00% rate is not double-counted." },
+    { "name": "Elizabeth Gloves", "id": 1081006, "src": "GMS", "note": "Black Friday crate. 1081006 and 1081007 have identical icons; lower id kept so the 2.00% rate is not double-counted." },
+    { "name": "Lucia Cape", "id": 1102373, "src": "GMS", "note": "Black Friday crate. 1102373 and 1102419 have identical icons; lower id kept so the 2.50% rate is not double-counted." },
+    { "name": "Elizabeth Fan", "id": 1702291, "src": "GMS", "note": "Black Friday crate. 1701000 and 1702291 render the same pink fan; 1702291 kept because it sits in the 1702xxx cash-weapon range like Alien Mug, Slime Stick and Strawberry Basket." }
   ],
-  "items": [],
   "weaponFits": [
     {
       "id": 1702004,

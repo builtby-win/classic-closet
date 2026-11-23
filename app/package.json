@@ -14,13 +14,16 @@
     "bake-skills": "tsx scripts/bake-skills.ts",
     "update-banners": "tsx scripts/update-banners.ts",
     "review-crate": "tsx scripts/review-crate.ts",
+    "review-hollow": "tsx scripts/review-hollow.ts",
     "check-hide": "tsx scripts/check-hide.ts",
     "check-icons": "tsx scripts/check-icons.ts",
     "check-sprites": "tsx scripts/check-sprites.ts",
-    "deploy": "pnpm build && CLOUDFLARE_ACCOUNT_ID=58df26bb8dbf15af4045df9c8f1740f1 npx wrangler deploy"
+    "deploy": "cf deploy",
+    "generate-types": "wrangler types"
   },
   "dependencies": {
-    "astro": "^7.3.1",
+    "@astrojs/cloudflare": "^14.4.4",
+    "astro": "^7.4.0",
     "embla-carousel-react": "^8.6.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
@@ -28,11 +31,14 @@
   "devDependencies": {
     "@astrojs/check": "^0.9.9",
     "@astrojs/react": "^6.0.5",
+    "@emnapi/core": "1.11.3",
+    "@emnapi/runtime": "1.11.3",
     "@types/node": "^26.6.4",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
+    "cf": "1.0.0-beta.27",
     "tsx": "^4.19.0",
     "typescript": "^5.8.0",
-    "wrangler": "4.148.0"
+    "wrangler": "4.157.0"
   }
 }
