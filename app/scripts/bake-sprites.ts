@@ -338,12 +338,12 @@ async function main() {
   }
 
   console.log('--- Baking Face Color Variants ---');
-  const faceJobs = new Map<number, { src?: 'GMS' | 'OSMS' | 'MCW1' }>();
+  const faceJobs = new Map<number, { src?: 'GMS' | 'OSMS' | 'MCW1'; sub: 'Face' }>();
   for (const [id, meta] of Object.entries<any>(catalog.items)) {
     if (meta.sub !== 'Face') continue;
     const sex = Number(id) >= 21000 ? 'f' : 'm';
     for (let color = 0; color < EYE_COLORS.length; color++) {
-      faceJobs.set(faceVariantId(sex, Number(id) % 100, color), { src: meta.src });
+      faceJobs.set(faceVariantId(sex, Number(id) % 100, color), { src: meta.src, sub: 'Face' });
     }
   }
   // Unreleased families may lack art in every dataset: warn-only, pruned below.
