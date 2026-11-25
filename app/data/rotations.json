@@ -76,47 +76,176 @@
       "start": "2026-10-06",
       "end": null,
       "post": "https://www.nexon.com/maplestory/news/sale/47857/classic-world-cash-shop-update-nov-18"
+    },
+    {
+      "id": "style-nov25",
+      "label": "Mystery Style Coupons",
+      "start": "2026-11-25",
+      "end": "2026-12-09",
+      "post": "https://www.nexon.com/maplestory/news/sale/48409/classic-world-cash-shop-update-black-friday-and-nov-25",
+      "rates": "https://g.nexonstatic.com/maplestory/cms/v1/general-posts/45537"
     }
   ],
   "current": [
     {
-      "id": "style-nov11",
+      "id": "style-nov25",
       "type": "style-coupon",
       "label": "Mystery Style Coupons",
-      "start": "2026-11-11",
-      "end": "2026-11-25",
-      "startAt": "2026-11-11T08:00:00Z",
-      "endAt": "2026-11-25T07:59:00Z",
-      "note": "Mystery Hair 5,500 NX · Mystery Face 3,500 NX · 14-day styles",
-      "post": "https://www.nexon.com/maplestory/news/sale/47069/classic-world-cash-shop-update-nov-11",
+      "start": "2026-11-25",
+      "end": "2026-12-09",
+      "startAt": "2026-11-25T08:00:00Z",
+      "note": "Mystery Hair 5,500 NX · Mystery Face 3,500 NX · 14-day styles · ends at Dec 9 maintenance",
+      "post": "https://www.nexon.com/maplestory/news/sale/48409/classic-world-cash-shop-update-black-friday-and-nov-25",
       "rates": "https://g.nexonstatic.com/maplestory/cms/v1/general-posts/45537",
       "hairs": [
-        { "name": "Artist Hair", "sex": "m", "rate": "16.67%", "style": 3089, "src": "MCW1" },
-        { "name": "Sweet Kitty Hair", "sex": "m", "rate": "16.67%", "style": 3090, "src": "MCW1" },
-        { "name": "Slick Dean", "sex": "m", "rate": "16.67%", "style": 3047 },
-        { "name": "Babby Cut", "sex": "m", "rate": "16.67%", "style": 3048 },
-        { "name": "Romance", "sex": "m", "rate": "16.67%", "style": 3030 },
-        { "name": "Cabana Boy Hair", "sex": "m", "rate": "16.67%", "style": 3033 },
-        { "name": "Side Ponytail", "sex": "f", "rate": "16.67%", "style": 3186, "src": "MCW1" },
-        { "name": "Kitty Hair", "sex": "f", "rate": "16.67%", "style": 3187, "src": "MCW1" },
-        { "name": "Curly Stream Hair", "sex": "f", "rate": "16.67%", "style": 3152 },
-        { "name": "Princess Warrior", "sex": "f", "rate": "16.67%", "style": 3171 },
-        { "name": "Dashing Damsel", "sex": "f", "rate": "16.67%", "style": 3165 },
-        { "name": "Carla", "sex": "f", "rate": "16.67%", "style": 3131 }
+        {
+          "name": "Sweet Flip Hair",
+          "sex": "m",
+          "rate": "16.67%",
+          "style": 3039
+        },
+        {
+          "name": "Cute Boy Hair",
+          "sex": "m",
+          "rate": "16.67%",
+          "style": 3050
+        },
+        {
+          "name": "Tornade Hair",
+          "sex": "m",
+          "rate": "16.67%",
+          "style": 3046
+        },
+        {
+          "name": "Messy Spikes",
+          "sex": "m",
+          "rate": "16.67%",
+          "style": 3049
+        },
+        {
+          "name": "Metro",
+          "sex": "m",
+          "rate": "16.67%",
+          "style": 3005
+        },
+        {
+          "name": "Fury",
+          "sex": "m",
+          "rate": "16.67%",
+          "style": 3044
+        },
+        {
+          "name": "Wavy Pigtails Hair",
+          "sex": "f",
+          "rate": "16.67%",
+          "style": 3139
+        },
+        {
+          "name": "Aria Hair",
+          "sex": "f",
+          "rate": "16.67%",
+          "style": 3137
+        },
+        {
+          "name": "Darling Diva",
+          "sex": "f",
+          "rate": "16.67%",
+          "style": 3161
+        },
+        {
+          "name": "Swooshy Ponytail Hair",
+          "sex": "f",
+          "rate": "16.67%",
+          "style": 3136
+        },
+        {
+          "name": "Monica Hair",
+          "sex": "f",
+          "rate": "16.67%",
+          "style": 3111
+        },
+        {
+          "name": "Fluffy Dolly Hair",
+          "sex": "f",
+          "rate": "16.67%",
+          "style": 3145
+        }
       ],
       "faces": [
-        { "name": "Round-Eyed Face", "sex": "m", "rate": "16.67%", "id": 20030, "src": "MCW1" },
-        { "name": "Mysterious Face", "sex": "m", "rate": "16.67%", "id": 20031, "src": "MCW1" },
-        { "name": "Confused Look", "sex": "m", "rate": "16.67%", "id": 20032, "src": "MCW1" },
-        { "name": "Oliver Face", "sex": "m", "rate": "16.67%", "id": 20033, "src": "MCW1" },
-        { "name": "Almond Face", "sex": "m", "rate": "16.67%", "id": 20034, "src": "MCW1" },
-        { "name": "Moonlight Eyes", "sex": "m", "rate": "16.67%", "id": 20035, "src": "MCW1" },
-        { "name": "Intelligent Eyes", "sex": "f", "rate": "16.67%", "id": 21034, "src": "MCW1" },
-        { "name": "Odd Eye", "sex": "f", "rate": "16.67%", "id": 21035, "src": "MCW1" },
-        { "name": "Confused Look", "sex": "f", "rate": "16.67%", "id": 21036, "src": "MCW1" },
-        { "name": "Olivia Face", "sex": "f", "rate": "16.67%", "id": 21037, "src": "MCW1" },
-        { "name": "Soul's Window", "sex": "f", "rate": "16.67%", "id": 21012 },
-        { "name": "Angel Glow", "sex": "f", "rate": "16.67%", "id": 21004 }
+        {
+          "name": "Noblesse Face",
+          "sex": "m",
+          "rate": "16.67%",
+          "id": 20040
+        },
+        {
+          "name": "Sulky Look",
+          "sex": "m",
+          "rate": "16.67%",
+          "id": 20039,
+          "unverified": true,
+          "unverifiedNote": "Male Sulky Look (20039) has no art in any sprite dataset yet; add it when a source ships it."
+        },
+        {
+          "name": "Piercing Gaze",
+          "sex": "m",
+          "rate": "16.67%",
+          "id": 20036
+        },
+        {
+          "name": "Glamor Look",
+          "sex": "m",
+          "rate": "16.67%",
+          "id": 20037
+        },
+        {
+          "name": "Intelligent Eyes",
+          "sex": "m",
+          "rate": "16.67%",
+          "id": 20038
+        },
+        {
+          "name": "Edge of Emotion",
+          "sex": "m",
+          "rate": "16.67%",
+          "id": 20025
+        },
+        {
+          "name": "Noblesse Face",
+          "sex": "f",
+          "rate": "16.67%",
+          "id": 21040
+        },
+        {
+          "name": "Timid Face",
+          "sex": "f",
+          "rate": "16.67%",
+          "id": 21038
+        },
+        {
+          "name": "Pucker Up Face",
+          "sex": "f",
+          "rate": "16.67%",
+          "id": 21006
+        },
+        {
+          "name": "Arrogant Face",
+          "sex": "f",
+          "rate": "16.67%",
+          "id": 21039
+        },
+        {
+          "name": "Wisdom Glance",
+          "sex": "f",
+          "rate": "16.67%",
+          "id": 21010
+        },
+        {
+          "name": "Hypnotized Look",
+          "sex": "f",
+          "rate": "16.67%",
+          "id": 21011
+        }
       ]
     },
     {
@@ -208,6 +337,180 @@
     }
   ],
   "past": [
+    {
+      "id": "style-nov11",
+      "type": "style-coupon",
+      "label": "Mystery Style Coupons",
+      "start": "2026-11-11",
+      "end": "2026-11-25",
+      "startAt": "2026-11-11T08:00:00Z",
+      "endAt": "2026-11-25T07:59:00Z",
+      "note": "Mystery Hair 5,500 NX · Mystery Face 3,500 NX · 14-day styles",
+      "post": "https://www.nexon.com/maplestory/news/sale/47069/classic-world-cash-shop-update-nov-11",
+      "rates": "https://g.nexonstatic.com/maplestory/cms/v1/general-posts/45537",
+      "hairs": [
+        {
+          "name": "Artist Hair",
+          "sex": "m",
+          "rate": "16.67%",
+          "style": 3089,
+          "src": "MCW1"
+        },
+        {
+          "name": "Sweet Kitty Hair",
+          "sex": "m",
+          "rate": "16.67%",
+          "style": 3090,
+          "src": "MCW1"
+        },
+        {
+          "name": "Slick Dean",
+          "sex": "m",
+          "rate": "16.67%",
+          "style": 3047
+        },
+        {
+          "name": "Babby Cut",
+          "sex": "m",
+          "rate": "16.67%",
+          "style": 3048
+        },
+        {
+          "name": "Romance",
+          "sex": "m",
+          "rate": "16.67%",
+          "style": 3030
+        },
+        {
+          "name": "Cabana Boy Hair",
+          "sex": "m",
+          "rate": "16.67%",
+          "style": 3033
+        },
+        {
+          "name": "Side Ponytail",
+          "sex": "f",
+          "rate": "16.67%",
+          "style": 3186,
+          "src": "MCW1"
+        },
+        {
+          "name": "Kitty Hair",
+          "sex": "f",
+          "rate": "16.67%",
+          "style": 3187,
+          "src": "MCW1"
+        },
+        {
+          "name": "Curly Stream Hair",
+          "sex": "f",
+          "rate": "16.67%",
+          "style": 3152
+        },
+        {
+          "name": "Princess Warrior",
+          "sex": "f",
+          "rate": "16.67%",
+          "style": 3171
+        },
+        {
+          "name": "Dashing Damsel",
+          "sex": "f",
+          "rate": "16.67%",
+          "style": 3165
+        },
+        {
+          "name": "Carla",
+          "sex": "f",
+          "rate": "16.67%",
+          "style": 3131
+        }
+      ],
+      "faces": [
+        {
+          "name": "Round-Eyed Face",
+          "sex": "m",
+          "rate": "16.67%",
+          "id": 20030,
+          "src": "MCW1"
+        },
+        {
+          "name": "Mysterious Face",
+          "sex": "m",
+          "rate": "16.67%",
+          "id": 20031,
+          "src": "MCW1"
+        },
+        {
+          "name": "Confused Look",
+          "sex": "m",
+          "rate": "16.67%",
+          "id": 20032,
+          "src": "MCW1"
+        },
+        {
+          "name": "Oliver Face",
+          "sex": "m",
+          "rate": "16.67%",
+          "id": 20033,
+          "src": "MCW1"
+        },
+        {
+          "name": "Almond Face",
+          "sex": "m",
+          "rate": "16.67%",
+          "id": 20034,
+          "src": "MCW1"
+        },
+        {
+          "name": "Moonlight Eyes",
+          "sex": "m",
+          "rate": "16.67%",
+          "id": 20035,
+          "src": "MCW1"
+        },
+        {
+          "name": "Intelligent Eyes",
+          "sex": "f",
+          "rate": "16.67%",
+          "id": 21034,
+          "src": "MCW1"
+        },
+        {
+          "name": "Odd Eye",
+          "sex": "f",
+          "rate": "16.67%",
+          "id": 21035,
+          "src": "MCW1"
+        },
+        {
+          "name": "Confused Look",
+          "sex": "f",
+          "rate": "16.67%",
+          "id": 21036,
+          "src": "MCW1"
+        },
+        {
+          "name": "Olivia Face",
+          "sex": "f",
+          "rate": "16.67%",
+          "id": 21037,
+          "src": "MCW1"
+        },
+        {
+          "name": "Soul's Window",
+          "sex": "f",
+          "rate": "16.67%",
+          "id": 21012
+        },
+        {
+          "name": "Angel Glow",
+          "sex": "f",
+          "rate": "16.67%",
+          "id": 21004
+        }
+      ]
+    },
     {
       "id": "style-oct28",
       "type": "style-coupon",
