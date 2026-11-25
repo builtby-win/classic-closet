@@ -102,13 +102,15 @@
           "name": "Sweet Flip Hair",
           "sex": "m",
           "rate": "16.67%",
-          "style": 3039
+          "style": 3328,
+          "src": "GMS"
         },
         {
           "name": "Cute Boy Hair",
           "sex": "m",
           "rate": "16.67%",
-          "style": 3050
+          "style": 3355,
+          "src": "GMS"
         },
         {
           "name": "Tornade Hair",
@@ -138,13 +140,15 @@
           "name": "Wavy Pigtails Hair",
           "sex": "f",
           "rate": "16.67%",
-          "style": 3139
+          "style": 3487,
+          "src": "GMS"
         },
         {
           "name": "Aria Hair",
           "sex": "f",
           "rate": "16.67%",
-          "style": 3137
+          "style": 3477,
+          "src": "GMS"
         },
         {
           "name": "Darling Diva",
