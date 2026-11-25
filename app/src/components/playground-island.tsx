@@ -960,14 +960,19 @@ export default function PlaygroundIsland() {
       });
     }
 
-    // 3. Style Coupons
-    const sc = CATALOG.banners['style-oct28'];
-    if (sc) {
-      const days = getDays(sc.end);
+    // 3. Style rotations: every style banner (active, upcoming, past), newest first, each with its own styles.
+    const styleBannerIds = Object.keys(CATALOG.banners)
+      .filter((id) => /^(beta-)?style-/.test(id))
+      .sort((a, b) => (CATALOG.banners[b]!.start ?? '').localeCompare(CATALOG.banners[a]!.start ?? ''));
+    const styleHairs = [...new Set([...mysteryHairs, ...signatureHairs, ...pastHairStyles])];
+    const styleFaces = [...new Set([...mysteryFaces, ...signatureFaces, ...pastFaces])];
+    for (const styleId of styleBannerIds) {
+      const sc = CATALOG.banners[styleId]!;
+      const phase = bannerPhase(sc);
       const items: Array<{ id: number; name: string; sub: string; rate?: string; isHair?: boolean; sex?: 'm' | 'f' | 'u'; sexMismatch?: number }> = [];
-      for (const hId of [...mysteryHairs, ...signatureHairs]) {
+      for (const hId of styleHairs) {
         const meta = getStyle(CATALOG, hId);
-        if (meta) items.push({
+        if (meta?.bannerId === sc.id) items.push({
           id: hId,
           name: meta.name,
           sub: 'Hair',
@@ -977,9 +982,9 @@ export default function PlaygroundIsland() {
           sexMismatch: meta.sex !== look.sex ? 1 : 0,
         });
       }
-      for (const fId of [...mysteryFaces, ...signatureFaces]) {
+      for (const fId of styleFaces) {
         const meta = getItem(CATALOG, fId);
-        if (meta) items.push({
+        if (meta?.bannerId === sc.id) items.push({
           id: fId,
           name: meta.name,
           sub: 'Face',
@@ -988,19 +993,20 @@ export default function PlaygroundIsland() {
           sexMismatch: meta.sex && meta.sex !== 'u' && meta.sex !== look.sex ? 1 : 0,
         });
       }
+      if (!items.length) continue;
       items.sort((a, b) => (a.sexMismatch ?? 0) - (b.sexMismatch ?? 0));
       list.push({
         id: sc.id,
         label: sc.label,
         type: 'style-coupon',
-        typeLabel: 'Style Coupon',
+        typeLabel: phase.isActive || phase.isUpcoming ? 'Style Coupon' : 'Past Rotation',
         start: sc.start,
         end: sc.end,
         note: sc.note,
         post: sc.post,
         rates: sc.rates,
-        daysLeft: days,
-        ...bannerPhase(sc),
+        daysLeft: phase.isActive ? getDays(sc.end) : -1,
+        ...phase,
         items,
       });
     }
@@ -1044,49 +1050,6 @@ export default function PlaygroundIsland() {
       });
     }
 
-    // 6. Past Style Rotations (newest first)
-    for (const pastId of ['style-oct26', 'beta-style-sep26']) {
-      const beta = CATALOG.banners[pastId];
-      if (!beta) continue;
-      const phase = bannerPhase(beta);
-      const items: Array<{ id: number; name: string; sub: string; rate?: string; isHair?: boolean; sex?: 'm' | 'f' | 'u'; sexMismatch?: number }> = [];
-      for (const hId of pastHairStyles) {
-        const meta = getStyle(CATALOG, hId);
-        if (meta?.bannerId === beta.id) items.push({
-          id: hId,
-          name: meta.name,
-          sub: 'Hair',
-          rate: meta.rate,
-          isHair: true,
-          sex: meta.sex,
-          sexMismatch: meta.sex !== look.sex ? 1 : 0,
-        });
-      }
-      for (const fId of pastFaces) {
-        const meta = getItem(CATALOG, fId);
-        if (meta?.bannerId === beta.id) items.push({
-          id: fId,
-          name: meta.name,
-          sub: 'Face',
-          rate: meta.rate,
-          sex: meta.sex,
-          sexMismatch: meta.sex && meta.sex !== 'u' && meta.sex !== look.sex ? 1 : 0,
-        });
-      }
-      items.sort((a, b) => (a.sexMismatch ?? 0) - (b.sexMismatch ?? 0));
-      list.push({
-        id: beta.id,
-        label: beta.label,
-        type: 'style-coupon',
-        typeLabel: phase.isActive ? 'Style Coupon' : 'Past Rotation',
-        start: beta.start,
-        end: beta.end,
-        note: beta.note,
-        daysLeft: phase.isActive ? daysUntil(beta.end!) : -1,
-        ...phase,
-        items,
-      });
-    }
 
     const phaseRank = (c: { isActive: boolean; isUpcoming?: boolean }) => (c.isActive ? 0 : c.isUpcoming ? 1 : 2);
     return list.sort((a, b) => {
