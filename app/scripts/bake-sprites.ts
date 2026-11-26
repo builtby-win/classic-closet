@@ -14,9 +14,12 @@ import { EMOTES, EYE_COLORS, faceVariantId } from '../src/lib/fashion';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const catalogPath = join(ROOT, 'src', 'data', 'catalog.json');
 const catalog = JSON.parse(readFileSync(catalogPath, 'utf8'));
-const overlay: { weaponFits?: Array<{ id: number; types: string[] }> } = JSON.parse(readFileSync(join(ROOT, 'data', 'nexon-overlay.json'), 'utf8'));
+const overlay: { weaponFits?: Array<{ id: number; types: string[] }>; artAliases?: Array<{ id: number; artId: number; src: 'GMS' | 'MCW' | 'MCW1'; note?: string }> } = JSON.parse(readFileSync(join(ROOT, 'data', 'nexon-overlay.json'), 'utf8'));
 /** Weapon types Nexon says a cash skin fits, for skins whose dataset ships fewer frame books. */
 const weaponFits = new Map((overlay.weaponFits ?? []).map((fit) => [fit.id, fit]));
+
+/** Items whose Classic art is in no dataset at their own id but verified identical under another region's id. */
+const artAliases = new Map((overlay.artAliases ?? []).map((alias) => [alias.id, alias]));
 
 const ITEMS_DIR = join(ROOT, 'public', 'sprites', 'items');
 const FACES_DIR = join(ROOT, 'public', 'sprites', 'faces');
@@ -61,6 +64,11 @@ function sourceBase(src?: 'GMS' | 'OSMS' | 'MCW' | 'MCW1', sub?: string): string
 
 async function fetchItemData(id: number, src?: 'GMS' | 'OSMS' | 'MCW' | 'MCW1', sub?: string, tries = 3): Promise<any | null> {
   // Transient flakes retry here, then throw loud instead of baking wrong art.
+  const alias = artAliases.get(id);
+  if (alias) {
+    id = alias.artId;
+    src = alias.src;
+  }
   const base = sourceBase(src, sub);
   for (let attempt = 1; attempt <= tries; attempt++) {
     try {
@@ -338,12 +346,12 @@ async function main() {
   }
 
   console.log('--- Baking Face Color Variants ---');
-  const faceJobs = new Map<number, { src?: 'GMS' | 'OSMS' | 'MCW1' }>();
+  const faceJobs = new Map<number, { src?: 'GMS' | 'OSMS' | 'MCW1'; sub: 'Face' }>();
   for (const [id, meta] of Object.entries<any>(catalog.items)) {
     if (meta.sub !== 'Face') continue;
     const sex = Number(id) >= 21000 ? 'f' : 'm';
     for (let color = 0; color < EYE_COLORS.length; color++) {
-      faceJobs.set(faceVariantId(sex, Number(id) % 100, color), { src: meta.src });
+      faceJobs.set(faceVariantId(sex, Number(id) % 100, color), { src: meta.src, sub: 'Face' });
     }
   }
   // Unreleased families may lack art in every dataset: warn-only, pruned below.

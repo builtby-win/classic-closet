@@ -28,6 +28,14 @@
     { "name": "Lucia Cape", "id": 1102373, "src": "GMS", "note": "Black Friday crate. 1102373 and 1102419 have identical icons; lower id kept so the 2.50% rate is not double-counted." },
     { "name": "Elizabeth Fan", "id": 1702291, "src": "GMS", "note": "Black Friday crate. 1701000 and 1702291 render the same pink fan; 1702291 kept because it sits in the 1702xxx cash-weapon range like Alien Mug, Slime Stick and Strawberry Basket." }
   ],
+  "artAliases": [
+    {
+      "id": 1452013,
+      "artId": 1452018,
+      "src": "GMS",
+      "note": "Magical Destruction Bow: Classic id 1452013 has no MCW art and is a different bow (Fire Arund) in GMS 270. GMS 1452018 (Bow of Magical Destruction) has a pixel-identical icon to the Nexon item icon (verified 2026-11-25)."
+    }
+  ],
   "weaponFits": [
     {
       "id": 1702004,
