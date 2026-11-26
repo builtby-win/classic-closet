@@ -120,6 +120,7 @@ export interface ItemMeta {
   history?: string[];
   coupon?: 'mystery' | 'signature';
   unverified?: boolean;
+  art?: { id: number; region: string; version: string };
 }
 
 export interface SearchEntry {
@@ -294,6 +295,7 @@ try {
 const overlay: {
   pins?: Array<{ name: string; id: number; note?: string; src?: PinSource }>;
   hide?: Array<{ id: number; note?: string; wrongIconMd5?: string }>;
+  artAliases?: Array<{ id: number; artId: number; src: 'GMS' | 'MCW' | 'MCW1'; note?: string }>;
 } = JSON.parse(
   readFileSync(join(ROOT, 'data', 'nexon-overlay.json'), 'utf8'),
 );
@@ -1107,6 +1109,13 @@ for (const grp of Object.values(fastCatalog.indexes.groups)) {
 fastCatalog.indexes.search.sort((a, b) => a.name.localeCompare(b.name));
 
 await assertNoAmbiguousNames();
+
+// Verified art aliases (see bake-sprites): the client's icon/render URLs use the alias id and region.
+for (const alias of overlay.artAliases ?? []) {
+  const item = fastCatalog.items[alias.id];
+  if (!item) throw new Error(`artAlias ${alias.id} is not in the catalog`);
+  item.art = alias.src === 'MCW1' ? { id: alias.artId, region: 'MCW', version: '1' } : alias.src === 'GMS' ? { id: alias.artId, region: 'GMS', version: '270' } : { id: alias.artId, region: 'MCW', version: 'CBT2' };
+}
 
 const out = join(ROOT, 'src', 'data', 'catalog.json');
 writeFileSync(out, JSON.stringify(fastCatalog));

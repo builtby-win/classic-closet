@@ -48,6 +48,8 @@ export interface ItemMeta {
   /** Cash weapon skins that ship frames for a single weapon family only
    *  (Plastic Slingshot → Bow, Toy Rifle → Crossbow); baked by bake-sprites. */
   wsub?: string;
+  /** Verified art lives under another id/region (artAliases in nexon-overlay.json). */
+  art?: { id: number; region: string; version: string };
   /** Cash weapon skins that ship different art per wieldable weapon type: sub → variant file code
    *  (`/sprites/items/<id>.w<code>.json`; 0 = the skin's base art). Only set when there are 2+ types. */
   wtypes?: Record<string, number>;
@@ -597,23 +599,21 @@ export function defaultFaceForSex(sex: Sex, eyeColor = 0): number {
 }
 
 /** Resolve each asset independently; same-number equips are not interchangeable. */
-export function assetSource(itemId: number): { region: string; version: string } {
+export function assetSource(itemId: number): { itemId: number; region: string; version: string } {
   const meta = getItem(CATALOG, itemId);
+  if (meta?.art) return { itemId: meta.art.id, region: meta.art.region, version: meta.art.version };
   const isGmsCosmetic = meta?.src === 'GMS'
     || (meta?.src === 'OSMS' && (meta.sub === 'Hair' || meta.sub === 'Face'));
-  if (meta?.src === 'MCW1') return { region: 'MCW', version: '1' };
+  if (meta?.src === 'MCW1') return { itemId, region: 'MCW', version: '1' };
   return isGmsCosmetic
-    ? { region: 'GMS', version: '270' }
-    : { region: REGION, version: VERSION };
+    ? { itemId, region: 'GMS', version: '270' }
+    : { itemId, region: REGION, version: VERSION };
 }
 
 export function renderURL(look: Look): string {
   // The Avatar endpoint requires both body and head, unlike the legacy Character endpoint.
   const ids = [look.skin, look.skin + 10000, look.face, look.hair, ...Object.values(look.items)];
-  const entries = ids.filter((id): id is number => id != null).map(itemId => ({
-    itemId,
-    ...assetSource(itemId),
-  }));
+  const entries = ids.filter((id): id is number => id != null).map(id => assetSource(id));
   const items = encodeURIComponent(entries.map(entry => JSON.stringify(entry)).join(','));
   return `https://maplestory.io/api/character/${items}/${encodeURIComponent(look.anim)}/${look.frame}?showears=false&showLefEars=false&showHighLefEars=false&resize=1&flipX=false&renderMode=0&padX=30&padY=50`;
 }
@@ -625,8 +625,8 @@ export function iconURL(itemId: number): string {
     const faceBase = itemId >= 21000 ? 21000 : 20000;
     return `/sprites/faces/${faceBase + faceStyleId(itemId)}.png`;
   }
-  const { region, version } = assetSource(itemId);
-  return `https://maplestory.io/api/${region}/${version}/item/${itemId}/icon`;
+  const art = assetSource(itemId);
+  return `https://maplestory.io/api/${art.region}/${art.version}/item/${art.itemId}/icon`;
 }
 
 const ICON_SOURCES = ['MCW/CBT2', 'GMS/270', 'GMS/255'];
