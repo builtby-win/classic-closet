@@ -32,7 +32,8 @@ test('Classic non-NX equips are indexed, searchable, and rendered from MCW', () 
     assert.equal(item.group, 'classic-equips');
     assert.ok(id >= 1000000);
     assert.ok(catalog.indexes.search.some(entry => entry.id === id));
-    assert.ok(iconURL(id).includes('/MCW/CBT2/'));
+    const art = (item as { art?: { id: number; region: string; version: string } }).art;
+    assert.ok(iconURL(id).includes(art ? `/${art.region}/${art.version}/item/${art.id}/` : '/MCW/CBT2/'));
   }
 });
 
